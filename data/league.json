@@ -1,0 +1,871 @@
+{
+  "num_rounds": 5,
+  "results": [
+    {
+      "challenge_url": "https://www.geoguessr.com/challenge/hvirdvBZjpXRM7qP",
+      "scores": [
+        {
+          "player": {
+            "name": "Bosnia & GetsTheGoldSweena",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 2283,
+              "distance_km": 9746.447505562503
+            },
+            {
+              "score": 2843,
+              "distance_km": 14319.743727962234
+            },
+            {
+              "score": 3413,
+              "distance_km": 7651.601992745298
+            },
+            {
+              "score": 209,
+              "distance_km": 4357.367668010564
+            },
+            {
+              "score": 2482,
+              "distance_km": 7180.160168867235
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Grand Duchy of Gregdova",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 4158,
+              "distance_km": 3180.892631114738
+            },
+            {
+              "score": 693,
+              "distance_km": 5216.283679795993
+            },
+            {
+              "score": 875,
+              "distance_km": 17572.97440609426
+            },
+            {
+              "score": 1655,
+              "distance_km": 11849.668197644804
+            },
+            {
+              "score": 1664,
+              "distance_km": 14499.952961049477
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ppl's Rep. Glorious Mickistan",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3609,
+              "distance_km": 384.0305236880814
+            },
+            {
+              "score": 2783,
+              "distance_km": 4460.804982333326
+            },
+            {
+              "score": 4855,
+              "distance_km": 3065.3740405704966
+            },
+            {
+              "score": 638,
+              "distance_km": 9040.104066497279
+            },
+            {
+              "score": 1864,
+              "distance_km": 11571.495596783994
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Danminican Republic",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 2872,
+              "distance_km": 6014.1127540957905
+            },
+            {
+              "score": 4806,
+              "distance_km": 17760.253772715572
+            },
+            {
+              "score": 3055,
+              "distance_km": 14819.852499457804
+            },
+            {
+              "score": 3196,
+              "distance_km": 17934.973283922405
+            },
+            {
+              "score": 773,
+              "distance_km": 18768.990259377086
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "St. Bics & Devitts",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 4947,
+              "distance_km": 1173.9945990904887
+            },
+            {
+              "score": 2656,
+              "distance_km": 9686.659992149938
+            },
+            {
+              "score": 2087,
+              "distance_km": 16668.989365125257
+            },
+            {
+              "score": 2050,
+              "distance_km": 14239.776898122762
+            },
+            {
+              "score": 3579,
+              "distance_km": 14929.297479026814
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ellitorial Guinea",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 4502,
+              "distance_km": 10363.663681696498
+            },
+            {
+              "score": 3662,
+              "distance_km": 954.991554656277
+            },
+            {
+              "score": 1578,
+              "distance_km": 14832.509049610402
+            },
+            {
+              "score": 1333,
+              "distance_km": 15724.172989516937
+            },
+            {
+              "score": 424,
+              "distance_km": 17786.855593192555
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "challenge_url": "https://www.geoguessr.com/challenge/hvirdvBZjpXRM7qP",
+      "scores": [
+        {
+          "player": {
+            "name": "Bosnia & GetsTheGoldSweena",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3237,
+              "distance_km": 610.6384633093098
+            },
+            {
+              "score": 2702,
+              "distance_km": 14527.90027881537
+            },
+            {
+              "score": 1603,
+              "distance_km": 10174.918276840914
+            },
+            {
+              "score": 2366,
+              "distance_km": 13842.495535160224
+            },
+            {
+              "score": 2729,
+              "distance_km": 10670.678293450948
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Grand Duchy of Gregdova",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 637,
+              "distance_km": 5255.096477846073
+            },
+            {
+              "score": 2403,
+              "distance_km": 9428.391069493138
+            },
+            {
+              "score": 2535,
+              "distance_km": 19758.622716310278
+            },
+            {
+              "score": 4012,
+              "distance_km": 18705.504973910876
+            },
+            {
+              "score": 1423,
+              "distance_km": 4784.7338859163565
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ppl's Rep. Glorious Mickistan",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3850,
+              "distance_km": 6592.28048048395
+            },
+            {
+              "score": 63,
+              "distance_km": 12261.35964674674
+            },
+            {
+              "score": 930,
+              "distance_km": 7756.01094873615
+            },
+            {
+              "score": 3512,
+              "distance_km": 4446.566885372434
+            },
+            {
+              "score": 2370,
+              "distance_km": 11498.790368856611
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Danminican Republic",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3681,
+              "distance_km": 6070.896192001154
+            },
+            {
+              "score": 2492,
+              "distance_km": 7117.395286365595
+            },
+            {
+              "score": 582,
+              "distance_km": 9252.737779055224
+            },
+            {
+              "score": 4873,
+              "distance_km": 4280.903301216774
+            },
+            {
+              "score": 4599,
+              "distance_km": 660.9766874550105
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "St. Bics & Devitts",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 2970,
+              "distance_km": 2201.3061319801363
+            },
+            {
+              "score": 3511,
+              "distance_km": 3049.184934017528
+            },
+            {
+              "score": 1943,
+              "distance_km": 3959.8221149598967
+            },
+            {
+              "score": 819,
+              "distance_km": 15833.03636317079
+            },
+            {
+              "score": 1678,
+              "distance_km": 2440.3350813614975
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ellitorial Guinea",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 2833,
+              "distance_km": 8059.747457093936
+            },
+            {
+              "score": 2985,
+              "distance_km": 9437.861586696405
+            },
+            {
+              "score": 4432,
+              "distance_km": 5877.927728578731
+            },
+            {
+              "score": 179,
+              "distance_km": 5715.203193658893
+            },
+            {
+              "score": 2925,
+              "distance_km": 10676.121808013695
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "challenge_url": "https://www.geoguessr.com/challenge/hvirdvBZjpXRM7qP",
+      "scores": [
+        {
+          "player": {
+            "name": "Bosnia & GetsTheGoldSweena",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 2270,
+              "distance_km": 16776.148860074896
+            },
+            {
+              "score": 4682,
+              "distance_km": 2176.1428713185114
+            },
+            {
+              "score": 2322,
+              "distance_km": 4045.382793479266
+            },
+            {
+              "score": 4432,
+              "distance_km": 7348.917379228687
+            },
+            {
+              "score": 4645,
+              "distance_km": 15687.143523773719
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Grand Duchy of Gregdova",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 2130,
+              "distance_km": 13987.070016943353
+            },
+            {
+              "score": 2584,
+              "distance_km": 15181.38580107434
+            },
+            {
+              "score": 1750,
+              "distance_km": 14757.042871215599
+            },
+            {
+              "score": 4963,
+              "distance_km": 15491.059884460916
+            },
+            {
+              "score": 4046,
+              "distance_km": 19132.635691091884
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ppl's Rep. Glorious Mickistan",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 1867,
+              "distance_km": 4918.580183873433
+            },
+            {
+              "score": 4024,
+              "distance_km": 16467.86114158604
+            },
+            {
+              "score": 3037,
+              "distance_km": 15658.092248674579
+            },
+            {
+              "score": 69,
+              "distance_km": 4695.979503872219
+            },
+            {
+              "score": 1640,
+              "distance_km": 15307.704693501388
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Danminican Republic",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 4166,
+              "distance_km": 19231.791079394177
+            },
+            {
+              "score": 2837,
+              "distance_km": 18789.327337602
+            },
+            {
+              "score": 2331,
+              "distance_km": 9073.897023673497
+            },
+            {
+              "score": 165,
+              "distance_km": 6651.486493846166
+            },
+            {
+              "score": 1655,
+              "distance_km": 3074.5613306726605
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "St. Bics & Devitts",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 569,
+              "distance_km": 8665.199917424214
+            },
+            {
+              "score": 2861,
+              "distance_km": 16305.28679821257
+            },
+            {
+              "score": 375,
+              "distance_km": 14612.885707407775
+            },
+            {
+              "score": 1037,
+              "distance_km": 18295.40630933515
+            },
+            {
+              "score": 4526,
+              "distance_km": 10868.317001825115
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ellitorial Guinea",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3846,
+              "distance_km": 9070.571698684153
+            },
+            {
+              "score": 138,
+              "distance_km": 6642.669188843946
+            },
+            {
+              "score": 3004,
+              "distance_km": 14390.211963920081
+            },
+            {
+              "score": 450,
+              "distance_km": 14454.448826033644
+            },
+            {
+              "score": 2381,
+              "distance_km": 12602.966466047328
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "challenge_url": "https://www.geoguessr.com/challenge/hvirdvBZjpXRM7qP",
+      "scores": [
+        {
+          "player": {
+            "name": "Bosnia & GetsTheGoldSweena",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 2249,
+              "distance_km": 19834.13074157561
+            },
+            {
+              "score": 1116,
+              "distance_km": 11209.571458585082
+            },
+            {
+              "score": 604,
+              "distance_km": 4259.813005010808
+            },
+            {
+              "score": 2627,
+              "distance_km": 18385.206458461285
+            },
+            {
+              "score": 4813,
+              "distance_km": 1117.705055939444
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Grand Duchy of Gregdova",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3667,
+              "distance_km": 13293.323315439318
+            },
+            {
+              "score": 2104,
+              "distance_km": 4367.0849252403095
+            },
+            {
+              "score": 4491,
+              "distance_km": 11231.046148694375
+            },
+            {
+              "score": 3529,
+              "distance_km": 1220.671926445369
+            },
+            {
+              "score": 1232,
+              "distance_km": 12339.120449742953
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ppl's Rep. Glorious Mickistan",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 4696,
+              "distance_km": 4751.148272882609
+            },
+            {
+              "score": 4832,
+              "distance_km": 6699.075197249728
+            },
+            {
+              "score": 2167,
+              "distance_km": 19563.4199834521
+            },
+            {
+              "score": 779,
+              "distance_km": 16941.70447557724
+            },
+            {
+              "score": 4452,
+              "distance_km": 14499.514428116845
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Danminican Republic",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 152,
+              "distance_km": 88.55443733478907
+            },
+            {
+              "score": 2309,
+              "distance_km": 18836.164372289837
+            },
+            {
+              "score": 3379,
+              "distance_km": 18715.52738587762
+            },
+            {
+              "score": 702,
+              "distance_km": 14803.270117006003
+            },
+            {
+              "score": 2275,
+              "distance_km": 7055.150009483964
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "St. Bics & Devitts",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 1792,
+              "distance_km": 5379.049002940319
+            },
+            {
+              "score": 3534,
+              "distance_km": 5428.183894828234
+            },
+            {
+              "score": 3780,
+              "distance_km": 8906.074227490664
+            },
+            {
+              "score": 3895,
+              "distance_km": 6692.971917300996
+            },
+            {
+              "score": 4754,
+              "distance_km": 6900.978830281388
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ellitorial Guinea",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 1907,
+              "distance_km": 4057.435641450693
+            },
+            {
+              "score": 4246,
+              "distance_km": 16465.78849222897
+            },
+            {
+              "score": 688,
+              "distance_km": 15000.77935376947
+            },
+            {
+              "score": 1189,
+              "distance_km": 8461.723795411535
+            },
+            {
+              "score": 2621,
+              "distance_km": 18760.64086690987
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "challenge_url": "https://www.geoguessr.com/challenge/hvirdvBZjpXRM7qP",
+      "scores": [
+        {
+          "player": {
+            "name": "Bosnia & GetsTheGoldSweena",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3852,
+              "distance_km": 12322.682488108612
+            },
+            {
+              "score": 1188,
+              "distance_km": 11130.08443222786
+            },
+            {
+              "score": 3364,
+              "distance_km": 5380.072805747755
+            },
+            {
+              "score": 2027,
+              "distance_km": 18387.12378664927
+            },
+            {
+              "score": 1172,
+              "distance_km": 12134.897845921038
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Grand Duchy of Gregdova",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 1128,
+              "distance_km": 4391.679485761401
+            },
+            {
+              "score": 3101,
+              "distance_km": 10914.77203955836
+            },
+            {
+              "score": 2565,
+              "distance_km": 7056.077269991123
+            },
+            {
+              "score": 4138,
+              "distance_km": 4551.6988865102785
+            },
+            {
+              "score": 855,
+              "distance_km": 7776.588564721199
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ppl's Rep. Glorious Mickistan",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3930,
+              "distance_km": 14124.644668551155
+            },
+            {
+              "score": 60,
+              "distance_km": 227.6904947895475
+            },
+            {
+              "score": 3137,
+              "distance_km": 15161.612846437338
+            },
+            {
+              "score": 114,
+              "distance_km": 14741.791904855052
+            },
+            {
+              "score": 295,
+              "distance_km": 12147.68114896329
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Danminican Republic",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 1851,
+              "distance_km": 9579.216860116734
+            },
+            {
+              "score": 3605,
+              "distance_km": 2211.9225687759413
+            },
+            {
+              "score": 2233,
+              "distance_km": 13750.99817067148
+            },
+            {
+              "score": 3851,
+              "distance_km": 804.686731776465
+            },
+            {
+              "score": 3864,
+              "distance_km": 8675.824463543313
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "St. Bics & Devitts",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 3015,
+              "distance_km": 7358.224909503035
+            },
+            {
+              "score": 3042,
+              "distance_km": 949.6273821054202
+            },
+            {
+              "score": 1752,
+              "distance_km": 15794.983963061642
+            },
+            {
+              "score": 2990,
+              "distance_km": 8999.531321360484
+            },
+            {
+              "score": 2577,
+              "distance_km": 16053.884287886944
+            }
+          ]
+        },
+        {
+          "player": {
+            "name": "Ellitorial Guinea",
+            "round_hcap": 0
+          },
+          "guesses": [
+            {
+              "score": 1912,
+              "distance_km": 18644.692998570226
+            },
+            {
+              "score": 3740,
+              "distance_km": 13374.285416273116
+            },
+            {
+              "score": 3884,
+              "distance_km": 9816.118496995621
+            },
+            {
+              "score": 1044,
+              "distance_km": 8548.928290693142
+            },
+            {
+              "score": 2242,
+              "distance_km": 19407.20439782399
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "current_round_url": null
+}
