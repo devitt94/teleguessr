@@ -8,9 +8,13 @@ import asyncio
 import dotenv
 from telegram import Update
 from telegram.ext import (
-    ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
+    ApplicationBuilder,
+    MessageHandler,
+    CommandHandler,
+    filters,
+    ContextTypes,
 )
-from geoguessr_scraper import scrape_challenge_scores, scrape_scores_fake
+from geoguessr_scraper import scrape_challenge_scores
 
 from settings import TIME_PER_ROUND_HOURS
 
@@ -35,7 +39,7 @@ def format_scoreboard(scores: dict) -> str:
 
     lines = [
         f"{'Player'.ljust(name_width)}| {'Total Score'.rjust(score_width)}",
-        "-" * (name_width + score_width + 2)
+        "-" * (name_width + score_width + 2),
     ]
     for name, score in sorted_scores:
         lines.append(f"{name.ljust(name_width)}| {str(score).rjust(score_width)}")
@@ -43,11 +47,14 @@ def format_scoreboard(scores: dict) -> str:
     table = "```\n" + "\n".join(lines) + "\n```"
     return table
 
+
 async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global league_state
     if league_state is None or league_state.is_finished:
         league_state = LeagueState(filepath=LEAGUE_FILE)
-        await update.message.reply_text("🏁 GeoGuessr League started! Post the first challenge link.")
+        await update.message.reply_text(
+            "🏁 GeoGuessr League started! Post the first challenge link."
+        )
     else:
         await update.message.reply_text("A league is already running.")
         return
@@ -58,12 +65,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     match = re.search(CHALLENGE_REGEX, text)
 
     ready_for_challenge = (
-        (league_state is not None) and (not league_state.round_in_progress) and (not league_state.is_finished)
+        (league_state is not None)
+        and (not league_state.round_in_progress)
+        and (not league_state.is_finished)
     )
 
     if not match or not ready_for_challenge:
-        return 
-    
+        return
+
     challenge_url = match.group(0)
     league_state.start_round(challenge_url, TIME_PER_ROUND_HOURS)
     league_state.save()
@@ -76,28 +85,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Start countdown in background
     delay = int(TIME_PER_ROUND_HOURS * 3600)
-    asyncio.create_task(countdown_and_scrape(context, update.effective_chat.id, challenge_url, delay))
+    asyncio.create_task(
+        countdown_and_scrape(context, update.effective_chat.id, challenge_url, delay)
+    )
+
 
 async def countdown_and_scrape(context, chat_id, challenge_url, delay_seconds):
     await asyncio.sleep(delay_seconds)
     # scrape the scores
-    round_result = await scrape_challenge_scores(Path("data/geoguessr_round_1.html"), challenge_url)
+    round_result = await scrape_challenge_scores(
+        Path("data/geoguessr_round_1.html"), challenge_url
+    )
 
     league_state.add_round_result(round_result)
     league_state.save()
 
     # Send update message
     scoreboard_text = format_scoreboard(league_state.leaderboard)
-    await context.bot.send_message(
-        chat_id,
-        scoreboard_text,
-        parse_mode="MarkdownV2"
-    )
+    await context.bot.send_message(chat_id, scoreboard_text, parse_mode="MarkdownV2")
 
     if league_state.is_finished:
-        await context.bot.send_message(chat_id, f"🏆 League finished. Winner: {league_state.winner}")
+        await context.bot.send_message(
+            chat_id, f"🏆 League finished. Winner: {league_state.winner}"
+        )
     else:
-        await context.bot.send_message(chat_id, f"Next challenge, please! ({league_state.current_round_num}/{league_state.num_rounds})")
+        await context.bot.send_message(
+            chat_id,
+            f"Next challenge, please! ({league_state.current_round_num}/{league_state.num_rounds})",
+        )
 
 
 async def restore_timers_post_init(app):
@@ -105,27 +120,32 @@ async def restore_timers_post_init(app):
     if league_state is None or not league_state.round_in_progress:
         return
 
-    delay = max(int((league_state.current_round.end_time - datetime.utcnow()).total_seconds()), 0)
+    delay = max(
+        int((league_state.current_round.end_time - datetime.utcnow()).total_seconds()),
+        0,
+    )
     print(f"Restoring timer with {delay} seconds remaining...")
     asyncio.create_task(
         countdown_and_scrape(
-            app.bot,
-            None,
-            league_state.current_round_url.challenge_url,
-            delay
+            app.bot, None, league_state.current_round_url.challenge_url, delay
         )
     )
+
 
 def main():
     global league_state
     league_state = LeagueState(filepath=LEAGUE_FILE)
     league_state.load_from_file()
 
-    print("League state loaded is {}".format(
-        "finished" if league_state.is_finished else
-        "in progress" if league_state.round_in_progress else
-        "not started"
-    ))
+    print(
+        "League state loaded is {}".format(
+            "finished"
+            if league_state.is_finished
+            else "in progress"
+            if league_state.round_in_progress
+            else "not started"
+        )
+    )
 
     app = ApplicationBuilder().token(TOKEN).post_init(restore_timers_post_init).build()
     app.add_handler(CommandHandler("startleague", start_league))

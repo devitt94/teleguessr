@@ -1,8 +1,5 @@
 from pathlib import Path
 from models import Guess, Player, RoundResult, RoundScore
-from settings import PLAYERS, NUM_GUESSES_PER_ROUND
-import random
-import aiohttp
 from bs4 import BeautifulSoup
 
 
@@ -33,14 +30,16 @@ async def scrape_challenge_scores(url: str) -> RoundResult:
         if not name:
             continue  # skip rows without a name
 
-
         # Each round's score
-        round_scores = [int(r.get_text(strip=True).replace(" pts", "").replace(",", ""))
-                        for r in row.select(".score-cell_score__oKM2x")][:-1]  # Exclude total score cell
+        round_scores = [
+            int(r.get_text(strip=True).replace(" pts", "").replace(",", ""))
+            for r in row.select(".score-cell_score__oKM2x")
+        ][:-1]  # Exclude total score cell
 
-        round_distances = [int(r.get_text(strip=True).replace(" km", "").replace(",", ""))
-                           for r in row.select(".score-cell_scoreDetails__D_Ygp > span:first-child")][:-1]
-
+        round_distances = [
+            int(r.get_text(strip=True).replace(" km", "").replace(",", ""))
+            for r in row.select(".score-cell_scoreDetails__D_Ygp > span:first-child")
+        ][:-1]
 
         guesses = [
             Guess(score=score, distance_km=distance)
@@ -48,12 +47,8 @@ async def scrape_challenge_scores(url: str) -> RoundResult:
         ]
 
         score = RoundScore(
-            player=Player(name=name.get_text(strip=True)),
-            guesses=guesses
+            player=Player(name=name.get_text(strip=True)), guesses=guesses
         )
         player_scores.append(score)
 
-    return RoundResult(
-        challenge_url=url,
-        scores=player_scores
-    )
+    return RoundResult(challenge_url=url, scores=player_scores)
