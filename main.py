@@ -81,7 +81,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def countdown_and_scrape(context, chat_id, challenge_url, delay_seconds):
     await asyncio.sleep(delay_seconds)
     # scrape the scores
-    round_result = await scrape_scores_fake(challenge_url)
+    round_result = await scrape_challenge_scores(Path("data/geoguessr_round_1.html"), challenge_url)
 
     league_state.add_round_result(round_result)
     league_state.save()

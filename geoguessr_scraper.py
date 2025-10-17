@@ -1,44 +1,59 @@
+from pathlib import Path
 from models import Guess, Player, RoundResult, RoundScore
 from settings import PLAYERS, NUM_GUESSES_PER_ROUND
 import random
-
-async def scrape_scores_fake(url: str) -> RoundResult:
-    """
-    Fake scraper for testing without hitting GeoGuessr.
-    """
-    players = [Player(**p) for p in PLAYERS]
-
-    scores = []
-    for p in players:
-        p.round_hcap = 0  # Reset score for the round
-        player_guesses = []
-        for i in range(NUM_GUESSES_PER_ROUND):
-            score = random.randint(0, 5000)
-            distance = random.uniform(0, 20000)
-            guess = Guess(score=score, distance_km=distance)
-            player_guesses.append(guess)
-            
-        player_score = RoundScore(player=p, guesses=player_guesses)
-        scores.append(player_score)
-    return RoundResult(challenge_url=url, scores=scores)
+import aiohttp
+from bs4 import BeautifulSoup
 
 
-async def scrape_challenge_scores(url: str):
+async def scrape_challenge_scores(url: str) -> RoundResult:
     """
     Scrape player names and scores from a GeoGuessr challenge page.
     (Assumes the challenge is public.)
     """
-    # results = {}
-    # async with aiohttp.ClientSession() as session:
-    #     async with session.get(url) as resp:
-    #         html = await resp.text()
 
-    # # ⚠️ This part depends on the actual GeoGuessr page structure.
-    # # Example logic (pseudo-selector):
-    # soup = BeautifulSoup(html, "html.parser")
-    # for player_tag in soup.select(".player-result"):
-    #     name = player_tag.select_one(".player-name").text.strip()
-    #     score = int(player_tag.select_one(".player-score").text.replace(",", "").strip())
-    #     results[name] = score
+    filepath = Path("data/geoguessr_round_1.html")
 
-    # return results
+    with filepath.open("r", encoding="utf-8") as f:
+        html = f.read()
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Each player is in a div with class "coordinate-results_row__xhPGb"
+    rows = soup.select("div.coordinate-results_row__xhPGb")
+
+    player_scores = []
+    for row in rows:
+        # skip header rows
+        if row.select_one(".coordinate-results_headerRow__GCyDD"):
+            continue
+
+        name = row.select_one(".user-nick_nick__sRjZ2")
+
+        if not name:
+            continue  # skip rows without a name
+
+
+        # Each round's score
+        round_scores = [int(r.get_text(strip=True).replace(" pts", "").replace(",", ""))
+                        for r in row.select(".score-cell_score__oKM2x")][:-1]  # Exclude total score cell
+
+        round_distances = [int(r.get_text(strip=True).replace(" km", "").replace(",", ""))
+                           for r in row.select(".score-cell_scoreDetails__D_Ygp > span:first-child")][:-1]
+
+
+        guesses = [
+            Guess(score=score, distance_km=distance)
+            for score, distance in zip(round_scores, round_distances)
+        ]
+
+        score = RoundScore(
+            player=Player(name=name.get_text(strip=True)),
+            guesses=guesses
+        )
+        player_scores.append(score)
+
+    return RoundResult(
+        challenge_url=url,
+        scores=player_scores
+    )
