@@ -8,7 +8,7 @@ class LeagueState(BaseModel):
     filepath: Path = Field(frozen=True)
     num_rounds: int = Field(default=5)
     results: list[RoundResult] = Field(default_factory=list)
-    current_round_url: ActiveRound | None = None
+    current_round: ActiveRound | None = None
     
     def __init__(self, **data):
         super().__init__(**data)
@@ -25,7 +25,7 @@ class LeagueState(BaseModel):
         file_data["filepath"] = str(self.filepath)  # re-add frozen field
         loaded = LeagueState.model_validate(file_data)
         self.results = loaded.results
-        self.current_round_url = loaded.current_round_url
+        self.current_round = loaded.current_round
         self.num_rounds = loaded.num_rounds
         
         # Recalculate scores
@@ -38,7 +38,7 @@ class LeagueState(BaseModel):
 
 
     @property
-    def current_round(self) -> int:
+    def current_round_num(self) -> int:
         return len(self.results) + 1 if self.round_in_progress else len(self.results)
     
     @property
@@ -47,11 +47,17 @@ class LeagueState(BaseModel):
 
     @property
     def round_in_progress(self) -> bool:
-        return self.current_round_url is not None
+        return self.current_round is not None
 
     @property
     def leaderboard(self) -> dict[str, int]:
         return self.__scores
+    
+    @property
+    def winner(self) -> str | None:
+        if not self.is_finished:
+            return None
+        return max(self.__scores, key=self.__scores.get)
     
     def start_round(self, url: str, hours: int):
         if self.round_in_progress:
@@ -60,7 +66,7 @@ class LeagueState(BaseModel):
             raise ValueError("The league has already finished.")
         from datetime import datetime, timedelta
         end_time = datetime.utcnow() + timedelta(hours=hours)
-        self.current_round_url = ActiveRound(challenge_url=url,  end_time=end_time)
+        self.current_round = ActiveRound(challenge_url=url,  end_time=end_time)
 
     def add_round_result(self, result: RoundResult):
         self.results.append(result)
@@ -69,7 +75,7 @@ class LeagueState(BaseModel):
             new_score = prev_score + player_score.total_score
             self.__scores[player_score.player.name] = new_score
 
-        self.current_round_url = None
+        self.current_round = None
 
     def save(self):
         self.filepath.parent.mkdir(parents=True, exist_ok=True)

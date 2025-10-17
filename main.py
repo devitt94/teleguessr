@@ -69,7 +69,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     league_state.save()
 
     await update.message.reply_text(
-        f"🌍 Challenge {league_state.current_round} detected!\n"
+        f"🌍 Challenge {league_state.current_round_num} detected!\n"
         f"Timer started: {TIME_PER_ROUND_HOURS} hours from now.\n"
         f"{challenge_url}"
     )
@@ -95,22 +95,17 @@ async def countdown_and_scrape(context, chat_id, challenge_url, delay_seconds):
     )
 
     if league_state.is_finished:
-        await context.bot.send_message(chat_id, "🏆 League finished!")
+        await context.bot.send_message(chat_id, f"🏆 League finished. Winner: {league_state.winner}")
     else:
-        await context.bot.send_message(chat_id, f"Next challenge, please! ({league_state.current_round}/{league_state.num_rounds})")
+        await context.bot.send_message(chat_id, f"Next challenge, please! ({league_state.current_round_num}/{league_state.num_rounds})")
 
 
 async def restore_timers_post_init(app):
-    print("Restoring timers if needed...")
     global league_state
-    if league_state is None:
-        print("No league state found.")
-        return
-    elif not league_state.round_in_progress:
-        print("No round in progress.")
+    if league_state is None or not league_state.round_in_progress:
         return
 
-    delay = max(int((league_state.current_round_url.end_time - datetime.utcnow()).total_seconds()), 0)
+    delay = max(int((league_state.current_round.end_time - datetime.utcnow()).total_seconds()), 0)
     print(f"Restoring timer with {delay} seconds remaining...")
     asyncio.create_task(
         countdown_and_scrape(
