@@ -70,6 +70,8 @@ class LeagueState(BaseModel):
     def winner(self) -> str | None:
         if not self.is_finished:
             return None
+        if not self.__scores:
+            return None
         return max(self.__scores, key=self.__scores.get)
 
     def start_round(self, url: str, hours: int):

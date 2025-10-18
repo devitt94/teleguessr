@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 import re
+import traceback
 from formatters import format_round_result, format_scoreboard
 from league import LeagueState
 import asyncio
@@ -25,6 +26,7 @@ dotenv.load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 LEAGUE_FILE = Path("data/league.json")
 CHALLENGE_REGEX = r"(https?://www\.geoguessr\.com/challenge/[a-zA-Z0-9]+)"
+ADMIN_ID = os.getenv("ADMIN_TELEGRAM_ID")
 
 # In-memory league state
 league_state: LeagueState | None = None
@@ -79,30 +81,36 @@ async def countdown_and_scrape(
     delay_seconds: int,
 ) -> None:
     await asyncio.sleep(delay_seconds)
+    try:
+        round_result = await get_challenge_scores(challenge_url)
 
-    round_result = await get_challenge_scores(challenge_url)
+        league_state.add_round_result(round_result)
+        league_state.save()
 
-    league_state.add_round_result(round_result)
-    league_state.save()
+        round_result_table = format_round_result(round_result)
+        round_result_text = f"⏰ Time's up\! Here are the results for challenge {league_state.current_round_num - 1}:\n{round_result_table}"
+        await context.bot.send_message(chat_id, round_result_text, "MarkdownV2")
 
-    round_result_table = format_round_result(round_result)
-    round_result_text = f"⏰ Time's up\! Here are the results for challenge {league_state.current_round_num - 1}:\n{round_result_table}"
-    await context.bot.send_message(chat_id, round_result_text, "MarkdownV2")
-
-    # Send update message
-    league_standings_table = format_scoreboard(league_state.leaderboard)
-    league_standings_text = f"📊 Current League Standings:\n{league_standings_table}"
-    await context.bot.send_message(chat_id, league_standings_text, "MarkdownV2")
-
-    if league_state.is_finished:
-        await context.bot.send_message(
-            chat_id, f"🏆 League finished. Winner: {league_state.winner}"
+        league_standings_table = format_scoreboard(league_state.leaderboard)
+        league_standings_text = (
+            f"📊 Current League Standings:\n{league_standings_table}"
         )
-    else:
+        await context.bot.send_message(chat_id, league_standings_text, "MarkdownV2")
+
+        if league_state.is_finished:
+            await context.bot.send_message(
+                chat_id, f"🏆 League finished. Winner: {league_state.winner}"
+            )
+        else:
+            await context.bot.send_message(
+                chat_id,
+                f"Next challenge, please! ({league_state.current_round_num}/{league_state.num_rounds})",
+            )
+    except Exception as e:
         await context.bot.send_message(
-            chat_id,
-            f"Next challenge, please! ({league_state.current_round_num}/{league_state.num_rounds})",
+            ADMIN_ID, f"🔥 Countdown error for {challenge_url}\n\n{e}"
         )
+        raise  # op
 
 
 async def restore_timers_post_init(app):
@@ -120,6 +128,32 @@ async def restore_timers_post_init(app):
             app.bot, None, league_state.current_round.challenge_url, delay
         )
     )
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Global error handler that sends the traceback to the admin."""
+    # Build a clean traceback message
+    tb_list = traceback.format_exception(
+        None, context.error, context.error.__traceback__
+    )
+    tb_text = "".join(tb_list)
+
+    message = (
+        "⚠️ <b>Bot Handler Error</b>\n"
+        f"<b>Exception:</b> {context.error}\n\n"
+        f"<b>Traceback:</b>\n<pre>{tb_text}</pre>"
+    )
+
+    # Try sending alert to admin
+    try:
+        await context.bot.send_message(
+            chat_id=ADMIN_ID, text=message, parse_mode="HTML"
+        )
+    except Exception as e:
+        print(f"Failed to send admin alert: {e}")
+
+    # Still print to logs
+    print(f"Exception while handling update {update}: {context.error}")
 
 
 def main():
@@ -140,6 +174,7 @@ def main():
     app = ApplicationBuilder().token(TOKEN).post_init(restore_timers_post_init).build()
     app.add_handler(CommandHandler("startleague", start_league))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_error_handler(error_handler)
     print("Bot running...")
     app.run_polling()
 

@@ -12,8 +12,13 @@ def get_player_shortname(fullname: str) -> str:
 def format_round_result(result: RoundResult) -> str:
     """Format the round result into a readable marked-down table."""
     lines = []
+
+    if not result.scores:
+        return "No scores available\!"
+
     # Sort scores by net score (descending)
     sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
+
     name_width = (
         max(len(get_player_shortname(rs.player.name)) for rs in sorted_scores) + 2
     )
@@ -35,8 +40,10 @@ def format_round_result(result: RoundResult) -> str:
 
 
 def format_scoreboard(scores: dict) -> str:
-    # Sort by score (descending)
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+    if not sorted_scores:
+        return "No scores available\!"
 
     # Determine column widths
     name_width = max(len(name) for name, _ in sorted_scores) + 2
