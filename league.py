@@ -11,12 +11,12 @@ ScoreManager = Callable[[RoundResult], dict[str, int]]
 def default_score_manager(result: RoundResult) -> dict[str, int]:
     scores: dict[str, int] = {}
     for round_score in result.scores:
-        scores[round_score.player.name] = round_score.total_score
+        scores[round_score.player.name] = round_score.net_score
     return scores
 
 
 def ranking_score_manager(result: RoundResult) -> dict[str, int]:
-    sorted_scores = sorted(result.scores, key=lambda rs: rs.total_score, reverse=True)
+    sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
     scores: dict[str, int] = {}
     for rank, round_score in enumerate(sorted_scores, start=1):
         scores[round_score.player.name] = len(sorted_scores) - rank + 1

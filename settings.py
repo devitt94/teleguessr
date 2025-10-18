@@ -1,11 +1,21 @@
-PLAYERS = [
-    {"name": "Bosnia & GetsTheGoldSweena", "round_hcap": 0},
-    {"name": "Grand Duchy of Gregdova", "round_hcap": 0},
-    {"name": "Ppl's Rep. Glorious Mickistan", "round_hcap": 0},
-    {"name": "Danminican Republic", "round_hcap": 0},
-    {"name": "St. Bics & Devitts", "round_hcap": 0},
-    {"name": "Ellitorial Guinea", "round_hcap": 0},
-]
+PLAYER_ROUND_HANDICAPS = {
+    "Bosnia & GetsTheGoldSweena": 0,
+    "Grand Duchy of Gregdova": 0,
+    "Ppl's Rep. Glorious Mickistan": 5000,
+    "Danminican Republic": 4000,
+    "St. Bics & Devitts": 3000,
+    "Ellitorial Guinea": 4000,
+}
+
+PLAYER_SHORTNAMES = {
+    "Bosnia & GetsTheGoldSweena": "B&GGS",
+    "Grand Duchy of Gregdova": "Gregdova",
+    "Ppl's Rep. Glorious Mickistan": "Mickistan",
+    "Danminican Republic": "Danminican",
+    "St. Bics & Devitts": "St. Bics",
+    "Ellitorial Guinea": "Ellitorial",
+}
+
 
 NUM_GUESSES_PER_ROUND = 5
 NUM_ROUNDS_PER_LEAGUE = 5

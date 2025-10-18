@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 import re
+from formatters import format_round_result, format_scoreboard
 from league import LeagueState
 import asyncio
 
@@ -27,25 +28,6 @@ CHALLENGE_REGEX = r"(https?://www\.geoguessr\.com/challenge/[a-zA-Z0-9]+)"
 
 # In-memory league state
 league_state: LeagueState | None = None
-
-
-def format_scoreboard(scores: dict) -> str:
-    # Sort by score (descending)
-    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-    # Determine column widths
-    name_width = max(len(name) for name, _ in sorted_scores) + 2
-    score_width = 10
-
-    lines = [
-        f"{'Player'.ljust(name_width)}| {'Total Score'.rjust(score_width)}",
-        "-" * (name_width + score_width + 2),
-    ]
-    for name, score in sorted_scores:
-        lines.append(f"{name.ljust(name_width)}| {str(score).rjust(score_width)}")
-
-    table = "```\n" + "\n".join(lines) + "\n```"
-    return table
 
 
 async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -103,9 +85,16 @@ async def countdown_and_scrape(
     league_state.add_round_result(round_result)
     league_state.save()
 
+    round_result_table = format_round_result(round_result)
+    round_result_text = f"⏰ Time's up\! Here are the results for challenge {league_state.current_round_num - 1}:\n{round_result_table}"
+    await context.bot.send_message(chat_id, round_result_text, parse_mode="MarkdownV2")
+
     # Send update message
-    scoreboard_text = format_scoreboard(league_state.leaderboard)
-    await context.bot.send_message(chat_id, scoreboard_text, parse_mode="MarkdownV2")
+    league_standings_table = format_scoreboard(league_state.leaderboard)
+    league_standings_text = f"📊 Current League Standings:\n{league_standings_table}"
+    await context.bot.send_message(
+        chat_id, league_standings_text, parse_mode="MarkdownV2"
+    )
 
     if league_state.is_finished:
         await context.bot.send_message(
