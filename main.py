@@ -87,14 +87,12 @@ async def countdown_and_scrape(
 
     round_result_table = format_round_result(round_result)
     round_result_text = f"⏰ Time's up\! Here are the results for challenge {league_state.current_round_num - 1}:\n{round_result_table}"
-    await context.bot.send_message(chat_id, round_result_text, parse_mode="MarkdownV2")
+    await context.bot.send_message(chat_id, round_result_text, "MarkdownV2")
 
     # Send update message
     league_standings_table = format_scoreboard(league_state.leaderboard)
     league_standings_text = f"📊 Current League Standings:\n{league_standings_table}"
-    await context.bot.send_message(
-        chat_id, league_standings_text, parse_mode="MarkdownV2"
-    )
+    await context.bot.send_message(chat_id, league_standings_text, "MarkdownV2")
 
     if league_state.is_finished:
         await context.bot.send_message(
