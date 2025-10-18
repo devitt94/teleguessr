@@ -1,7 +1,26 @@
+from typing import Callable
 from models import ActiveRound, RoundResult
 import json
 from pathlib import Path
 from pydantic import BaseModel, Field
+
+
+ScoreManager = Callable[[RoundResult], dict[str, int]]
+
+
+def default_score_manager(result: RoundResult) -> dict[str, int]:
+    scores: dict[str, int] = {}
+    for round_score in result.scores:
+        scores[round_score.player.name] = round_score.total_score
+    return scores
+
+
+def ranking_score_manager(result: RoundResult) -> dict[str, int]:
+    sorted_scores = sorted(result.scores, key=lambda rs: rs.total_score, reverse=True)
+    scores: dict[str, int] = {}
+    for rank, round_score in enumerate(sorted_scores, start=1):
+        scores[round_score.player.name] = len(sorted_scores) - rank + 1
+    return scores
 
 
 class LeagueState(BaseModel):
@@ -23,17 +42,13 @@ class LeagueState(BaseModel):
 
         file_data["filepath"] = str(self.filepath)  # re-add frozen field
         loaded = LeagueState.model_validate(file_data)
-        self.results = loaded.results
-        self.current_round = loaded.current_round
         self.num_rounds = loaded.num_rounds
 
-        # Recalculate scores
         self.__scores.clear()
-        for result in self.results:
-            for player_score in result.scores:
-                prev_score = self.__scores.get(player_score.player.name, 0)
-                new_score = prev_score + player_score.total_score
-                self.__scores[player_score.player.name] = new_score
+        for result in loaded.results:
+            self.add_round_result(result)
+
+        self.current_round = loaded.current_round
 
     @property
     def current_round_num(self) -> int:
@@ -69,10 +84,9 @@ class LeagueState(BaseModel):
 
     def add_round_result(self, result: RoundResult):
         self.results.append(result)
-        for player_score in result.scores:
-            prev_score = self.__scores.get(player_score.player.name, 0)
-            new_score = prev_score + player_score.total_score
-            self.__scores[player_score.player.name] = new_score
+        added_scores = ranking_score_manager(result)
+        for player, score in added_scores.items():
+            self.__scores[player] = self.__scores.get(player, 0) + score
 
         self.current_round = None
 
