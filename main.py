@@ -14,7 +14,7 @@ from telegram.ext import (
     filters,
     ContextTypes,
 )
-from geoguessr_scraper import scrape_challenge_scores
+from geoguessr_scraper import get_challenge_scores
 
 from settings import TIME_PER_ROUND_HOURS
 
@@ -90,12 +90,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def countdown_and_scrape(context, chat_id, challenge_url, delay_seconds):
+async def countdown_and_scrape(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: str,
+    challenge_url: str,
+    delay_seconds: int,
+) -> None:
     await asyncio.sleep(delay_seconds)
-    # scrape the scores
-    round_result = await scrape_challenge_scores(
-        Path("data/geoguessr_round_1.html"), challenge_url
-    )
+
+    round_result = await get_challenge_scores(challenge_url)
 
     league_state.add_round_result(round_result)
     league_state.save()
@@ -127,7 +130,7 @@ async def restore_timers_post_init(app):
     print(f"Restoring timer with {delay} seconds remaining...")
     asyncio.create_task(
         countdown_and_scrape(
-            app.bot, None, league_state.current_round_url.challenge_url, delay
+            app.bot, None, league_state.current_round.challenge_url, delay
         )
     )
 

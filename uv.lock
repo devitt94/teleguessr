@@ -292,6 +292,18 @@ wheels = [
 ]
 
 [[package]]
+name = "geoguessr-async"
+version = "1.0.13"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e1/d7/7366d224e78d3fcff210d5b48a3755d70aa8aa80e22d446c0d555f62b88d/geoguessr_async-1.0.13.tar.gz", hash = "sha256:01f45e76d9dd4e0c5892bc968d85c4321ad2b5b51e4edbd14fbaa88a6db336f9", size = 11185, upload-time = "2025-02-06T14:40:46.558Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/72/a2/45f3674fe5ddac0782c605bd06c4806f711e45f9b48c04dcd6f7f3bbbb6c/geoguessr_async-1.0.13-py3-none-any.whl", hash = "sha256:692e23e4454ef408b973481658f3b3bf6c199107ed5a4320fd6d347e298e6a87", size = 10416, upload-time = "2025-02-06T14:40:44.794Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -763,6 +775,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "bs4" },
+    { name = "geoguessr-async" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "python-telegram-bot" },
@@ -778,6 +791,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.1" },
     { name = "bs4", specifier = ">=0.0.2" },
+    { name = "geoguessr-async", specifier = ">=1.0.13" },
     { name = "pydantic", specifier = ">=2.12.2" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "python-telegram-bot", specifier = ">=22.5" },
