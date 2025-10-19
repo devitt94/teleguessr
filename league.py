@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from pydantic import BaseModel, Field
 
+from settings import NUM_ROUNDS_PER_LEAGUE
+
 
 ScoreManager = Callable[[RoundResult], dict[str, int]]
 
@@ -25,7 +27,7 @@ def ranking_score_manager(result: RoundResult) -> dict[str, int]:
 
 class LeagueState(BaseModel):
     filepath: Path = Field(frozen=True)
-    num_rounds: int = Field(default=5)
+    num_rounds: int = Field(default=NUM_ROUNDS_PER_LEAGUE)
     results: list[RoundResult] = Field(default_factory=list)
     current_round: ActiveRound | None = None
 

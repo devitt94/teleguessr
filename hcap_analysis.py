@@ -25,10 +25,10 @@ async def main():
             totals[player_score.player.name] += player_score.gross_score
 
     averages = {
-        player: total_score / len(CHALLENGE_URLS)
+        player: round(total_score / len(CHALLENGE_URLS))
         for player, total_score in totals.items()
     }
-    print(format_scoreboard(averages))
+    print(format_scoreboard(averages, header="Average Score"))
 
 
 if __name__ == "__main__":

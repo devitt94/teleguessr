@@ -39,7 +39,7 @@ def format_round_result(result: RoundResult) -> str:
     return table
 
 
-def format_scoreboard(scores: dict) -> str:
+def format_scoreboard(scores: dict, header: str = "Total Score") -> str:
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
     if not sorted_scores:
@@ -50,7 +50,7 @@ def format_scoreboard(scores: dict) -> str:
     score_width = 10
 
     lines = [
-        f"{'Player'.ljust(name_width)}| {'Total Score'.rjust(score_width)}",
+        f"{'Player'.ljust(name_width)}| {header.rjust(score_width)}",
         "-" * (name_width + score_width + 2),
     ]
     for name, score in sorted_scores:

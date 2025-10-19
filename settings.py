@@ -7,6 +7,8 @@ PLAYER_ROUND_HANDICAPS = {
     "Ellitorial Guinea": 4000,
 }
 
+NEW_ENTRANT_HANDICAP = 5000
+
 PLAYER_SHORTNAMES = {
     "Bosnia & GetsTheGoldSweena": "B&GGS",
     "Grand Duchy of Gregdova": "Gregdova",
@@ -17,6 +19,5 @@ PLAYER_SHORTNAMES = {
 }
 
 
-NUM_GUESSES_PER_ROUND = 5
 NUM_ROUNDS_PER_LEAGUE = 5
-TIME_PER_ROUND_HOURS = 0.0001
+TIME_PER_ROUND_HOURS = 24
