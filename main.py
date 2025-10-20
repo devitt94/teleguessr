@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 import os
 from pathlib import Path
 import re
@@ -19,6 +19,8 @@ from telegram.ext import (
 from geoguessr_scraper import get_challenge_scores
 
 from settings import TIME_PER_ROUND_HOURS
+
+from loguru import logger
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -80,6 +82,19 @@ async def countdown_and_scrape(
     challenge_url: str,
     delay_seconds: int,
 ) -> None:
+    if delay_seconds > 3600:
+        logger.info("Starting 1 hour warning countdown...")
+        one_hour_warning_countdown = delay_seconds - 3600
+        await asyncio.sleep(one_hour_warning_countdown)
+
+        await context.bot.send_message(
+            chat_id,
+            "1 hour remaining",
+        )
+
+        delay_seconds = 3600
+
+    logger.info("Starting final countdown...")
     await asyncio.sleep(delay_seconds)
     try:
         round_result = await get_challenge_scores(challenge_url)
@@ -88,14 +103,18 @@ async def countdown_and_scrape(
         league_state.save()
 
         round_result_table = format_round_result(round_result)
-        round_result_text = f"⏰ Time's up\! Here are the results for challenge {league_state.current_round_num - 1}:\n{round_result_table}"
-        await context.bot.send_message(chat_id, round_result_text, "MarkdownV2")
+        round_result_text = f"⏰ Time's up - Here are the results for challenge {league_state.current_round_num - 1}:\n{round_result_table}"
+        await context.bot.send_message(
+            chat_id, round_result_text, parse_mode="MarkdownV2"
+        )
 
         league_standings_table = format_scoreboard(league_state.leaderboard)
         league_standings_text = (
             f"📊 Current League Standings:\n{league_standings_table}"
         )
-        await context.bot.send_message(chat_id, league_standings_text, "MarkdownV2")
+        await context.bot.send_message(
+            chat_id, league_standings_text, parse_mode="MarkdownV2"
+        )
 
         if league_state.is_finished:
             await context.bot.send_message(
@@ -108,7 +127,7 @@ async def countdown_and_scrape(
             )
     except Exception as e:
         await context.bot.send_message(
-            ADMIN_ID, f"🔥 Countdown error for {challenge_url}\n\n{e}"
+            ADMIN_ID, f"Countdown error for {challenge_url}\n\n{e}"
         )
         raise  # op
 
@@ -118,11 +137,12 @@ async def restore_timers_post_init(app):
     if league_state is None or not league_state.round_in_progress:
         return
 
+    current_time = datetime.now(UTC).replace(tzinfo=None)
     delay = max(
-        int((league_state.current_round.end_time - datetime.utcnow()).total_seconds()),
+        int((league_state.current_round.end_time - current_time).total_seconds()),
         0,
     )
-    print(f"Restoring timer with {delay} seconds remaining...")
+    logger.info(f"Restoring timer with {delay} seconds remaining...")
     asyncio.create_task(
         countdown_and_scrape(
             app.bot, None, league_state.current_round.challenge_url, delay
@@ -150,10 +170,32 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             chat_id=ADMIN_ID, text=message, parse_mode="HTML"
         )
     except Exception as e:
-        print(f"Failed to send admin alert: {e}")
+        logger.info(f"Failed to send admin alert: {e}")
 
     # Still print to logs
-    print(f"Exception while handling update {update}: {context.error}")
+    logger.info(f"Exception while handling update {update}: {context.error}")
+
+
+async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global league_state
+    if league_state is None:
+        update.message.reply_text("No league is currently running.")
+        return
+
+    latest_round = league_state.results[-1] if league_state.results else None
+    if latest_round is None:
+        update.message.reply_text("No rounds have been played yet.")
+        return
+
+    latest_round_text = format_round_result(latest_round)
+    await update.message.reply_text(
+        f"📋 Latest Round Results:\n{latest_round_text}", parse_mode="MarkdownV2"
+    )
+
+    leaderboard_text = format_scoreboard(league_state.leaderboard)
+    await update.message.reply_text(
+        f"📊 Current League Standings:\n{leaderboard_text}", parse_mode="MarkdownV2"
+    )
 
 
 def main():
@@ -161,7 +203,7 @@ def main():
     league_state = LeagueState(filepath=LEAGUE_FILE)
     league_state.load_from_file()
 
-    print(
+    logger.info(
         "League state loaded is {}".format(
             "finished"
             if league_state.is_finished
@@ -173,12 +215,13 @@ def main():
 
     app = ApplicationBuilder().token(TOKEN).post_init(restore_timers_post_init).build()
     app.add_handler(CommandHandler("startleague", start_league))
+    app.add_handler(CommandHandler("leaderboard", show_leaderboard))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
-    print("Bot running...")
+    logger.info("Bot running...")
     app.run_polling()
 
-    print("Bot stopped.")
+    logger.info("Bot stopped.")
 
 
 if __name__ == "__main__":

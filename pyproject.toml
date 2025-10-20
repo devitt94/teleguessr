@@ -8,6 +8,7 @@ dependencies = [
     "aiohttp>=3.13.1",
     "bs4>=0.0.2",
     "geoguessr-async>=1.0.13",
+    "loguru>=0.7.3",
     "pydantic>=2.12.2",
     "python-dotenv>=1.1.1",
     "python-telegram-bot>=22.5",
