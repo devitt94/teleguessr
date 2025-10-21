@@ -6,6 +6,27 @@ from geoguessr_async import Geoguessr, GeoguessrScore
 from settings import PLAYER_ROUND_HANDICAPS
 
 
+async def create_challenge(
+    map_id: str,
+    time_limit_seconds: int,
+) -> str:
+    """
+    Create a new GeoGuessr challenge and return its URL.
+    """
+
+    map_url = f"https://www.geoguessr.com/maps/{map_id}"
+    client = Geoguessr(os.getenv("NCFA_COOKIE"))
+    challenge_url = await client.generate_challenge(
+        map_url=map_url,
+        move=False,
+        pan=True,
+        zoom=True,
+        timeLimit=90,
+        play_map=False,
+    )
+    return challenge_url
+
+
 async def get_challenge_scores(url: str) -> RoundResult:
     """
     Scrape player names and scores from a GeoGuessr challenge page.
