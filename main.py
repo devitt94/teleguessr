@@ -135,7 +135,7 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     latest_round_text = format_round_result(latest_round)
     await update.message.reply_text(
-        f"Round {league_state.current_round_num} Results:\n{latest_round_text}",
+        f"Round {league_state.current_round_num - 1} Results:\n{latest_round_text}",
         parse_mode="MarkdownV2",
     )
 
