@@ -11,6 +11,7 @@ from telegram.ext import (
     ContextTypes,
 )
 from geoguessr_scraper import create_challenge, get_challenge_scores
+from awards import get_best_and_worst_guesses
 
 from settings import TIME_PER_ROUND_HOURS
 
@@ -145,6 +146,35 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def show_awards(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != int(ADMIN_ID):
+        await update.message.reply_text("You are not authorized to use this command.")
+        return
+
+    global league_state
+    if league_state is None:
+        update.message.reply_text("No league is currently running.")
+        return
+
+    latest_round = league_state.results[-1] if league_state.results else None
+    if latest_round is None:
+        update.message.reply_text("No rounds have been played yet.")
+        return
+
+    awards = get_best_and_worst_guesses(latest_round)
+    message = (
+        f"🏅 <b>Awards for Round {league_state.current_round_num - 1}</b>\n\n"
+        f"🥇 <b>Best Guess:</b> {awards.best_guess.player.name} (Location {awards.best_guess.location_index})\n"
+        f"      Distance: {awards.best_guess.guess.distance_km} km\n"
+        f"      Average Distance: {awards.best_guess.round_stats.average:.2f} km\n\n"
+        f"💩 <b>Worst Guess:</b> {awards.worst_guess.player.name} (Location {awards.worst_guess.location_index})\n"
+        f"      Distance: {awards.worst_guess.guess.distance_km} km\n"
+        f"      Average Distance: {awards.worst_guess.round_stats.average:.2f} km\n"
+    )
+
+    await update.message.reply_text(message, parse_mode="HTML")
+
+
 def main():
     global league_state
     league_state = LeagueState(filepath=LEAGUE_FILE)
@@ -161,9 +191,10 @@ def main():
     )
 
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("startleague", start_league))
+    app.add_handler(CommandHandler("startleagushow_awardse", start_league))
     app.add_handler(CommandHandler("leaderboard", show_leaderboard))
     app.add_handler(CommandHandler("endround", end_round))
+    app.add_handler(CommandHandler("awards", show_awards))
     app.add_error_handler(error_handler)
     logger.info("Bot running...")
     app.run_polling()

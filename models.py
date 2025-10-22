@@ -33,3 +33,20 @@ class RoundScore(BaseModel):
 class RoundResult(BaseModel):
     challenge_url: str
     scores: list[RoundScore] = conlist(RoundScore, min_length=1)
+
+
+class GuessStats(BaseModel):
+    average: float
+    stddev: float
+
+
+class Award(BaseModel):
+    player: Player
+    guess: Guess
+    round_stats: GuessStats
+    location_index: int
+
+
+class Awards(BaseModel):
+    best_guess: Award
+    worst_guess: Award
