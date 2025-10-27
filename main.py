@@ -191,7 +191,7 @@ def main():
     )
 
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("startleagushow_awardse", start_league))
+    app.add_handler(CommandHandler("startleague", start_league))
     app.add_handler(CommandHandler("leaderboard", show_leaderboard))
     app.add_handler(CommandHandler("endround", end_round))
     app.add_handler(CommandHandler("awards", show_awards))

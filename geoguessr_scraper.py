@@ -3,7 +3,7 @@ from models import Guess, Player, RoundResult, RoundScore
 
 
 from geoguessr_async import Geoguessr, GeoguessrScore
-from settings import PLAYER_ROUND_HANDICAPS
+from settings import NEW_ENTRANT_HANDICAP, PLAYER_ROUND_HANDICAPS
 
 
 async def create_challenge(
@@ -21,7 +21,7 @@ async def create_challenge(
         move=False,
         pan=True,
         zoom=True,
-        timeLimit=90,
+        timeLimit=time_limit_seconds,
         play_map=False,
     )
     return challenge_url
@@ -39,7 +39,7 @@ async def get_challenge_scores(url: str) -> RoundResult:
     challenge_scores: list[RoundScore] = []
     for geoguessr_score in geoguessr_scores:
         playername = geoguessr_score.gamePlayerNick
-        round_hcap = PLAYER_ROUND_HANDICAPS.get(playername, 0)
+        round_hcap = PLAYER_ROUND_HANDICAPS.get(playername, NEW_ENTRANT_HANDICAP)
         player = Player(name=playername, round_hcap=round_hcap)
         guess_points = geoguessr_score.gamePlayerGuessesRoundScoreInPoints
         guess_distances = geoguessr_score.gamePlayerGuessesDistanceInMeters

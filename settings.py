@@ -1,13 +1,13 @@
 PLAYER_ROUND_HANDICAPS = {
     "Bosnia & GetsTheGoldSweena": 0,
     "Grand Duchy of Gregdova": 0,
-    "Ppl's Rep. Glorious Mickistan": 5000,
+    "St. Bics & Devitts": 2000,
+    "Ppl's Rep. Glorious Mickistan": 3000,
     "Danminican Republic": 4000,
-    "St. Bics & Devitts": 3000,
-    "Ellitorial Guinea": 4000,
+    "Ellitorial Guinea": 5000,
 }
 
-NEW_ENTRANT_HANDICAP = 5000
+NEW_ENTRANT_HANDICAP = 3000
 
 PLAYER_SHORTNAMES = {
     "Bosnia & GetsTheGoldSweena": "B&GGS",
