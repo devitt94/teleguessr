@@ -84,9 +84,8 @@ async def end_round(
     await show_leaderboard(update, context, include_awards=include_awards)
 
     if league_state.is_finished:
-        await context.bot.send_message(
-            chat_id, f"🏆 League finished. Winner: {league_state.winner}"
-        )
+        winner = league_state.get_winner()
+        await context.bot.send_message(chat_id, f"🏆 League finished. Winner: {winner}")
     else:
         new_round_url = await create_challenge(
             map_id=MAP_ID,

@@ -68,13 +68,27 @@ class LeagueState(BaseModel):
     def leaderboard(self) -> dict[str, int]:
         return self.__scores
 
-    @property
-    def winner(self) -> str | None:
+    def get_winner(self) -> str:
         if not self.is_finished:
-            return None
+            raise ValueError("League is not finished yet.")
         if not self.__scores:
-            return None
-        return max(self.__scores, key=self.__scores.get)
+            raise ValueError("No scores available to determine a winner.")
+
+        # For tie breakers, the player who had the best score in the last round wins.
+        sorted_leaderboard = sorted(
+            self.__scores.items(), key=lambda x: x[1], reverse=True
+        )
+        top_score = sorted_leaderboard[0][1]
+        top_players = [p for p, s in sorted_leaderboard if s == top_score]
+        if len(top_players) == 1:
+            return top_players[0]
+
+        last_round = self.results[-1]
+        last_round_scores = {rs.player.name: rs.net_score for rs in last_round.scores}
+        top_players_sorted = sorted(
+            top_players, key=lambda p: last_round_scores.get(p, 0), reverse=True
+        )
+        return top_players_sorted[0]
 
     def start_round(self, url: str, hours: int):
         if self.round_in_progress:
