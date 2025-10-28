@@ -92,6 +92,16 @@ class LeagueState(BaseModel):
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
 
+        if result.awards is not None:
+            best_guess_player = result.awards.best_guess.player.name
+            worst_guess_player = result.awards.worst_guess.player.name
+            self.__scores[best_guess_player] = (
+                self.__scores.get(best_guess_player, 0) + 1
+            )
+            self.__scores[worst_guess_player] = (
+                self.__scores.get(worst_guess_player, 0) - 1
+            )
+
         self.current_round = None
 
     def save(self):

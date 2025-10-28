@@ -6,7 +6,7 @@ def get_player_shortname(fullname: str) -> str:
     try:
         return PLAYER_SHORTNAMES[fullname]
     except KeyError:
-        return f"{fullname[:8]}..."
+        return f"{fullname[:7]}..."
 
 
 def format_round_result(result: RoundResult) -> str:
@@ -18,24 +18,32 @@ def format_round_result(result: RoundResult) -> str:
 
     # Sort scores by net score (descending)
     sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
-
     name_width = (
-        max(len(get_player_shortname(rs.player.name)) for rs in sorted_scores) + 2
+        max(len(get_player_shortname(rs.player.name)) for rs in sorted_scores) + 1
     )
-    score_width = 6
-    hcap_width = 6
+    score_width = 5
+    bonus_points = {rs.player.name: 0 for rs in sorted_scores}
+    points_width = 2
+    if result.awards is not None:
+        bonus_points[result.awards.best_guess.player.name] += 1
+        bonus_points[result.awards.worst_guess.player.name] -= 1
+
     lines.append(
-        f"{'Player'.ljust(name_width)}| {'Gross'.rjust(score_width)} | {'Hcap'.rjust(hcap_width)} | {'Net'.rjust(score_width)} | Pts"
+        f"{'Player'.ljust(name_width)}| {'Gross'.rjust(score_width)} | {'Net'.rjust(score_width)} | RP | BP | TP"
     )
-    lines.append("-" * (name_width + score_width * 2 + hcap_width + 14))
+
+    lines.append("-" * (name_width + score_width * 2 + points_width * 3 + 15))
     num_players = len(sorted_scores)
     for i, rs in enumerate(sorted_scores):
+        bonus_points_value = bonus_points[rs.player.name]
+        rank_points = num_players - i
         lines.append(
             f"{get_player_shortname(rs.player.name).ljust(name_width)}| "
             f"{str(rs.gross_score).rjust(score_width)} | "
-            f"{str(rs.player.round_hcap).rjust(6)} | "
             f"{str(rs.net_score).rjust(score_width)} | "
-            f"{str(num_players - i).rjust(3)}"
+            f"{str(rank_points).rjust(points_width)} | "
+            f"{str(bonus_points_value).rjust(points_width)} | "
+            f"{str(bonus_points_value + rank_points).rjust(points_width)}"
         )
     table = "```\n" + "\n".join(lines) + "\n```"
     return table

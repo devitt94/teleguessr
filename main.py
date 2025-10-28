@@ -60,6 +60,7 @@ async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def end_round(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
+    include_awards: bool = False,
 ) -> None:
     if update.effective_user.id != int(ADMIN_ID):
         await update.message.reply_text("You are not authorized to use this command.")
@@ -74,10 +75,13 @@ async def end_round(
     chat_id = update.effective_chat.id
     round_result = await get_challenge_scores(challenge_url)
 
+    if include_awards:
+        round_result.awards = get_best_and_worst_guesses(round_result)
+
     league_state.add_round_result(round_result)
     league_state.save()
 
-    await show_leaderboard(update, context)
+    await show_leaderboard(update, context, include_awards=include_awards)
 
     if league_state.is_finished:
         await context.bot.send_message(
@@ -96,6 +100,13 @@ async def end_round(
             chat_id,
             f"Round {league_state.current_round_num} started! URL: {new_round_url}",
         )
+
+
+async def end_round_with_awards(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    await end_round(update, context, include_awards=True)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -117,13 +128,15 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             chat_id=ADMIN_ID, text=message, parse_mode="HTML"
         )
     except Exception as e:
-        logger.info(f"Failed to send admin alert: {e}")
+        logger.exception(f"Failed to send admin alert: {e}")
 
     # Still print to logs
     logger.info(f"Exception while handling update {update}: {context.error}")
 
 
-async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def show_leaderboard(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, include_awards: bool = False
+):
     global league_state
     if league_state is None:
         update.message.reply_text("No league is currently running.")
@@ -136,9 +149,12 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     latest_round_text = format_round_result(latest_round)
     await update.message.reply_text(
-        f"Round {league_state.current_round_num - 1} Results:\n{latest_round_text}",
+        f"Round {league_state.current_round_num} Results:\n{latest_round_text}",
         parse_mode="MarkdownV2",
     )
+
+    if include_awards:
+        await show_awards(update, context)
 
     leaderboard_text = format_scoreboard(league_state.leaderboard)
     await update.message.reply_text(
@@ -163,7 +179,7 @@ async def show_awards(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     awards = get_best_and_worst_guesses(latest_round)
     message = (
-        f"🏅 <b>Awards for Round {league_state.current_round_num - 1}</b>\n\n"
+        f"🏅 <b>Awards for Round {league_state.current_round_num}</b>\n\n"
         f"🥇 <b>Best Guess:</b> {awards.best_guess.player.name} (Location {awards.best_guess.location_index})\n"
         f"      Distance: {awards.best_guess.guess.distance_km} km\n"
         f"      Average Distance: {awards.best_guess.round_stats.average:.2f} km\n\n"
@@ -193,7 +209,7 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("startleague", start_league))
     app.add_handler(CommandHandler("leaderboard", show_leaderboard))
-    app.add_handler(CommandHandler("endround", end_round))
+    app.add_handler(CommandHandler("endround", end_round_with_awards))
     app.add_handler(CommandHandler("awards", show_awards))
     app.add_error_handler(error_handler)
     logger.info("Bot running...")

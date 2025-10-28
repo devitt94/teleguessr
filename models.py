@@ -30,11 +30,6 @@ class RoundScore(BaseModel):
         return self.gross_score + self.player.round_hcap
 
 
-class RoundResult(BaseModel):
-    challenge_url: str
-    scores: list[RoundScore] = conlist(RoundScore, min_length=1)
-
-
 class GuessStats(BaseModel):
     average: float
     stddev: float
@@ -50,3 +45,9 @@ class Award(BaseModel):
 class Awards(BaseModel):
     best_guess: Award
     worst_guess: Award
+
+
+class RoundResult(BaseModel):
+    challenge_url: str
+    scores: list[RoundScore] = conlist(RoundScore, min_length=1)
+    awards: Awards | None = None
