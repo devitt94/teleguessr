@@ -3,7 +3,10 @@ from models import Guess, Player, RoundResult, RoundScore
 
 
 from geoguessr_async import Geoguessr, GeoguessrScore
-from settings import NEW_ENTRANT_HANDICAP, PLAYER_ROUND_HANDICAPS
+from settings import NEW_ENTRANT_HANDICAP_MULTIPLIER, PLAYER_HANDICAP_MULTIPLIERS
+
+
+MAX_ROUND_SCORE = 25_000
 
 
 async def create_challenge(
@@ -39,14 +42,23 @@ async def get_challenge_scores(url: str) -> RoundResult:
     challenge_scores: list[RoundScore] = []
     for geoguessr_score in geoguessr_scores:
         playername = geoguessr_score.gamePlayerNick
-        round_hcap = PLAYER_ROUND_HANDICAPS.get(playername, NEW_ENTRANT_HANDICAP)
-        player = Player(name=playername, round_hcap=round_hcap)
+        # round_hcap = PLAYER_ROUND_HANDICAPS.get(playername, NEW_ENTRANT_HANDICAP)
+
+        hcap_multiplier = PLAYER_HANDICAP_MULTIPLIERS.get(
+            playername, NEW_ENTRANT_HANDICAP_MULTIPLIER
+        )
+
         guess_points = geoguessr_score.gamePlayerGuessesRoundScoreInPoints
         guess_distances = geoguessr_score.gamePlayerGuessesDistanceInMeters
         guesses = [
             Guess(score=score, distance_km=distance // 1000)
             for score, distance in zip(guess_points, guess_distances)
         ]
+
+        guess_total = sum(guess.score for guess in guesses)
+        round_hcap = int(hcap_multiplier * (MAX_ROUND_SCORE - guess_total))
+
+        player = Player(name=playername, round_hcap=round_hcap)
         round_score = RoundScore(player=player, guesses=guesses)
         challenge_scores.append(round_score)
 

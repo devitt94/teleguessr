@@ -31,8 +31,10 @@ class RoundScore(BaseModel):
 
 
 class GuessStats(BaseModel):
-    average: float
-    stddev: float
+    average_distance: float
+    stddev_distance: float
+    average_pts: float
+    stddev_pts: float
 
 
 class Award(BaseModel):

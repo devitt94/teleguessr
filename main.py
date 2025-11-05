@@ -180,11 +180,11 @@ async def show_awards(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         f"🏅 <b>Awards for Round {league_state.current_round_num}</b>\n\n"
         f"🥇 <b>Best Guess:</b> {awards.best_guess.player.name} (Location {awards.best_guess.location_index})\n"
-        f"      Distance: {awards.best_guess.guess.distance_km} km\n"
-        f"      Average Distance: {awards.best_guess.round_stats.average:.2f} km\n\n"
+        f"      {awards.best_guess.guess.score} pts (Distance: {awards.best_guess.guess.distance_km} km)\n"
+        f"      Average: {awards.best_guess.round_stats.average_pts:.1f} pts (Distance: {awards.best_guess.round_stats.average_distance:.1f} km)\n\n"
         f"💩 <b>Worst Guess:</b> {awards.worst_guess.player.name} (Location {awards.worst_guess.location_index})\n"
-        f"      Distance: {awards.worst_guess.guess.distance_km} km\n"
-        f"      Average Distance: {awards.worst_guess.round_stats.average:.2f} km\n"
+        f"      {awards.worst_guess.guess.score} pts (Distance: {awards.worst_guess.guess.distance_km} km)\n"
+        f"      Average: {awards.worst_guess.round_stats.average_pts:.1f} pts (Distance: {awards.worst_guess.round_stats.average_distance:.1f} km)\n"
     )
 
     await update.message.reply_text(message, parse_mode="HTML")
