@@ -138,12 +138,12 @@ async def show_leaderboard(
 ):
     global league_state
     if league_state is None:
-        update.message.reply_text("No league is currently running.")
+        await update.message.reply_text("No league is currently running.")
         return
 
     latest_round = league_state.results[-1] if league_state.results else None
     if latest_round is None:
-        update.message.reply_text("No rounds have been played yet.")
+        await update.message.reply_text("No rounds have been played yet.")
         return
 
     latest_round_text = format_round_result(latest_round)
