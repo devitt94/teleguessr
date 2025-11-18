@@ -190,6 +190,36 @@ async def show_awards(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode="HTML")
 
 
+async def remind_players(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
+    global league_state
+    if league_state is None or not league_state.round_in_progress:
+        await update.message.reply_text("No round is currently in progress.")
+        return
+
+    challenge_url = league_state.current_round.challenge_url
+    chat_id = update.effective_chat.id
+
+    current_result = await get_challenge_scores(challenge_url)
+    players_finished = current_result.players_finished
+    from settings import PLAYER_SHORTNAMES
+    players_expected = set(PLAYER_SHORTNAMES.keys())
+
+    players_pending = players_expected - players_finished
+    if not players_pending:
+        await context.bot.send_message(
+            chat_id,
+            "All players have finished their guesses for the current round!",
+        )
+        return
+    pending_list = "\n".join(f"- {player}" for player in players_pending)
+    await context.bot.send_message(
+        chat_id,
+        f"⏰ Reminder: The following players have not yet completed their guesses for the current round:\n{pending_list}",
+    )
+
+
 def main():
     global league_state
     league_state = LeagueState(filepath=LEAGUE_FILE)
@@ -209,7 +239,7 @@ def main():
     app.add_handler(CommandHandler("startleague", start_league))
     app.add_handler(CommandHandler("leaderboard", show_leaderboard))
     app.add_handler(CommandHandler("endround", end_round_with_awards))
-    app.add_handler(CommandHandler("awards", show_awards))
+    app.add_handler(CommandHandler("remind", remind_players))
     app.add_error_handler(error_handler)
     logger.info("Bot running...")
     app.run_polling()

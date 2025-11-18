@@ -53,3 +53,8 @@ class RoundResult(BaseModel):
     challenge_url: str
     scores: list[RoundScore] = conlist(RoundScore, min_length=1)
     awards: Awards | None = None
+
+
+    @property
+    def players_finished(self) -> set[str]:
+        return {score.player.name for score in self.scores}
