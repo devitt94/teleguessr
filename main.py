@@ -210,13 +210,14 @@ async def remind_players(
     if not players_pending:
         await context.bot.send_message(
             chat_id,
-            "All players have finished their guesses for the current round!",
+            f"All players have finished round {league_state.current_round_num}!",
         )
         return
     pending_list = "\n".join(f"- {player}" for player in players_pending)
     await context.bot.send_message(
         chat_id,
-        f"⏰ Reminder: The following players have not yet completed their guesses for the current round:\n{pending_list}",
+        f"⏰ Reminder: The following players have not yet completed round {league_state.current_round_num}:\n{pending_list}"
+        f"\n\nRound URL: {challenge_url}",
     )
 
 

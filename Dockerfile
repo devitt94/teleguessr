@@ -9,6 +9,8 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
+COPY data/league.json data/league.json
+
 # Install dependencies using uvsudo systemctl start docker
 RUN uv sync --frozen
 

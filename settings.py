@@ -27,7 +27,7 @@ PLAYER_SHORTNAMES = {
     "Ppl's Rep. Glorious Mickistan": "Mickistan",
     "Danminican Republic": "Danminican",
     "St. Bics & Devitts": "St. Bics",
-    "Ellitorial Guinea": "Ellitorial",
+    "Kingdom of Gregoria I": "Gregoria",
 }
 
 
