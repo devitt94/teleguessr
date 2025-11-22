@@ -113,6 +113,14 @@ async def end_round(
     league_state.add_round_result(round_result)
     league_state.save()
 
+    round_text = format_round_result_html(round_result)
+    
+    await send_html_message(
+        context,
+        update.effective_chat.id,
+        f"Round {league_state.last_round_finished_num} Results:\n\n{round_text}",
+    )
+
     await show_leaderboard(update, context)
 
     if league_state.is_finished:
@@ -171,21 +179,12 @@ async def show_leaderboard(
         await update.message.reply_text("No rounds have been played yet.")
         return
 
-    last_round_text = format_round_result_html(latest_round)
-    
-    await send_html_message(
-        context,
-        update.effective_chat.id,
-        f"Round {league_state.last_round_finished_num} Results:\n\n{last_round_text}",
-    )
-
     leaderboard_text = format_leaderboard_html(**league_state.leaderboard_detail)
     await send_html_message(
         context,
         update.effective_chat.id,
         f"📊 Standings after round {league_state.last_round_finished_num}:\n\n{leaderboard_text}",
     )
-
 
 
 async def remind_players(
