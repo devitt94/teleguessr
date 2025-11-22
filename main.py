@@ -172,19 +172,20 @@ async def show_leaderboard(
         return
 
     last_round_text = format_round_result_html(latest_round)
-    last_round_index = league_state.current_round_num - 1
+    
     await send_html_message(
         context,
         update.effective_chat.id,
-        f"Round {last_round_index} Results:\n\n{last_round_text}",
+        f"Round {league_state.last_round_finished_num} Results:\n\n{last_round_text}",
     )
 
     leaderboard_text = format_leaderboard_html(**league_state.leaderboard_detail)
     await send_html_message(
         context,
         update.effective_chat.id,
-        f"📊 Current League Standings:\n{leaderboard_text}",
+        f"📊 Standings after round {league_state.last_round_finished_num}:\n\n{leaderboard_text}",
     )
+
 
 
 async def remind_players(
@@ -258,7 +259,7 @@ async def simulate_league(
         await send_html_message(
             context,
             update.effective_chat.id,
-            f"📊 Current League Standings:\n{leaderboard_text}",
+            f"📊 Standings after round {sim_league_state.last_round_finished_num}:\n\n{leaderboard_text}",
         )
 
         await asyncio.sleep(5)  # Small delay to avoid flooding

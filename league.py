@@ -59,6 +59,12 @@ class LeagueState(BaseModel):
     @property
     def current_round_num(self) -> int:
         return len(self.results) + 1 if self.round_in_progress else len(self.results)
+    
+    @property
+    def last_round_finished_num(self) -> int:
+        if self.results:
+            return len(self.results)
+        return None
 
     @property
     def is_finished(self) -> bool:
