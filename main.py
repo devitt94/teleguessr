@@ -94,7 +94,6 @@ async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def end_round(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    include_awards: bool = False,
 ) -> None:
     if update.effective_user.id != int(ADMIN_ID):
         await update.message.reply_text("You are not authorized to use this command.")
@@ -109,13 +108,12 @@ async def end_round(
     chat_id = update.effective_chat.id
     round_result = await get_challenge_scores(challenge_url)
 
-    if include_awards:
-        round_result.awards = get_best_and_worst_guesses(round_result)
+    round_result.awards = get_best_and_worst_guesses(round_result)
 
     league_state.add_round_result(round_result)
     league_state.save()
 
-    await show_leaderboard(update, context, include_awards=include_awards)
+    await show_leaderboard(update, context)
 
     if league_state.is_finished:
         winner = league_state.get_winner()
@@ -133,13 +131,6 @@ async def end_round(
             chat_id,
             f"Round {league_state.current_round_num} started! URL: {new_round_url}",
         )
-
-
-async def end_round_with_awards(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
-    await end_round(update, context, include_awards=True)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -168,7 +159,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def show_leaderboard(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, include_awards: bool = False
+    update: Update, context: ContextTypes.DEFAULT_TYPE,
 ):
     global league_state
     if league_state is None:
@@ -230,7 +221,6 @@ async def remind_players(
 async def simulate_league(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    include_awards: bool = True,
 ):
     """Simulate a full league with given challenge URLs for testing purposes."""
 
@@ -251,9 +241,7 @@ async def simulate_league(
         # Simulate waiting for round to end
         round_result = await get_challenge_scores(url)
 
-        # For simulation, we won't assign awards
-        if include_awards:
-            round_result.awards = get_best_and_worst_guesses(round_result)
+        round_result.awards = get_best_and_worst_guesses(round_result)
 
         sim_league_state.add_round_result(round_result)
         sim_league_state.save()
@@ -299,7 +287,7 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("startleague", start_league))
     app.add_handler(CommandHandler("leaderboard", show_leaderboard))
-    app.add_handler(CommandHandler("endround", end_round_with_awards))
+    app.add_handler(CommandHandler("endround", end_round))
     app.add_handler(CommandHandler("remind", remind_players))
     app.add_handler(CommandHandler("simulateTestLeague", simulate_league))
     app.add_error_handler(error_handler)
