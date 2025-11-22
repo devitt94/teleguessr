@@ -30,8 +30,53 @@ def format_scoreboard(scores: dict, header: str = "Total Score") -> str:
     return table
 
 
+def get_rank_emoji(position: int, total_participants: int) -> str:
+    rank_emojis = {1: "🦈", 2: "🥈", 3: "🥉"}
+    rank_emojis[total_participants] = "🐡"
+    return rank_emojis.get(position, "🐟")
+
+
+def format_leaderboard_html(
+    scores: dict,
+    best_guesses: dict,
+    worst_guesses: dict,
+    round_positions: dict,
+) -> str:
+    
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    if not sorted_scores:
+        return "No scores available!"
+
+    blocks = []
+    num_players = len(sorted_scores)
+    for i, (player, score) in enumerate(sorted_scores):
+        position = i+1
+        rank_emoji = get_rank_emoji(position, num_players)
+        pos_str = get_position_str(position)
+
+        round_results = [
+            get_position_str(round_rank) for round_rank in round_positions.get(player, [])
+        ]
+        round_result_str = "-".join(round_results)
+
+        bg_count = best_guesses[player]
+        wg_count = worst_guesses[player]
+        awards_str = f"🐐x{bg_count} 🎣x{wg_count}"
+
+        blocks.append(
+            f"{rank_emoji} <b>{pos_str} — {player}</b>\n"
+            f"    • Score: <b>{score}</b>\n"
+            f"    • Results: <b>{round_result_str}</b>\n"
+            f"    • Awards: <b>{awards_str}</b>\n"
+        )
+
+    return "\n".join(blocks)
+
 def get_position_str(position: int) -> str:
     """Convert a numeric position into its ordinal string representation."""
+    if position < 0:
+        return "DNF"
+    
     suffix = {1: "st", 2: "nd", 3: "rd"}.get(position % 10, "th")
     return f"{position}{suffix}"
 
@@ -71,14 +116,11 @@ def format_round_result_html(result: RoundResult) -> str:
 
     num_players = len(sorted_scores)
 
-    rank_emojis = {1: "🦈", 2: "🥈", 3: "🥉"}
-    rank_emojis[num_players] = "🐡" 
     blocks = []
 
     for i, rs in enumerate(sorted_scores):
         pos = i + 1
         pos_str = get_position_str(pos)
-        rank_emoji = rank_emojis.get(pos, "🐟")
 
         bonus = bonus_points[rs.player.name]
         rank_points = num_players - i
@@ -89,6 +131,8 @@ def format_round_result_html(result: RoundResult) -> str:
             points_str += f" (+{bonus}) = {total_points}"
         elif bonus < 0:
             points_str += f" ({bonus}) = {total_points}"
+
+        rank_emoji = get_rank_emoji(pos, num_players)
 
         block = (
             f"{rank_emoji} <b>{pos_str} — {rs.player.name}</b>\n"

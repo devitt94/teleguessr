@@ -60,7 +60,14 @@ class RoundResult(BaseModel):
     scores: list[RoundScore] = conlist(RoundScore, min_length=1)
     awards: Awards | None = None
 
-
     @property
     def players_finished(self) -> set[str]:
         return {score.player.name for score in self.scores}
+    
+    def get_player_position(self, player_name: str) -> int:
+        sorted_scores = sorted(self.scores, key=lambda rs: rs.net_score, reverse=True)
+        for index, rs in enumerate(sorted_scores):
+            if rs.player.name == player_name:
+                return index + 1
+            
+        return -1

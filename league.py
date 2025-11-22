@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Callable
 from models import ActiveRound, RoundResult
 import json
@@ -34,6 +35,9 @@ class LeagueState(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
         self.__scores: dict[str, int] = {}
+        self.__best_guesses_by_player: dict[str, int] = defaultdict(int)
+        self.__worst_guesses_by_player: dict[str, int] = defaultdict(int)
+        self.__round_results_by_player: dict[str, list[int]] = defaultdict(list)
 
     def load_from_file(self):
         try:
@@ -67,8 +71,23 @@ class LeagueState(BaseModel):
     @property
     def leaderboard(self) -> dict[str, int]:
         return self.__scores
+    
+    @property
+    def leaderboard_detail(self) -> dict[str, dict]:
+        return {
+            "scores": self.__scores,
+            "best_guesses": self.__best_guesses_by_player,
+            "worst_guesses": self.__worst_guesses_by_player,
+            "round_positions": self.__round_results_by_player,
+        }
 
     def get_winner(self) -> str:
+        if not self.is_finished:
+            raise ValueError("League is not finished yet.")
+        if not self.__scores:
+            raise ValueError("No scores available to determine a winner.")
+
+        # For tie bre
         if not self.is_finished:
             raise ValueError("League is not finished yet.")
         if not self.__scores:
@@ -105,6 +124,7 @@ class LeagueState(BaseModel):
         added_scores = ranking_score_manager(result)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
+            self.__round_results_by_player[player].append(result.get_player_position(player))
 
         if result.awards is not None:
             best_guess_player = result.awards.best_guess.player.name
@@ -116,6 +136,9 @@ class LeagueState(BaseModel):
                 self.__scores.get(worst_guess_player, 0) - 1
             )
 
+            self.__best_guesses_by_player[best_guess_player] += 1
+            self.__worst_guesses_by_player[worst_guess_player] += 1
+
         self.current_round = None
 
     def save(self):
@@ -123,3 +146,5 @@ class LeagueState(BaseModel):
         data = self.model_dump_json(exclude=["filepath"], indent=2)
         with open(self.filepath, "w") as f:
             f.write(data)
+
+    

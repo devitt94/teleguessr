@@ -2,7 +2,7 @@ import asyncio
 import os
 from pathlib import Path
 import traceback
-from formatters import format_awards_html, format_round_result_html, format_scoreboard
+from formatters import format_round_result_html, format_leaderboard_html
 from league import LeagueState
 import dotenv
 from telegram import Update
@@ -188,8 +188,8 @@ async def show_leaderboard(
         f"Round {last_round_index} Results:\n\n{last_round_text}",
     )
 
-    leaderboard_text = format_scoreboard(league_state.leaderboard)
-    await send_markdown_message(
+    leaderboard_text = format_leaderboard_html(**league_state.leaderboard_detail)
+    await send_html_message(
         context,
         update.effective_chat.id,
         f"📊 Current League Standings:\n{leaderboard_text}",
@@ -263,11 +263,11 @@ async def simulate_league(
         await send_html_message(
             context,
             update.effective_chat.id,
-            f"Round {sim_league_state.current_round_num} Results:\n{latest_round_text}",
+            f"Round {sim_league_state.current_round_num} Results:\n\n{latest_round_text}",
         )
         
-        leaderboard_text = format_scoreboard(sim_league_state.leaderboard)
-        await send_markdown_message(
+        leaderboard_text = format_leaderboard_html(**sim_league_state.leaderboard_detail)
+        await send_html_message(
             context,
             update.effective_chat.id,
             f"📊 Current League Standings:\n{leaderboard_text}",
