@@ -1,6 +1,8 @@
 from datetime import datetime
-from pydantic import BaseModel, conlist
+from pydantic import BaseModel, confloat, conlist
 
+
+MAX_ROUND_SCORE = 25_000
 
 class Guess(BaseModel):
     score: int
@@ -9,7 +11,7 @@ class Guess(BaseModel):
 
 class Player(BaseModel):
     name: str
-    round_hcap: int = 0
+    hcap_multiplier: confloat(ge=0.0, le=1.0)
 
 
 class ActiveRound(BaseModel):
@@ -26,8 +28,12 @@ class RoundScore(BaseModel):
         return sum(guess.score for guess in self.guesses)
 
     @property
+    def hcap_adjustment(self) -> int:
+        return int(self.player.hcap_multiplier * (MAX_ROUND_SCORE - self.gross_score))
+        
+    @property
     def net_score(self) -> int:
-        return self.gross_score + self.player.round_hcap
+        return self.gross_score + self.hcap_adjustment
 
 
 class GuessStats(BaseModel):

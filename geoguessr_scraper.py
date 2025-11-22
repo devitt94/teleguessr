@@ -42,7 +42,6 @@ async def get_challenge_scores(url: str) -> RoundResult:
     challenge_scores: list[RoundScore] = []
     for geoguessr_score in geoguessr_scores:
         playername = geoguessr_score.gamePlayerNick
-        # round_hcap = PLAYER_ROUND_HANDICAPS.get(playername, NEW_ENTRANT_HANDICAP)
 
         hcap_multiplier = PLAYER_HANDICAP_MULTIPLIERS.get(
             playername, NEW_ENTRANT_HANDICAP_MULTIPLIER
@@ -55,10 +54,7 @@ async def get_challenge_scores(url: str) -> RoundResult:
             for score, distance in zip(guess_points, guess_distances)
         ]
 
-        guess_total = sum(guess.score for guess in guesses)
-        round_hcap = int(hcap_multiplier * (MAX_ROUND_SCORE - guess_total))
-
-        player = Player(name=playername, round_hcap=round_hcap)
+        player = Player(name=playername, hcap_multiplier=hcap_multiplier)
         round_score = RoundScore(player=player, guesses=guesses)
         challenge_scores.append(round_score)
 

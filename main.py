@@ -1,7 +1,8 @@
+import asyncio
 import os
 from pathlib import Path
 import traceback
-from formatters import format_round_result, format_scoreboard
+from formatters import format_awards_html, format_round_result_html, format_scoreboard
 from league import LeagueState
 import dotenv
 from telegram import Update
@@ -25,6 +26,39 @@ LEAGUE_FILE = Path("data/league.json")
 ADMIN_ID = int(os.getenv("ADMIN_TELEGRAM_ID"))
 MAP_ID = os.getenv("MAP_ID")
 TIME_LIMIT_PER_GUESS_SECONDS = int(os.getenv("TIME_LIMIT_PER_GUESS_SECONDS", "90"))
+
+
+async def send_markdown_message(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    message: str,
+):
+    """Send a markdown-formatted message to a chat."""
+    
+    def escape_markdown_v2(text: str) -> str:
+        """Escape characters for Telegram MarkdownV2."""
+        to_escape = r'_*[]()~`>#+-=|{}.!'
+        return ''.join("\\" + c if c in to_escape else c for c in text)
+    
+    message = escape_markdown_v2(message)
+    
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=message,
+        parse_mode="MarkdownV2",
+    )
+
+async def send_html_message(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    message: str,
+):
+    """Send an HTML-formatted message to a chat."""
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=message,
+        parse_mode="HTML",
+    )
 
 
 async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -146,48 +180,20 @@ async def show_leaderboard(
         await update.message.reply_text("No rounds have been played yet.")
         return
 
-    latest_round_text = format_round_result(latest_round)
-    await update.message.reply_text(
-        f"Round {league_state.current_round_num} Results:\n{latest_round_text}",
-        parse_mode="MarkdownV2",
+    last_round_text = format_round_result_html(latest_round)
+    last_round_index = league_state.current_round_num - 1
+    await send_html_message(
+        context,
+        update.effective_chat.id,
+        f"Round {last_round_index} Results:\n\n{last_round_text}",
     )
-
-    if include_awards:
-        await show_awards(update, context)
 
     leaderboard_text = format_scoreboard(league_state.leaderboard)
-    await update.message.reply_text(
-        f"📊 Current League Standings:\n{leaderboard_text}", parse_mode="MarkdownV2"
+    await send_markdown_message(
+        context,
+        update.effective_chat.id,
+        f"📊 Current League Standings:\n{leaderboard_text}",
     )
-
-
-async def show_awards(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != int(ADMIN_ID):
-        await update.message.reply_text("You are not authorized to use this command.")
-        return
-
-    global league_state
-    if league_state is None:
-        update.message.reply_text("No league is currently running.")
-        return
-
-    latest_round = league_state.results[-1] if league_state.results else None
-    if latest_round is None:
-        update.message.reply_text("No rounds have been played yet.")
-        return
-
-    awards = get_best_and_worst_guesses(latest_round)
-    message = (
-        f"🏅 <b>Awards for Round {league_state.current_round_num}</b>\n\n"
-        f"🥇 <b>Best Guess:</b> {awards.best_guess.player.name} (Location {awards.best_guess.location_index})\n"
-        f"      {awards.best_guess.guess.score} pts (Distance: {awards.best_guess.guess.distance_km} km)\n"
-        f"      Average: {awards.best_guess.round_stats.average_pts:.1f} pts (Distance: {awards.best_guess.round_stats.average_distance:.1f} km)\n\n"
-        f"💩 <b>Worst Guess:</b> {awards.worst_guess.player.name} (Location {awards.worst_guess.location_index})\n"
-        f"      {awards.worst_guess.guess.score} pts (Distance: {awards.worst_guess.guess.distance_km} km)\n"
-        f"      Average: {awards.worst_guess.round_stats.average_pts:.1f} pts (Distance: {awards.worst_guess.round_stats.average_distance:.1f} km)\n"
-    )
-
-    await update.message.reply_text(message, parse_mode="HTML")
 
 
 async def remind_players(
@@ -221,6 +227,60 @@ async def remind_players(
     )
 
 
+async def simulate_league(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    include_awards: bool = True,
+):
+    """Simulate a full league with given challenge URLs for testing purposes."""
+
+
+    challenge_urls = [
+        "https://www.geoguessr.com/challenge/q1jl07AoTdu9XqVr",
+        "https://www.geoguessr.com/challenge/TBoioOIrdqrFZJIQ",
+        "https://www.geoguessr.com/challenge/gVmY1NVOqnaHnHy4",
+        "https://www.geoguessr.com/challenge/KGI2gHP15ejmDGVg",
+        "https://www.geoguessr.com/challenge/989O8zGW1iWsfrsu",
+    ]
+    random_str = os.urandom(4).hex()
+    sim_league_state = LeagueState(filepath=f"data/simulated_league_{random_str}.json", num_rounds=len(challenge_urls))
+    for url in challenge_urls:
+        
+        sim_league_state.start_round(url=url, hours=1)
+
+        # Simulate waiting for round to end
+        round_result = await get_challenge_scores(url)
+
+        # For simulation, we won't assign awards
+        if include_awards:
+            round_result.awards = get_best_and_worst_guesses(round_result)
+
+        sim_league_state.add_round_result(round_result)
+        sim_league_state.save()
+
+        
+        latest_round_text = format_round_result_html(round_result)
+        await send_html_message(
+            context,
+            update.effective_chat.id,
+            f"Round {sim_league_state.current_round_num} Results:\n{latest_round_text}",
+        )
+        
+        leaderboard_text = format_scoreboard(sim_league_state.leaderboard)
+        await send_markdown_message(
+            context,
+            update.effective_chat.id,
+            f"📊 Current League Standings:\n{leaderboard_text}",
+        )
+
+        await asyncio.sleep(5)  # Small delay to avoid flooding
+
+
+    winner = sim_league_state.get_winner()
+    await context.bot.send_message(update.effective_chat.id, f"🏆 League finished. Winner: {winner}")
+
+
+
 def main():
     global league_state
     league_state = LeagueState(filepath=LEAGUE_FILE)
@@ -241,6 +301,7 @@ def main():
     app.add_handler(CommandHandler("leaderboard", show_leaderboard))
     app.add_handler(CommandHandler("endround", end_round_with_awards))
     app.add_handler(CommandHandler("remind", remind_players))
+    app.add_handler(CommandHandler("simulateTestLeague", simulate_league))
     app.add_error_handler(error_handler)
     logger.info("Bot running...")
     app.run_polling()
