@@ -179,7 +179,8 @@ async def show_leaderboard(
         await update.message.reply_text("No rounds have been played yet.")
         return
 
-    leaderboard_text = format_leaderboard_html(**league_state.leaderboard_detail)
+    leaderboard = league_state.get_leaderboard_data()
+    leaderboard_text = format_leaderboard_html(**leaderboard)
     await send_html_message(
         context,
         update.effective_chat.id,
@@ -226,8 +227,8 @@ async def simulate_league(
 
 
     challenge_urls = [
-        "https://www.geoguessr.com/challenge/q1jl07AoTdu9XqVr",
-        "https://www.geoguessr.com/challenge/TBoioOIrdqrFZJIQ",
+        "https://www.geoguessr.com/challenge/X37AfCqv57u8rGdz",
+        "https://www.geoguessr.com/challenge/J2tCBccFnlJq1eUD",
         "https://www.geoguessr.com/challenge/gVmY1NVOqnaHnHy4",
         "https://www.geoguessr.com/challenge/KGI2gHP15ejmDGVg",
         "https://www.geoguessr.com/challenge/989O8zGW1iWsfrsu",
@@ -254,7 +255,8 @@ async def simulate_league(
             f"Round {sim_league_state.current_round_num} Results:\n\n{latest_round_text}",
         )
         
-        leaderboard_text = format_leaderboard_html(**sim_league_state.leaderboard_detail)
+        leaderboard = sim_league_state.get_leaderboard_data()
+        leaderboard_text = format_leaderboard_html(**leaderboard)
         await send_html_message(
             context,
             update.effective_chat.id,

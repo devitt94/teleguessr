@@ -74,17 +74,31 @@ class LeagueState(BaseModel):
     def round_in_progress(self) -> bool:
         return self.current_round is not None
 
-    @property
-    def leaderboard(self) -> dict[str, int]:
-        return self.__scores
+    def construct_leaderboard(self) -> dict[int, list[str]]:
+        """Returns a mapping of rank to list of player names at that rank."""
+        rank_map: dict[int, list[str]] = defaultdict(list)
+        sorted_scores = sorted(
+            self.__scores.items(), key=lambda x: x[1], reverse=True
+        )
+        current_rank = 1
+        last_score = None
+        for player, score in sorted_scores:
+            if last_score is None or score < last_score:
+                rank_map[current_rank].append(player)
+                last_score = score
+            else:
+                rank_map[current_rank - 1].append(player)
+            current_rank += 1
+            
+        return dict(rank_map)
     
-    @property
-    def leaderboard_detail(self) -> dict[str, dict]:
+    def get_leaderboard_data(self) -> dict[str, dict]:
         return {
-            "scores": self.__scores,
+            "leaderboard": self.construct_leaderboard(),
             "best_guesses": self.__best_guesses_by_player,
             "worst_guesses": self.__worst_guesses_by_player,
             "round_positions": self.__round_results_by_player,
+            "scores": self.__scores,
         }
 
     def get_winner(self) -> str:

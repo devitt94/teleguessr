@@ -71,3 +71,9 @@ class RoundResult(BaseModel):
                 return index + 1
             
         return -1
+
+
+class PlayerPosition(BaseModel):
+    player: Player
+    score: int
+    position: int

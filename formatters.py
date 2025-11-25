@@ -37,48 +37,50 @@ def get_rank_emoji(position: int, total_participants: int) -> str:
 
 
 def format_leaderboard_html(
-    scores: dict,
+    leaderboard: dict[int, list[str]],
+    scores: dict[str, int],
     best_guesses: dict,
     worst_guesses: dict,
     round_positions: dict,
 ) -> str:
     
-    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    if not sorted_scores:
-        return "No scores available!"
-
     blocks = []
-    num_players = len(sorted_scores)
-    for i, (player, score) in enumerate(sorted_scores):
-        position = i+1
+    num_players = len(scores)
+    for position, players in leaderboard.items():
+        
         rank_emoji = get_rank_emoji(position, num_players)
-        pos_str = get_position_str(position)
+        pos_str = get_position_str(position, tied=len(players) > 1)
 
-        round_results = [
-            get_position_str(round_rank) for round_rank in round_positions.get(player, [])
-        ]
-        round_result_str = "-".join(round_results)
+        for player in players:
+            round_results = [
+                get_position_str(round_rank) for round_rank in round_positions.get(player, [])
+            ]
+            score = scores[player]
+            round_result_str = "-".join(round_results)
 
-        bg_count = best_guesses[player]
-        wg_count = worst_guesses[player]
-        awards_str = f"🐐x{bg_count} 🎣x{wg_count}"
+            bg_count = best_guesses[player]
+            wg_count = worst_guesses[player]
+            awards_str = f"🐐x{bg_count} 🎣x{wg_count}"
 
-        blocks.append(
-            f"{rank_emoji} <b>{pos_str} — {player}</b>\n"
-            f"    • Score: <b>{score}</b>\n"
-            f"    • Results: <b>{round_result_str}</b>\n"
-            f"    • Awards: <b>{awards_str}</b>\n"
-        )
+            blocks.append(
+                f"{rank_emoji} <b>{pos_str} — {player}</b>\n"
+                f"    • Score: <b>{score}</b>\n"
+                f"    • Results: <b>{round_result_str}</b>\n"
+                f"    • Awards: <b>{awards_str}</b>\n"
+            )
 
     return "\n".join(blocks)
 
-def get_position_str(position: int) -> str:
+def get_position_str(position: int, tied: bool = False) -> str:
     """Convert a numeric position into its ordinal string representation."""
     if position < 0:
         return "DNF"
     
     suffix = {1: "st", 2: "nd", 3: "rd"}.get(position % 10, "th")
-    return f"{position}{suffix}"
+    pos_str = f"{position}{suffix}"
+    if tied:
+        pos_str = f"={pos_str}"
+    return pos_str
 
 
 def format_awards_html(awards: Awards) -> str:
