@@ -1,6 +1,6 @@
 from collections import defaultdict
 from typing import Callable
-from models import ActiveRound, RoundResult
+from models import ActiveRound, ChallengeResult, RankedGuess
 import json
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -8,17 +8,17 @@ from pydantic import BaseModel, Field
 from settings import NUM_ROUNDS_PER_LEAGUE
 
 
-ScoreManager = Callable[[RoundResult], dict[str, int]]
+ScoreManager = Callable[[ChallengeResult], dict[str, int]]
 
 
-def default_score_manager(result: RoundResult) -> dict[str, int]:
+def default_score_manager(result: ChallengeResult) -> dict[str, int]:
     scores: dict[str, int] = {}
     for round_score in result.scores:
         scores[round_score.player.name] = round_score.net_score
     return scores
 
 
-def ranking_score_manager(result: RoundResult) -> dict[str, int]:
+def ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
     sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
     scores: dict[str, int] = {}
     for rank, round_score in enumerate(sorted_scores, start=1):
@@ -29,7 +29,7 @@ def ranking_score_manager(result: RoundResult) -> dict[str, int]:
 class LeagueState(BaseModel):
     filepath: Path = Field(frozen=True)
     num_rounds: int = Field(default=NUM_ROUNDS_PER_LEAGUE)
-    results: list[RoundResult] = Field(default_factory=list)
+    results: list[ChallengeResult] = Field(default_factory=list)
     current_round: ActiveRound | None = None
 
     def __init__(self, **data):
@@ -139,27 +139,27 @@ class LeagueState(BaseModel):
         end_time = datetime.utcnow() + timedelta(hours=hours)
         self.current_round = ActiveRound(challenge_url=url, end_time=end_time)
 
-    def add_round_result(self, result: RoundResult):
+    def add_round_result(self, result: ChallengeResult):
         self.results.append(result)
         added_scores = ranking_score_manager(result)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
             self.__round_results_by_player[player].append(result.get_player_position(player))
 
-        if result.awards is not None:
-            best_guess_player = result.awards.best_guess.player.name
-            worst_guess_player = result.awards.worst_guess.player.name
-            self.__scores[best_guess_player] = (
-                self.__scores.get(best_guess_player, 0) + 1
-            )
-            self.__scores[worst_guess_player] = (
-                self.__scores.get(worst_guess_player, 0) - 1
-            )
-
-            self.__best_guesses_by_player[best_guess_player] += 1
-            self.__worst_guesses_by_player[worst_guess_player] += 1
-
         self.current_round = None
+
+    def add_awards(self, best_guess: RankedGuess, worst_guess: RankedGuess):
+        best_guess_player = best_guess.player.name
+        worst_guess_player = worst_guess.player.name
+        self.__scores[best_guess_player] = (
+            self.__scores.get(best_guess_player, 0) + 1
+        )
+        self.__scores[worst_guess_player] = (
+            self.__scores.get(worst_guess_player, 0) - 1
+        )
+
+        self.__best_guesses_by_player[best_guess_player] += 1
+        self.__worst_guesses_by_player[worst_guess_player] += 1
 
     def save(self):
         self.filepath.parent.mkdir(parents=True, exist_ok=True)

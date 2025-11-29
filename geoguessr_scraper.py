@@ -1,5 +1,5 @@
 import os
-from models import Guess, Player, RoundResult, RoundScore
+from models import Guess, Player, ChallengeResult, ChallengeScore
 
 
 from geoguessr_async import Geoguessr, GeoguessrScore
@@ -30,7 +30,7 @@ async def create_challenge(
     return challenge_url
 
 
-async def get_challenge_scores(url: str) -> RoundResult:
+async def get_challenge_scores(url: str) -> ChallengeResult:
     """
     Scrape player names and scores from a GeoGuessr challenge page.
     (Assumes the challenge is public.)
@@ -39,7 +39,7 @@ async def get_challenge_scores(url: str) -> RoundResult:
     client = Geoguessr(os.getenv("NCFA_COOKIE"))
 
     geoguessr_scores: list[GeoguessrScore] = await client.get_challenge_score(url)
-    challenge_scores: list[RoundScore] = []
+    challenge_scores: list[ChallengeScore] = []
     for geoguessr_score in geoguessr_scores:
         playername = geoguessr_score.gamePlayerNick
 
@@ -50,12 +50,12 @@ async def get_challenge_scores(url: str) -> RoundResult:
         guess_points = geoguessr_score.gamePlayerGuessesRoundScoreInPoints
         guess_distances = geoguessr_score.gamePlayerGuessesDistanceInMeters
         guesses = [
-            Guess(score=score, distance_km=distance // 1000)
+            Guess(score=score, distance_km=distance / 1000)
             for score, distance in zip(guess_points, guess_distances)
         ]
 
         player = Player(name=playername, hcap_multiplier=hcap_multiplier)
-        round_score = RoundScore(player=player, guesses=guesses)
+        round_score = ChallengeScore(player=player, guesses=guesses)
         challenge_scores.append(round_score)
 
-    return RoundResult(challenge_url=url, scores=challenge_scores)
+    return ChallengeResult(challenge_url=url, scores=challenge_scores)

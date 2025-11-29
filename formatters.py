@@ -1,4 +1,4 @@
-from models import Awards, RoundResult
+from models import Awards, ChallengeResult, RankedGuess
 from settings import PLAYER_SHORTNAMES
 
 
@@ -83,38 +83,38 @@ def get_position_str(position: int, tied: bool = False) -> str:
     return pos_str
 
 
-def format_awards_html(awards: Awards) -> str:
+def format_awards_html(ranked_guesses: list[RankedGuess]) -> str:
     lines = []
-    if awards.best_guess:
-        bg = awards.best_guess
-        lines.append(
-            f"🐐 <b>Best Guess Award</b>\n"
-            f"   • Player: {bg.player.name}\n"
-            f"   • Distance: <b>{bg.guess.distance_km:.2f} km</b> (Average: {bg.round_stats.average_distance:.2f} km)\n"
-            f"   • Score: <b>{bg.guess.score} pts</b> (Average: {bg.round_stats.average_pts:.2f} pts)\n"
-            f"   • Location: <b>{bg.location_index}</b>"
-        )
-    if awards.worst_guess:
-        wg = awards.worst_guess
-        lines.append(
-            f"🎣 <b>Worst Guess Award</b>\n"
-            f"   • Player: {wg.player.name}\n"
-            f"   • Distance: <b>{wg.guess.distance_km:.2f} km</b> (Average: {wg.round_stats.average_distance:.2f} km)\n"
-            f"   • Score: <b>{wg.guess.score} pts</b> (Average: {wg.round_stats.average_pts:.2f} pts)\n"
-            f"   • Location: <b>{wg.location_index}</b>"
-        )
+    
+    bg = ranked_guesses[0]
+    lines.append(
+        f"🐐 <b>Best Guess Award</b>\n"
+        f"   • Player: {bg.player.name}\n"
+        f"   • Distance: <b>{bg.guess.distance_km:.2f} km</b> (Average: {bg.guess_stats.average_distance:.2f} km)\n"
+        f"   • Score: <b>{bg.guess.score} pts</b> (Average: {bg.guess_stats.average_pts:.2f} pts)\n"
+        f"   • Location: <b>{bg.location_index}</b>"
+    )
+    wg = ranked_guesses[-1]
+    lines.append(
+        f"🎣 <b>Worst Guess Award</b>\n"
+        f"   • Player: {wg.player.name}\n"
+        f"   • Distance: <b>{wg.guess.distance_km:.2f} km</b> (Average: {wg.guess_stats.average_distance:.2f} km)\n"
+        f"   • Score: <b>{wg.guess.score} pts</b> (Average: {wg.guess_stats.average_pts:.2f} pts)\n"
+        f"   • Location: <b>{wg.location_index}</b>"
+    )
     return "\n\n".join(lines)
 
-def format_round_result_html(result: RoundResult) -> str:
+def format_round_result_html(result: ChallengeResult, ranked_guesses: list[RankedGuess]) -> str:
     if not result.scores:
         return "⚠️ No scores available!"
 
     sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
 
     bonus_points = {rs.player.name: 0 for rs in sorted_scores}
-    if result.awards:
-        bonus_points[result.awards.best_guess.player.name] += 1
-        bonus_points[result.awards.worst_guess.player.name] -= 1
+    best_guess_player = ranked_guesses[0].player.name
+    worst_guess_player = ranked_guesses[-1].player.name
+    bonus_points[best_guess_player] += 1  # Best Guess bonus
+    bonus_points[worst_guess_player] -= 1  # Worst Guess penalty
 
     num_players = len(sorted_scores)
 
@@ -148,9 +148,8 @@ def format_round_result_html(result: RoundResult) -> str:
         blocks.append(block)
 
 
-    if result.awards:
-        blocks.append("-" * 60)
-        awards_block = format_awards_html(result.awards)
-        blocks.append(awards_block)
+    blocks.append("-" * 60)
+    awards_block = format_awards_html(ranked_guesses)
+    blocks.append(awards_block)
 
     return "\n".join(blocks)

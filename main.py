@@ -12,7 +12,7 @@ from telegram.ext import (
     ContextTypes,
 )
 from geoguessr_scraper import create_challenge, get_challenge_scores
-from awards import get_best_and_worst_guesses
+from awards import get_ranked_guesses
 
 from settings import TIME_PER_ROUND_HOURS
 
@@ -108,12 +108,13 @@ async def end_round(
     chat_id = update.effective_chat.id
     round_result = await get_challenge_scores(challenge_url)
 
-    round_result.awards = get_best_and_worst_guesses(round_result)
+    ranked_guesses = get_ranked_guesses(round_result)
 
     league_state.add_round_result(round_result)
+    league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
     league_state.save()
 
-    round_text = format_round_result_html(round_result)
+    round_text = format_round_result_html(round_result, ranked_guesses)
     
     await send_html_message(
         context,
@@ -242,13 +243,14 @@ async def simulate_league(
         # Simulate waiting for round to end
         round_result = await get_challenge_scores(url)
 
-        round_result.awards = get_best_and_worst_guesses(round_result)
+        ranked_guesses = get_ranked_guesses(round_result)
 
         sim_league_state.add_round_result(round_result)
+        sim_league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
         sim_league_state.save()
 
         
-        latest_round_text = format_round_result_html(round_result)
+        latest_round_text = format_round_result_html(round_result, ranked_guesses)
         await send_html_message(
             context,
             update.effective_chat.id,

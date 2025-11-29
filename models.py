@@ -19,7 +19,7 @@ class ActiveRound(BaseModel):
     end_time: datetime
 
 
-class RoundScore(BaseModel):
+class ChallengeScore(BaseModel):
     player: Player
     guesses: list[Guess] = conlist(Guess, min_length=1)
 
@@ -38,8 +38,10 @@ class RoundScore(BaseModel):
 
 class GuessStats(BaseModel):
     average_distance: float
+    median_distance: float
     stddev_distance: float
     average_pts: float
+    median_pts: float
     stddev_pts: float
 
 
@@ -55,10 +57,24 @@ class Awards(BaseModel):
     worst_guess: Award
 
 
-class RoundResult(BaseModel):
+class PlayerPosition(BaseModel):
+    player: Player
+    score: int
+    position: int
+
+
+class RankedGuess(BaseModel):
+    player: Player
+    guess: Guess
+    guess_stats: GuessStats
+    location_index: int
+    rayleigh_score: float
+
+
+class ChallengeResult(BaseModel):
     challenge_url: str
-    scores: list[RoundScore] = conlist(RoundScore, min_length=1)
-    awards: Awards | None = None
+    scores: list[ChallengeScore] = conlist(ChallengeScore, min_length=1)
+    ranked_guesses: list[RankedGuess] | None = None
 
     @property
     def players_finished(self) -> set[str]:
@@ -71,9 +87,13 @@ class RoundResult(BaseModel):
                 return index + 1
             
         return -1
+    
+    def get_round_guesses(self, round_index: int) -> dict[str, Guess]:
+        return {rs.player.name: rs.guesses[round_index] for rs in self.scores}
 
-
-class PlayerPosition(BaseModel):
-    player: Player
-    score: int
-    position: int
+    def get_guess(self, player_name: str, round_index: int) -> Guess:
+        guess = self.get_round_guesses(round_index).get(player_name)
+        if not guess:
+            raise ValueError(f"Player {player_name} did not participate in round {round_index}")
+        return guess
+    
