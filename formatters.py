@@ -42,6 +42,7 @@ def format_leaderboard_html(
     best_guesses: dict,
     worst_guesses: dict,
     round_positions: dict,
+    rounds_played: int,
 ) -> str:
     
     blocks = []
@@ -52,9 +53,14 @@ def format_leaderboard_html(
         pos_str = get_position_str(position, tied=len(players) > 1)
 
         for player in players:
-            round_results = [
-                get_position_str(round_rank) for round_rank in round_positions.get(player, [])
-            ]
+            round_results = [] 
+            player_round_positions: dict[int, int] = round_positions.get(player, {})
+            for round_index in range(1, rounds_played + 1):
+                round_rank = player_round_positions.get(round_index, -1)
+                round_results.append(
+                    get_position_str(round_rank)
+                )
+
             score = scores[player]
             round_result_str = "-".join(round_results)
 

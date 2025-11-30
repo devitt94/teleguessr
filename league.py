@@ -37,7 +37,7 @@ class LeagueState(BaseModel):
         self.__scores: dict[str, int] = {}
         self.__best_guesses_by_player: dict[str, int] = defaultdict(int)
         self.__worst_guesses_by_player: dict[str, int] = defaultdict(int)
-        self.__round_results_by_player: dict[str, list[int]] = defaultdict(list)
+        self.__round_results_by_player: dict[str, dict[int, str]] = defaultdict(dict)
 
     def load_from_file(self):
         try:
@@ -99,6 +99,7 @@ class LeagueState(BaseModel):
             "worst_guesses": self.__worst_guesses_by_player,
             "round_positions": self.__round_results_by_player,
             "scores": self.__scores,
+            "rounds_played": self.last_round_finished_num or 0
         }
 
     def get_winner(self) -> str:
@@ -144,7 +145,7 @@ class LeagueState(BaseModel):
         added_scores = ranking_score_manager(result)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
-            self.__round_results_by_player[player].append(result.get_player_position(player))
+            self.__round_results_by_player[player][self.current_round_num - 1] = result.get_player_position(player)
 
         self.current_round = None
 
