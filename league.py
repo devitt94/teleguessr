@@ -168,4 +168,12 @@ class LeagueState(BaseModel):
         with open(self.filepath, "w") as f:
             f.write(data)
 
+    def get_time_left_seconds(self) -> int:
+        if not self.round_in_progress:
+            return 0
+        from datetime import datetime
+
+        now = datetime.now(self.current_round.end_time.tzinfo)
+        delta = self.current_round.end_time - now
+        return max(0, int(delta.total_seconds()))
     

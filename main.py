@@ -1,8 +1,9 @@
 import asyncio
+from datetime import datetime
 import os
 from pathlib import Path
 import traceback
-from formatters import format_awards_html, format_round_result_html, format_leaderboard_html
+from formatters import format_awards_html, format_round_result_html, format_leaderboard_html, format_time
 from league import LeagueState
 import dotenv
 from telegram import Update
@@ -82,16 +83,36 @@ async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         league_state.start_round(url=new_round_url, hours=TIME_PER_ROUND_HOURS)
         league_state.save()
+        message = (
+            f"First round started! URL: {new_round_url}\n"
+            f"This round will end in {format_time(int(TIME_PER_ROUND_HOURS*3600))}."
+        )
+
         await context.bot.send_message(
             update.effective_chat.id,
-            f"First round started! URL: {new_round_url}",
+            message,
+        )
+
+        end_round_in = TIME_PER_ROUND_HOURS * 3600
+        reminder_in = int(end_round_in * 23/24) # 23 hours
+
+        context.job_queue.run_once(
+            daily_reminder,
+            when=reminder_in,
+            chat_id=update.effective_chat.id,
+        )
+
+        context.job_queue.run_once(
+            daily_round_finish,
+            when=end_round_in,
+            chat_id=update.effective_chat.id,
         )
     else:
         await update.message.reply_text("A league is already running.")
         return
 
 
-async def end_round(
+async def end_round_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
@@ -104,8 +125,15 @@ async def end_round(
         await update.message.reply_text("No round is currently in progress.")
         return
 
+    await end_current_round(context, update.effective_chat.id)
+
+
+async def end_current_round(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+) -> None:
+    
     challenge_url = league_state.current_round.challenge_url
-    chat_id = update.effective_chat.id
     round_result = await get_challenge_scores(challenge_url)
 
     ranked_guesses = get_ranked_guesses(round_result)
@@ -118,11 +146,11 @@ async def end_round(
     
     await send_html_message(
         context,
-        update.effective_chat.id,
+        chat_id,
         f"Round {league_state.last_round_finished_num} Results:\n\n{round_text}",
     )
 
-    await show_leaderboard(update, context)
+    await show_leaderboard(chat_id=chat_id, context=context)
 
     if league_state.is_finished:
         winner = league_state.get_winner()
@@ -136,9 +164,26 @@ async def end_round(
         league_state.start_round(url=new_round_url, hours=TIME_PER_ROUND_HOURS)
         league_state.save()
 
+        message = (
+            f"Next round {league_state.current_round_num} started! URL: {new_round_url}\n"
+            f"This round will end in {format_time(int(TIME_PER_ROUND_HOURS*3600))}."
+        )
+
+        context.job_queue.run_once(
+            daily_reminder,
+            when=int(TIME_PER_ROUND_HOURS * 3600 * 23/24), # 23 hours
+            chat_id=chat_id,
+        )
+
+        context.job_queue.run_once(
+            daily_round_finish,
+            when=int(TIME_PER_ROUND_HOURS * 3600),
+            chat_id=chat_id,
+        )
+
         await context.bot.send_message(
             chat_id,
-            f"Round {league_state.current_round_num} started! URL: {new_round_url}",
+            message,
         )
 
 
@@ -168,25 +213,71 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def show_leaderboard(
-    update: Update, context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    context: ContextTypes.DEFAULT_TYPE,
 ):
     global league_state
     if league_state is None:
-        await update.message.reply_text("No league is currently running.")
+        await context.bot.send_message(chat_id, "No league is currently running.")
         return
 
     latest_round = league_state.results[-1] if league_state.results else None
     if latest_round is None:
-        await update.message.reply_text("No rounds have been played yet.")
+        await context.bot.send_message(chat_id, "No rounds have been played yet.")
         return
 
     leaderboard = league_state.get_leaderboard_data()
     leaderboard_text = format_leaderboard_html(**leaderboard)
     await send_html_message(
         context,
-        update.effective_chat.id,
+        chat_id,
         f"📊 Standings after round {league_state.last_round_finished_num}:\n\n{leaderboard_text}",
     )
+
+async def daily_reminder(
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    global league_state
+    if league_state is None or not league_state.round_in_progress:
+        return
+
+    challenge_url = league_state.current_round.challenge_url
+    chat_id = context.job.chat_id
+
+    current_result = await get_challenge_scores(challenge_url)
+    players_finished = current_result.players_finished
+    from settings import PLAYER_SHORTNAMES
+    players_expected = set(PLAYER_SHORTNAMES.keys())
+
+    time_left = league_state.get_time_left_seconds()
+    time_left_str = format_time(time_left)
+
+    players_pending = players_expected - players_finished
+    if not players_pending:
+        return
+    
+    pending_list = "\n".join(f"- {player}" for player in players_pending)
+
+    message = (
+        f"⏰ Reminder: Round {league_state.current_round_num} will end in {time_left_str}.\n"
+        f"The following players have not played yet:\n{pending_list}\n\n"
+        f"Round URL: {challenge_url}"
+    )
+
+    await context.bot.send_message(
+        chat_id,
+        message,
+    )
+
+
+async def daily_round_finish(
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    global league_state
+    if league_state is None or not league_state.round_in_progress:
+        return
+    
+    await end_current_round(context, context.job.chat_id)
 
 
 async def remind_players(
@@ -309,8 +400,7 @@ def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("startleague", start_league))
-    app.add_handler(CommandHandler("leaderboard", show_leaderboard))
-    app.add_handler(CommandHandler("endround", end_round))
+    app.add_handler(CommandHandler("endround", end_round_handler))
     app.add_handler(CommandHandler("remind", remind_players))
     app.add_handler(CommandHandler("simulateTestLeague", simulate_league))
     app.add_handler(CommandHandler("simulateRoundAwards", simulate_awards))

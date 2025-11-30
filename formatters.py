@@ -159,3 +159,18 @@ def format_round_result_html(result: ChallengeResult, ranked_guesses: list[Ranke
     blocks.append(awards_block)
 
     return "\n".join(blocks)
+
+
+def format_time(seconds: int) -> str:
+    if seconds < 60:
+        return f"{seconds} seconds"
+    elif seconds < 3600:
+        minutes = seconds // 60
+        seconds = seconds % 60
+        return f"{minutes} minutes" + (f" {seconds} seconds" if seconds > 0 else "")
+    else:
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        return f"{hours} hours" + (f" {minutes} minutes" if minutes > 0 else "")
+
+    

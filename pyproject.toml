@@ -11,7 +11,7 @@ dependencies = [
     "loguru>=0.7.3",
     "pydantic>=2.12.2",
     "python-dotenv>=1.1.1",
-    "python-telegram-bot>=22.5",
+    "python-telegram-bot[job-queue]>=22.5",
 ]
 
 [dependency-groups]
