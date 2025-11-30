@@ -43,6 +43,7 @@ class GuessStats(BaseModel):
     average_pts: float
     median_pts: float
     stddev_pts: float
+    n_players: int
 
 
 class Award(BaseModel):
@@ -68,7 +69,7 @@ class RankedGuess(BaseModel):
     guess: Guess
     guess_stats: GuessStats
     location_index: int
-    rayleigh_score: float
+    adjusted_score: float
 
 
 class ChallengeResult(BaseModel):

@@ -2,7 +2,7 @@ import asyncio
 import os
 from pathlib import Path
 import traceback
-from formatters import format_round_result_html, format_leaderboard_html
+from formatters import format_awards_html, format_round_result_html, format_leaderboard_html
 from league import LeagueState
 import dotenv
 from telegram import Update
@@ -254,7 +254,7 @@ async def simulate_league(
         await send_html_message(
             context,
             update.effective_chat.id,
-            f"Round {sim_league_state.current_round_num} Results:\n\n{latest_round_text}",
+            f"Round {sim_league_state.current_round_num}\n\n Results:\n\n{latest_round_text}",
         )
         
         leaderboard = sim_league_state.get_leaderboard_data()
@@ -271,7 +271,26 @@ async def simulate_league(
     winner = sim_league_state.get_winner()
     await context.bot.send_message(update.effective_chat.id, f"🏆 League finished. Winner: {winner}")
 
+async def simulate_awards(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    """Simulate awards for a given challenge URL for testing purposes."""
 
+    challenge_id = "X37AfCqv57u8rGdz"
+    challenge_url = f"https://www.geoguessr.com/challenge/{challenge_id}"
+    round_result = await get_challenge_scores(challenge_url)
+    ranked_guesses = get_ranked_guesses(round_result)
+    
+    for rg in ranked_guesses:
+        logger.info(f"Player: {rg.player.name}, Location: {rg.location_index}, Score: {rg.guess.score}, Adjusted Score: {rg.adjusted_score}")
+
+    awards_text = format_awards_html(ranked_guesses)
+    await send_html_message(
+        context,
+        update.effective_chat.id,
+        f"Awards for challenge {challenge_url}:\n\n{awards_text}",
+    )
 
 def main():
     global league_state
@@ -294,6 +313,7 @@ def main():
     app.add_handler(CommandHandler("endround", end_round))
     app.add_handler(CommandHandler("remind", remind_players))
     app.add_handler(CommandHandler("simulateTestLeague", simulate_league))
+    app.add_handler(CommandHandler("simulateRoundAwards", simulate_awards))
     app.add_error_handler(error_handler)
     logger.info("Bot running...")
     app.run_polling()

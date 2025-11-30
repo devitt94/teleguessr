@@ -90,16 +90,16 @@ def format_awards_html(ranked_guesses: list[RankedGuess]) -> str:
     lines.append(
         f"🐐 <b>Best Guess Award</b>\n"
         f"   • Player: {bg.player.name}\n"
-        f"   • Distance: <b>{bg.guess.distance_km:.2f} km</b> (Average: {bg.guess_stats.average_distance:.2f} km)\n"
-        f"   • Score: <b>{bg.guess.score} pts</b> (Average: {bg.guess_stats.average_pts:.2f} pts)\n"
+        f"   • Distance: <b>{bg.guess.distance_km:.2f} km</b> (Median: {bg.guess_stats.median_distance:.2f} km)\n"
+        f"   • Score: <b>{bg.guess.score} pts</b> (Median: {bg.guess_stats.median_pts:.2f} pts)\n"
         f"   • Location: <b>{bg.location_index}</b>"
     )
     wg = ranked_guesses[-1]
     lines.append(
         f"🎣 <b>Worst Guess Award</b>\n"
         f"   • Player: {wg.player.name}\n"
-        f"   • Distance: <b>{wg.guess.distance_km:.2f} km</b> (Average: {wg.guess_stats.average_distance:.2f} km)\n"
-        f"   • Score: <b>{wg.guess.score} pts</b> (Average: {wg.guess_stats.average_pts:.2f} pts)\n"
+        f"   • Distance: <b>{wg.guess.distance_km:.2f} km</b> (Median: {wg.guess_stats.median_distance:.2f} km)\n"
+        f"   • Score: <b>{wg.guess.score} pts</b> (Median: {wg.guess_stats.median_pts:.2f} pts)\n"
         f"   • Location: <b>{wg.location_index}</b>"
     )
     return "\n\n".join(lines)

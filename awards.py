@@ -1,4 +1,5 @@
 import statistics
+from typing import Callable
 from models import Award, Awards, Guess, ChallengeResult, GuessStats, RankedGuess
 
 
@@ -31,6 +32,7 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
                 average_pts=avg_pts,
                 median_pts=statistics.median(points),
                 stddev_pts=stddev_pts,
+                n_players=len(distances),
             )
         )
 
@@ -65,39 +67,63 @@ def get_rayleigh_scores(round_result: ChallengeResult) -> dict[tuple[str, int], 
         
     return scores
 
+GuessRanker = Callable[[Guess, GuessStats], float]
+
+
+def absoulte_median_diff_points_ranker(guess: Guess, stats: GuessStats) -> float:
+    return guess.score - stats.median_pts
+
+def adjusted_median_points_ranker(guess: Guess, stats: GuessStats) -> float:
+    return (guess.score - stats.median_pts) / 5000
+
+
+def expected_distance_ranker(guess: Guess, stats: GuessStats) -> float:
+    total_distance = stats.average_distance * stats.n_players
+    pct_distance = guess.distance_km / total_distance
+    return 1 - pct_distance
+
+
+def expected_points_ranker(guess: Guess, stats: GuessStats) -> float:
+    total_points = stats.average_pts * stats.n_players
+    pct_points = guess.score / total_points
+    return pct_points
+
+
+def combined_ranker(guess: Guess, stats: GuessStats) -> float:
+    return adjusted_median_points_ranker(guess, stats) + expected_distance_ranker(guess, stats)
 
 def get_ranked_guesses(
-    round_result: ChallengeResult
+    round_result: ChallengeResult,
+    guess_ranker: GuessRanker = combined_ranker,
 ) -> list[RankedGuess]:
     """
     Identify the best and worst guesses in a round based on z-scores.
     Returns an Awards object containing the best and worst guesses.
     """
 
-    rayleigh_scores = get_rayleigh_scores(round_result)
+    # rayleigh_scores = get_rayleigh_scores(round_result)
 
     all_guess_stats = compute_stats(round_result)
 
-    guess_data_with_rayleigh = []
+    guess_data_with_adjusted_score = []
 
     for round_score in round_result.scores:
         for i, guess in enumerate(round_score.guesses):
             guess_stats = all_guess_stats[i]
-            guess_rayleigh_score = rayleigh_scores[(round_score.player.name, i + 1)]
-            guess_data_with_rayleigh.append(
+            adjusted_score = guess_ranker(guess, guess_stats)
+            guess_data_with_adjusted_score.append(
                 RankedGuess(
                     player=round_score.player,
                     guess=guess,
                     guess_stats=guess_stats,
                     location_index=i + 1,
-                    rayleigh_score=guess_rayleigh_score
+                    adjusted_score=adjusted_score
                 )
             )
     
-    sorted_by_rayleigh = sorted(
-        guess_data_with_rayleigh,
-        key=lambda rg: rg.rayleigh_score,
+    return sorted(
+        guess_data_with_adjusted_score,
+        key=lambda rg: rg.adjusted_score,
+        reverse=True
     )
-
-    return sorted_by_rayleigh
 
