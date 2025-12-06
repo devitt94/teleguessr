@@ -15,6 +15,10 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
 
     for round_score in round_result.scores:
         for i, guess in enumerate(round_score.guesses):
+            if i == 1 and round_score.player.name == "Danminican Republic":
+                # Skip invalid guess
+                print("Skipping invalid guess for Danminican Republic: ", guess)
+                continue 
             all_distances[i].append(guess.distance_km)
             all_points[i].append(guess.score)
 
@@ -37,35 +41,6 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
         )
 
     return stats
-
-def get_rayleigh_scores(round_result: ChallengeResult) -> dict[tuple[str, int], float]:
-    """
-    Compute Rayleigh scores for each player's guesses in the round.
-    Returns a dictionary mapping (player_name, location_index) to Rayleigh score.
-    """
-    scores = {}
-    def rayleigh_sigma_hat(distances: list[float]) -> float:
-        # distances: list of numbers (km)
-        n = len(distances)
-        sum_sq = sum(r*r for r in distances)
-        sigma_hat = (sum_sq / (2*n)) ** 0.5
-        return sigma_hat
-    
-    def rayleigh_percentile(distance: float, sigma_hat: float) -> float:
-        from math import exp
-        percentile = 1 - exp(-(distance ** 2) / (2 * sigma_hat ** 2))
-        return percentile
-    
-    for i in range(5):  # assuming 5 locations
-        guesses = round_result.get_round_guesses(i)
-        distances = {player: guess.distance_km for player, guess in guesses.items()}
-        for player, distance in distances.items():
-            other_distances = [distances[p] for p in distances if p != player]
-            sigma_hat = rayleigh_sigma_hat(other_distances)
-            percentile = rayleigh_percentile(distance, sigma_hat)
-            scores[(player, i+1)] = percentile * 100  # convert to percentage
-        
-    return scores
 
 GuessRanker = Callable[[Guess, GuessStats], float]
 
@@ -101,8 +76,6 @@ def get_ranked_guesses(
     Returns an Awards object containing the best and worst guesses.
     """
 
-    # rayleigh_scores = get_rayleigh_scores(round_result)
-
     all_guess_stats = compute_stats(round_result)
 
     guess_data_with_adjusted_score = []
@@ -110,6 +83,10 @@ def get_ranked_guesses(
     for round_score in round_result.scores:
         for i, guess in enumerate(round_score.guesses):
             guess_stats = all_guess_stats[i]
+            if i == 1 and round_score.player.name == "Danminican Republic":
+                # Skip invalid guess
+                continue
+            
             adjusted_score = guess_ranker(guess, guess_stats)
             guess_data_with_adjusted_score.append(
                 RankedGuess(

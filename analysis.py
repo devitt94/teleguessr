@@ -4,8 +4,7 @@ from pprint import pprint
 import statistics
 from typing import Iterable
 
-import pandas as pd
-from awards import rayleigh_scores
+from awards import get_ranked_guesses
 from geoguessr_scraper import get_challenge_scores
 from formatters import format_scoreboard
 
@@ -39,21 +38,6 @@ async def average_scores():
     }
     print(format_scoreboard(averages, header="Average Score"))
 
-
-def get_guess_dataframe(round_result: ChallengeResult) -> pd.DataFrame:
-    data = []
-    for rs in round_result.scores:
-        for i, guess in enumerate(rs.guesses):
-            data.append(
-                {
-                    "player": rs.player.name,
-                    "location_index": i + 1,
-                    "guess_score": guess.score,
-                    "guess_distance_km": guess.distance_km,
-                }
-            )
-    df = pd.DataFrame(data)
-    return df
 
 async def awards_analysis(
     challege_ids: list[str],
@@ -144,54 +128,27 @@ async def get_results_for_challenges(
         except Exception as e:
             print(f"Error fetching challenge {challenge_id}: {e}")
             raise
-        
-async def rayleigh_analysis(challenge_ids: list[str]):
-    
-    data = []
-    async for challenge_result in get_results_for_challenges(challenge_ids):
 
-        scores = rayleigh_scores(challenge_result)
-        for (player_name, location_index), score in scores.items():
-            print(
-                f"Player {player_name} - Location {location_index}: Rayleigh Score = {score:.2f}"
-            )
 
-            player_guess = challenge_result.get_guess(player_name, location_index - 1)
-            data.append({
-                "player_name": player_name,
-                "location_index": location_index,
-                "rayleigh_score": score,
-                "guess_distance_km": player_guess.distance_km,
-                "guess_score": player_guess.score,
-                "challenge_url": challenge_result.challenge_url,
-            })
-    df = pd.DataFrame(data)
-    df.to_csv("data/rayleigh_analysis.csv", index=False)
+async def analyse_round(challenge_id: str):
+    challenge_url = f"https://www.geoguessr.com/challenge/{challenge_id}"
+    result = await get_challenge_scores(challenge_url)
+    ranked_guesses = get_ranked_guesses(result)
+
+    table_data = {
+       f"{rg.player.name}-{rg.location_index}": rg.adjusted_score
+        for rg in ranked_guesses
+    }
+    print(format_scoreboard(
+        table_data,
+        header=f"Adjusted Scores for Challenge {challenge_id}"
+    ))
 
 if __name__ == "__main__":
     import asyncio
 
     ALL_CHALLENGES = [
-        "3qfccXf0H2LxVfKd",
-        "GaE9HCgVPNUVAAtD",
-        "o6HtQ5XfgdXzY7hO",
-        "J2tCBccFnlJq1eUD",
-        "X37AfCqv57u8rGdz",
-        "qYfz8PCNsvSEcEpo",
-        "jnPeVIR9cMMcaHKL",
-        "EO15fho3VkzB41CX",
-        "bwnTLsC4oVV0zkSY",
-        "5zDtniWpKjF9cL8I",
-        "DT3pVBmF4MVZt0QS",
-        "iOgqSZ2AFXV0k1ku",
-        "uLRo3Nl2ZbMG3HnL",
-        "8YpJQusdcr2DkNjV",
-        "cU0tALpAOGT6iLET",
-        "ctNxp7ksqHuKyBWd",
-        "nDlRf0Nfg9f19lyR",
-        "sgTR0MdmQRJ9Ntdx",
-        "OEViUK0CsXsO7BcB",
-        "bJMNpBrnnH9tTguW",
+        "862qIpnYWI3V07S1",
     ]
 
-    asyncio.run(rayleigh_analysis(ALL_CHALLENGES))
+    asyncio.run(analyse_round(ALL_CHALLENGES[0]))

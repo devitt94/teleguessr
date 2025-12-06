@@ -73,7 +73,8 @@ async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
         or league_state.is_finished
         or not league_state.round_in_progress
     ):
-        league_state = LeagueState(filepath=LEAGUE_FILE)
+        league_state = LeagueState(filepath=LEAGUE_FILE, chat_id=update.effective_chat.id)
+        league_state.chat_id = update.effective_chat.id
         await update.message.reply_text("🏁 GeoGuessr League started!")
 
         new_round_url = await create_challenge(
@@ -150,7 +151,7 @@ async def end_current_round(
         f"Round {league_state.last_round_finished_num} Results:\n\n{round_text}",
     )
 
-    await show_leaderboard(chat_id=chat_id, context=context)
+    await show_leaderboard(context, chat_id)
 
     if league_state.is_finished:
         winner = league_state.get_winner()
@@ -212,9 +213,15 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.info(f"Exception while handling update {update}: {context.error}")
 
 
-async def show_leaderboard(
-    chat_id: int,
+async def show_leaderboard_handler(
+    update: Update,
     context: ContextTypes.DEFAULT_TYPE,
+):
+    await show_leaderboard(context, update.effective_chat.id)
+
+async def show_leaderboard(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
 ):
     global league_state
     if league_state is None:
@@ -383,6 +390,27 @@ async def simulate_awards(
         f"Awards for challenge {challenge_url}:\n\n{awards_text}",
     )
 
+async def status_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    global league_state
+    if league_state is None or league_state.is_finished:
+        await update.message.reply_text("No league is currently running.")
+        return
+
+    if league_state.round_in_progress:
+        time_left = league_state.get_time_left_seconds()
+        await update.message.reply_text(
+            f"Round {league_state.current_round_num} is in progress.\n"
+            f"URL: {league_state.current_round.challenge_url}\n"
+            f"Time left: {format_time(time_left)}."
+        )
+    else:
+        await update.message.reply_text(
+            f"No round is currently in progress. Last finished round: {league_state.last_round_finished_num}."
+        )
+
 def main():
     global league_state
     league_state = LeagueState(filepath=LEAGUE_FILE)
@@ -402,10 +430,30 @@ def main():
     app.add_handler(CommandHandler("startleague", start_league))
     app.add_handler(CommandHandler("endround", end_round_handler))
     app.add_handler(CommandHandler("remind", remind_players))
+    app.add_handler(CommandHandler("status", status_handler))
+    app.add_handler(CommandHandler("leaderboard", show_leaderboard_handler))
     app.add_handler(CommandHandler("simulateTestLeague", simulate_league))
     app.add_handler(CommandHandler("simulateRoundAwards", simulate_awards))
     app.add_error_handler(error_handler)
     logger.info("Bot running...")
+
+    if league_state.round_in_progress:
+        logger.info(
+            f"Current round in progress, scheduling end in {league_state.get_time_left_seconds()} seconds."
+        )
+
+        app.job_queue.run_once(
+            daily_reminder,
+            when=league_state.get_time_left_seconds() * 23/24, # 23 hours
+            chat_id=ADMIN_ID,
+        )
+
+        app.job_queue.run_once(
+            daily_round_finish,
+            when=league_state.get_time_left_seconds(),
+            chat_id=ADMIN_ID,
+        )
+
     app.run_polling()
 
     logger.info("Bot stopped.")

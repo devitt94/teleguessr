@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 from typing import Callable
 from models import ActiveRound, ChallengeResult, RankedGuess
 import json
@@ -26,10 +27,16 @@ def ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
     return scores
 
 
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.isoformat()
+
 class LeagueState(BaseModel):
     filepath: Path = Field(frozen=True)
     num_rounds: int = Field(default=NUM_ROUNDS_PER_LEAGUE)
     results: list[ChallengeResult] = Field(default_factory=list)
+    chat_id: int | None = None
     current_round: ActiveRound | None = None
 
     def __init__(self, **data):
@@ -37,7 +44,7 @@ class LeagueState(BaseModel):
         self.__scores: dict[str, int] = {}
         self.__best_guesses_by_player: dict[str, int] = defaultdict(int)
         self.__worst_guesses_by_player: dict[str, int] = defaultdict(int)
-        self.__round_results_by_player: dict[str, dict[int, str]] = defaultdict(dict)
+        self.__round_results_by_player: dict[str, dict[int, int]] = defaultdict(dict)
 
     def load_from_file(self):
         try:
@@ -49,10 +56,13 @@ class LeagueState(BaseModel):
         file_data["filepath"] = str(self.filepath)  # re-add frozen field
         loaded = LeagueState.model_validate(file_data)
         self.num_rounds = loaded.num_rounds
+        self.chat_id = loaded.chat_id
 
-        self.__scores.clear()
-        for result in loaded.results:
-            self.add_round_result(result)
+        self.results = loaded.results
+        self.__best_guesses_by_player = defaultdict(int, file_data.get("best_guesses_by_player", {}))
+        self.__worst_guesses_by_player = defaultdict(int, file_data.get("worst_guesses_by_player", {}))
+        self.__round_results_by_player = defaultdict(dict, file_data.get("round_results_by_player", {}))
+        self.__scores = file_data.get("scores", {})
 
         self.current_round = loaded.current_round
 
@@ -145,7 +155,7 @@ class LeagueState(BaseModel):
         added_scores = ranking_score_manager(result)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
-            self.__round_results_by_player[player][self.current_round_num - 1] = result.get_player_position(player)
+            self.__round_results_by_player[player][str(self.current_round_num - 1)] = result.get_player_position(player)
 
         self.current_round = None
 
@@ -164,9 +174,14 @@ class LeagueState(BaseModel):
 
     def save(self):
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
-        data = self.model_dump_json(exclude=["filepath"], indent=2)
+        data = self.model_dump(exclude=["filepath"])
+        data["scores"] = self.__scores
+        data["best_guesses_by_player"] = dict(self.__best_guesses_by_player)
+        data["worst_guesses_by_player"] = dict(self.__worst_guesses_by_player)
+        data["round_results_by_player"] = dict(self.__round_results_by_player)
+
         with open(self.filepath, "w") as f:
-            f.write(data)
+            f.write(json.dumps(data, indent=2, cls=JSONEncoder))
 
     def get_time_left_seconds(self) -> int:
         if not self.round_in_progress:
