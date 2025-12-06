@@ -1,6 +1,6 @@
 import statistics
 from typing import Callable
-from models import Award, Awards, Guess, ChallengeResult, GuessStats, RankedGuess
+from models import Guess, ChallengeResult, GuessStats, RankedGuess
 
 
 def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
@@ -18,7 +18,7 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
             if i == 1 and round_score.player.name == "Danminican Republic":
                 # Skip invalid guess
                 print("Skipping invalid guess for Danminican Republic: ", guess)
-                continue 
+                continue
             all_distances[i].append(guess.distance_km)
             all_points[i].append(guess.score)
 
@@ -42,11 +42,13 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
 
     return stats
 
+
 GuessRanker = Callable[[Guess, GuessStats], float]
 
 
 def absoulte_median_diff_points_ranker(guess: Guess, stats: GuessStats) -> float:
     return guess.score - stats.median_pts
+
 
 def adjusted_median_points_ranker(guess: Guess, stats: GuessStats) -> float:
     return (guess.score - stats.median_pts) / 5000
@@ -65,7 +67,10 @@ def expected_points_ranker(guess: Guess, stats: GuessStats) -> float:
 
 
 def combined_ranker(guess: Guess, stats: GuessStats) -> float:
-    return adjusted_median_points_ranker(guess, stats) + expected_distance_ranker(guess, stats)
+    return adjusted_median_points_ranker(guess, stats) + expected_distance_ranker(
+        guess, stats
+    )
+
 
 def get_ranked_guesses(
     round_result: ChallengeResult,
@@ -86,7 +91,7 @@ def get_ranked_guesses(
             if i == 1 and round_score.player.name == "Danminican Republic":
                 # Skip invalid guess
                 continue
-            
+
             adjusted_score = guess_ranker(guess, guess_stats)
             guess_data_with_adjusted_score.append(
                 RankedGuess(
@@ -94,13 +99,10 @@ def get_ranked_guesses(
                     guess=guess,
                     guess_stats=guess_stats,
                     location_index=i + 1,
-                    adjusted_score=adjusted_score
+                    adjusted_score=adjusted_score,
                 )
             )
-    
-    return sorted(
-        guess_data_with_adjusted_score,
-        key=lambda rg: rg.adjusted_score,
-        reverse=True
-    )
 
+    return sorted(
+        guess_data_with_adjusted_score, key=lambda rg: rg.adjusted_score, reverse=True
+    )

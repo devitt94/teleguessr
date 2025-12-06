@@ -1,9 +1,13 @@
 import asyncio
-from datetime import datetime
 import os
 from pathlib import Path
 import traceback
-from formatters import format_awards_html, format_round_result_html, format_leaderboard_html, format_time
+from formatters import (
+    format_awards_html,
+    format_round_result_html,
+    format_leaderboard_html,
+    format_time,
+)
 from league import LeagueState
 import dotenv
 from telegram import Update
@@ -35,19 +39,20 @@ async def send_markdown_message(
     message: str,
 ):
     """Send a markdown-formatted message to a chat."""
-    
+
     def escape_markdown_v2(text: str) -> str:
         """Escape characters for Telegram MarkdownV2."""
-        to_escape = r'_*[]()~`>#+-=|{}.!'
-        return ''.join("\\" + c if c in to_escape else c for c in text)
-    
+        to_escape = r"_*[]()~`>#+-=|{}.!"
+        return "".join("\\" + c if c in to_escape else c for c in text)
+
     message = escape_markdown_v2(message)
-    
+
     await context.bot.send_message(
         chat_id=chat_id,
         text=message,
         parse_mode="MarkdownV2",
     )
+
 
 async def send_html_message(
     context: ContextTypes.DEFAULT_TYPE,
@@ -73,7 +78,9 @@ async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
         or league_state.is_finished
         or not league_state.round_in_progress
     ):
-        league_state = LeagueState(filepath=LEAGUE_FILE, chat_id=update.effective_chat.id)
+        league_state = LeagueState(
+            filepath=LEAGUE_FILE, chat_id=update.effective_chat.id
+        )
         league_state.chat_id = update.effective_chat.id
         await update.message.reply_text("🏁 GeoGuessr League started!")
 
@@ -95,7 +102,7 @@ async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         end_round_in = TIME_PER_ROUND_HOURS * 3600
-        reminder_in = int(end_round_in * 23/24) # 23 hours
+        reminder_in = int(end_round_in * 23 / 24)  # 23 hours
 
         context.job_queue.run_once(
             daily_reminder,
@@ -133,7 +140,6 @@ async def end_current_round(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
 ) -> None:
-    
     challenge_url = league_state.current_round.challenge_url
     round_result = await get_challenge_scores(challenge_url)
 
@@ -144,7 +150,7 @@ async def end_current_round(
     league_state.save()
 
     round_text = format_round_result_html(round_result, ranked_guesses)
-    
+
     await send_html_message(
         context,
         chat_id,
@@ -172,7 +178,7 @@ async def end_current_round(
 
         context.job_queue.run_once(
             daily_reminder,
-            when=int(TIME_PER_ROUND_HOURS * 3600 * 23/24), # 23 hours
+            when=int(TIME_PER_ROUND_HOURS * 3600 * 23 / 24),  # 23 hours
             chat_id=chat_id,
         )
 
@@ -219,6 +225,7 @@ async def show_leaderboard_handler(
 ):
     await show_leaderboard(context, update.effective_chat.id)
 
+
 async def show_leaderboard(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
@@ -241,6 +248,7 @@ async def show_leaderboard(
         f"📊 Standings after round {league_state.last_round_finished_num}:\n\n{leaderboard_text}",
     )
 
+
 async def daily_reminder(
     context: ContextTypes.DEFAULT_TYPE,
 ):
@@ -254,6 +262,7 @@ async def daily_reminder(
     current_result = await get_challenge_scores(challenge_url)
     players_finished = current_result.players_finished
     from settings import PLAYER_SHORTNAMES
+
     players_expected = set(PLAYER_SHORTNAMES.keys())
 
     time_left = league_state.get_time_left_seconds()
@@ -262,7 +271,7 @@ async def daily_reminder(
     players_pending = players_expected - players_finished
     if not players_pending:
         return
-    
+
     pending_list = "\n".join(f"- {player}" for player in players_pending)
 
     message = (
@@ -283,13 +292,11 @@ async def daily_round_finish(
     global league_state
     if league_state is None or not league_state.round_in_progress:
         return
-    
+
     await end_current_round(context, context.job.chat_id)
 
 
-async def remind_players(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def remind_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global league_state
     if league_state is None or not league_state.round_in_progress:
         await update.message.reply_text("No round is currently in progress.")
@@ -301,6 +308,7 @@ async def remind_players(
     current_result = await get_challenge_scores(challenge_url)
     players_finished = current_result.players_finished
     from settings import PLAYER_SHORTNAMES
+
     players_expected = set(PLAYER_SHORTNAMES.keys())
 
     players_pending = players_expected - players_finished
@@ -324,7 +332,6 @@ async def simulate_league(
 ):
     """Simulate a full league with given challenge URLs for testing purposes."""
 
-
     challenge_urls = [
         "https://www.geoguessr.com/challenge/X37AfCqv57u8rGdz",
         "https://www.geoguessr.com/challenge/J2tCBccFnlJq1eUD",
@@ -333,9 +340,11 @@ async def simulate_league(
         "https://www.geoguessr.com/challenge/989O8zGW1iWsfrsu",
     ]
     random_str = os.urandom(4).hex()
-    sim_league_state = LeagueState(filepath=f"data/simulated_league_{random_str}.json", num_rounds=len(challenge_urls))
+    sim_league_state = LeagueState(
+        filepath=f"data/simulated_league_{random_str}.json",
+        num_rounds=len(challenge_urls),
+    )
     for url in challenge_urls:
-        
         sim_league_state.start_round(url=url, hours=1)
 
         # Simulate waiting for round to end
@@ -347,14 +356,13 @@ async def simulate_league(
         sim_league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
         sim_league_state.save()
 
-        
         latest_round_text = format_round_result_html(round_result, ranked_guesses)
         await send_html_message(
             context,
             update.effective_chat.id,
             f"Round {sim_league_state.current_round_num}\n\n Results:\n\n{latest_round_text}",
         )
-        
+
         leaderboard = sim_league_state.get_leaderboard_data()
         leaderboard_text = format_leaderboard_html(**leaderboard)
         await send_html_message(
@@ -365,9 +373,11 @@ async def simulate_league(
 
         await asyncio.sleep(5)  # Small delay to avoid flooding
 
-
     winner = sim_league_state.get_winner()
-    await context.bot.send_message(update.effective_chat.id, f"🏆 League finished. Winner: {winner}")
+    await context.bot.send_message(
+        update.effective_chat.id, f"🏆 League finished. Winner: {winner}"
+    )
+
 
 async def simulate_awards(
     update: Update,
@@ -379,9 +389,11 @@ async def simulate_awards(
     challenge_url = f"https://www.geoguessr.com/challenge/{challenge_id}"
     round_result = await get_challenge_scores(challenge_url)
     ranked_guesses = get_ranked_guesses(round_result)
-    
+
     for rg in ranked_guesses:
-        logger.info(f"Player: {rg.player.name}, Location: {rg.location_index}, Score: {rg.guess.score}, Adjusted Score: {rg.adjusted_score}")
+        logger.info(
+            f"Player: {rg.player.name}, Location: {rg.location_index}, Score: {rg.guess.score}, Adjusted Score: {rg.adjusted_score}"
+        )
 
     awards_text = format_awards_html(ranked_guesses)
     await send_html_message(
@@ -389,6 +401,7 @@ async def simulate_awards(
         update.effective_chat.id,
         f"Awards for challenge {challenge_url}:\n\n{awards_text}",
     )
+
 
 async def status_handler(
     update: Update,
@@ -410,6 +423,7 @@ async def status_handler(
         await update.message.reply_text(
             f"No round is currently in progress. Last finished round: {league_state.last_round_finished_num}."
         )
+
 
 def main():
     global league_state
@@ -444,7 +458,7 @@ def main():
 
         app.job_queue.run_once(
             daily_reminder,
-            when=league_state.get_time_left_seconds() * 23/24, # 23 hours
+            when=league_state.get_time_left_seconds() * 23 / 24,  # 23 hours
             chat_id=ADMIN_ID,
         )
 

@@ -1,8 +1,5 @@
 from collections import defaultdict
 from collections.abc import AsyncGenerator
-from pprint import pprint
-import statistics
-from typing import Iterable
 
 from awards import get_ranked_guesses
 from geoguessr_scraper import get_challenge_scores
@@ -39,83 +36,6 @@ async def average_scores():
     print(format_scoreboard(averages, header="Average Score"))
 
 
-async def awards_analysis(
-    challege_ids: list[str],
-):
-    # for url in CHALLENGE_URLS:
-    dataframes = []
-    for challenge_id in challege_ids:
-        url = f"https://www.geoguessr.com/challenge/{challenge_id}"
-        print(f"Fetching challenge {challenge_id}...")
-        try:
-            result = await get_challenge_scores(url)
-        except Exception as e:
-            print(f"Error fetching challenge {challenge_id}: {e}")
-            raise
-
-        if len(result.scores) == 1:
-            print(f"Skipping challenge {challenge_id} with only one player.")
-            continue
-
-        df = get_guess_dataframe(result)
-        df["challenge_id"] = challenge_id
-        df["num_players"] = len(result.scores)
-        dataframes.append(df)
-
-    df = pd.concat(dataframes)
-
-    df["round_average_distance"] = df.groupby(["challenge_id", "location_index"])["guess_distance_km"].transform(
-        "mean"
-    )
-    df["round_average_score"] = df.groupby(["challenge_id", "location_index"])["guess_score"].transform(
-        "mean"
-    )
-    df["round_median_distance"] = df.groupby(["challenge_id", "location_index"])["guess_distance_km"].transform(
-        "median"
-    )
-    df["round_median_score"] = df.groupby(["challenge_id", "location_index"])["guess_score"].transform(
-        "median"
-    )
-    df["round_stddev_distance"] = df.groupby(["challenge_id", "location_index"])["guess_distance_km"].transform(
-        "std"
-    )
-    df["round_stddev_score"] = df.groupby(["challenge_id", "location_index"])["guess_score"].transform(
-        "std"
-    )
-
-    df["distance_zscore"] = df.groupby(["challenge_id", "location_index"])["guess_distance_km"].transform(
-        lambda x: (x.mean() - x) / x.std(ddof=0)
-    )
-    df["score_zscore"] = df.groupby(["challenge_id", "location_index"])["guess_score"].transform(
-        lambda x: (x - x.mean()) / x.std(ddof=0)
-    )
-
-    df["score_absscore"] = df.groupby(["challenge_id", "location_index"])["guess_score"].transform(
-        lambda x: (x - x.mean())
-    )
-
-    df["distance_absscore"] = df.groupby(["challenge_id", "location_index"])["guess_distance_km"].transform(
-        lambda x: (x.mean() - x)
-    )
-
-    df["distance_pctscore"] = df.groupby(["challenge_id", "location_index"])["guess_distance_km"].transform(
-        lambda x: 1 -x / x.sum()
-    )
-
-    df["score_pctscore"] = df.groupby(["challenge_id", "location_index"])["guess_score"].transform(
-        lambda x: x / x.sum()
-    )
-
-    df["score_meddiffscore"] = df.groupby(["challenge_id", "location_index"])["guess_score"].transform(
-        lambda x: x - x.median()
-    )
-    df["distance_meddiffscore"] = df.groupby(["challenge_id", "location_index"])["guess_distance_km"].transform(
-        lambda x: x.median() - x
-    )
-
-    df.to_csv("data/awards_analysis.csv", index=False)
-
-
 async def get_results_for_challenges(
     challenge_ids: list[str],
 ) -> AsyncGenerator[ChallengeResult]:
@@ -136,13 +56,15 @@ async def analyse_round(challenge_id: str):
     ranked_guesses = get_ranked_guesses(result)
 
     table_data = {
-       f"{rg.player.name}-{rg.location_index}": rg.adjusted_score
+        f"{rg.player.name}-{rg.location_index}": rg.adjusted_score
         for rg in ranked_guesses
     }
-    print(format_scoreboard(
-        table_data,
-        header=f"Adjusted Scores for Challenge {challenge_id}"
-    ))
+    print(
+        format_scoreboard(
+            table_data, header=f"Adjusted Scores for Challenge {challenge_id}"
+        )
+    )
+
 
 if __name__ == "__main__":
     import asyncio

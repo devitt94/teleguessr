@@ -1,4 +1,4 @@
-from models import Awards, ChallengeResult, RankedGuess
+from models import ChallengeResult, RankedGuess
 from settings import PLAYER_SHORTNAMES
 
 
@@ -44,23 +44,22 @@ def format_leaderboard_html(
     round_positions: dict,
     rounds_played: int,
 ) -> str:
-    
     blocks = []
     num_players = len(scores)
     for position, players in leaderboard.items():
-        
         rank_emoji = get_rank_emoji(position, num_players)
         pos_str = get_position_str(position, tied=len(players) > 1)
 
         for player in players:
             round_results = []
-            print("Getting round results for player:", player, )
+            print(
+                "Getting round results for player:",
+                player,
+            )
             player_round_positions: dict[int, int] = round_positions.get(player, {})
             for round_index in range(1, rounds_played + 1):
                 round_rank = player_round_positions.get(str(round_index), -1)
-                round_results.append(
-                    get_position_str(round_rank)
-                )
+                round_results.append(get_position_str(round_rank))
 
             score = scores[player]
             round_result_str = "-".join(round_results)
@@ -78,11 +77,12 @@ def format_leaderboard_html(
 
     return "\n".join(blocks)
 
+
 def get_position_str(position: int, tied: bool = False) -> str:
     """Convert a numeric position into its ordinal string representation."""
     if position < 0:
         return "DNF"
-    
+
     suffix = {1: "st", 2: "nd", 3: "rd"}.get(position % 10, "th")
     pos_str = f"{position}{suffix}"
     if tied:
@@ -92,7 +92,7 @@ def get_position_str(position: int, tied: bool = False) -> str:
 
 def format_awards_html(ranked_guesses: list[RankedGuess]) -> str:
     lines = []
-    
+
     bg = ranked_guesses[0]
     lines.append(
         f"🐐 <b>Best Guess Award</b>\n"
@@ -111,7 +111,10 @@ def format_awards_html(ranked_guesses: list[RankedGuess]) -> str:
     )
     return "\n\n".join(lines)
 
-def format_round_result_html(result: ChallengeResult, ranked_guesses: list[RankedGuess]) -> str:
+
+def format_round_result_html(
+    result: ChallengeResult, ranked_guesses: list[RankedGuess]
+) -> str:
     if not result.scores:
         return "⚠️ No scores available!"
 
@@ -154,7 +157,6 @@ def format_round_result_html(result: ChallengeResult, ranked_guesses: list[Ranke
 
         blocks.append(block)
 
-
     blocks.append("-" * 60)
     awards_block = format_awards_html(ranked_guesses)
     blocks.append(awards_block)
@@ -173,5 +175,3 @@ def format_time(seconds: int) -> str:
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
         return f"{hours} hours" + (f" {minutes} minutes" if minutes > 0 else "")
-
-    

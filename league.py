@@ -32,6 +32,7 @@ class JSONEncoder(json.JSONEncoder):
         if isinstance(o, datetime):
             return o.isoformat()
 
+
 class LeagueState(BaseModel):
     filepath: Path = Field(frozen=True)
     num_rounds: int = Field(default=NUM_ROUNDS_PER_LEAGUE)
@@ -59,9 +60,15 @@ class LeagueState(BaseModel):
         self.chat_id = loaded.chat_id
 
         self.results = loaded.results
-        self.__best_guesses_by_player = defaultdict(int, file_data.get("best_guesses_by_player", {}))
-        self.__worst_guesses_by_player = defaultdict(int, file_data.get("worst_guesses_by_player", {}))
-        self.__round_results_by_player = defaultdict(dict, file_data.get("round_results_by_player", {}))
+        self.__best_guesses_by_player = defaultdict(
+            int, file_data.get("best_guesses_by_player", {})
+        )
+        self.__worst_guesses_by_player = defaultdict(
+            int, file_data.get("worst_guesses_by_player", {})
+        )
+        self.__round_results_by_player = defaultdict(
+            dict, file_data.get("round_results_by_player", {})
+        )
         self.__scores = file_data.get("scores", {})
 
         self.current_round = loaded.current_round
@@ -69,7 +76,7 @@ class LeagueState(BaseModel):
     @property
     def current_round_num(self) -> int:
         return len(self.results) + 1 if self.round_in_progress else len(self.results)
-    
+
     @property
     def last_round_finished_num(self) -> int:
         if self.results:
@@ -87,9 +94,7 @@ class LeagueState(BaseModel):
     def construct_leaderboard(self) -> dict[int, list[str]]:
         """Returns a mapping of rank to list of player names at that rank."""
         rank_map: dict[int, list[str]] = defaultdict(list)
-        sorted_scores = sorted(
-            self.__scores.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_scores = sorted(self.__scores.items(), key=lambda x: x[1], reverse=True)
         current_rank = 1
         last_score = None
         for player, score in sorted_scores:
@@ -99,9 +104,9 @@ class LeagueState(BaseModel):
             else:
                 rank_map[current_rank - 1].append(player)
             current_rank += 1
-            
+
         return dict(rank_map)
-    
+
     def get_leaderboard_data(self) -> dict[str, dict]:
         return {
             "leaderboard": self.construct_leaderboard(),
@@ -109,7 +114,7 @@ class LeagueState(BaseModel):
             "worst_guesses": self.__worst_guesses_by_player,
             "round_positions": self.__round_results_by_player,
             "scores": self.__scores,
-            "rounds_played": self.last_round_finished_num or 0
+            "rounds_played": self.last_round_finished_num or 0,
         }
 
     def get_winner(self) -> str:
@@ -155,19 +160,17 @@ class LeagueState(BaseModel):
         added_scores = ranking_score_manager(result)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
-            self.__round_results_by_player[player][str(self.current_round_num - 1)] = result.get_player_position(player)
+            self.__round_results_by_player[player][str(self.current_round_num - 1)] = (
+                result.get_player_position(player)
+            )
 
         self.current_round = None
 
     def add_awards(self, best_guess: RankedGuess, worst_guess: RankedGuess):
         best_guess_player = best_guess.player.name
         worst_guess_player = worst_guess.player.name
-        self.__scores[best_guess_player] = (
-            self.__scores.get(best_guess_player, 0) + 1
-        )
-        self.__scores[worst_guess_player] = (
-            self.__scores.get(worst_guess_player, 0) - 1
-        )
+        self.__scores[best_guess_player] = self.__scores.get(best_guess_player, 0) + 1
+        self.__scores[worst_guess_player] = self.__scores.get(worst_guess_player, 0) - 1
 
         self.__best_guesses_by_player[best_guess_player] += 1
         self.__worst_guesses_by_player[worst_guess_player] += 1
@@ -191,4 +194,3 @@ class LeagueState(BaseModel):
         now = datetime.now(self.current_round.end_time.tzinfo)
         delta = self.current_round.end_time - now
         return max(0, int(delta.total_seconds()))
-    
