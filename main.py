@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 import os
 from pathlib import Path
 import traceback
@@ -105,13 +106,13 @@ async def start_league(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reminder_in = int(end_round_in * 23 / 24)  # 23 hours
 
         context.job_queue.run_once(
-            daily_reminder,
+            scheduled_reminder,
             when=reminder_in,
             chat_id=update.effective_chat.id,
         )
 
         context.job_queue.run_once(
-            daily_round_finish,
+            scheduled_round_end,
             when=end_round_in,
             chat_id=update.effective_chat.id,
         )
@@ -139,6 +140,7 @@ async def end_round_handler(
 async def end_current_round(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
+    next_challenge_creator: Callable[[str, int], Awaitable[str]] | None = None,
 ) -> None:
     challenge_url = league_state.current_round.challenge_url
     round_result = await get_challenge_scores(challenge_url)
@@ -163,7 +165,10 @@ async def end_current_round(
         winner = league_state.get_winner()
         await context.bot.send_message(chat_id, f"🏆 League finished. Winner: {winner}")
     else:
-        new_round_url = await create_challenge(
+        if next_challenge_creator is None:
+            next_challenge_creator = create_challenge
+
+        new_round_url = await next_challenge_creator(
             map_id=MAP_ID,
             time_limit_seconds=TIME_LIMIT_PER_GUESS_SECONDS,
         )
@@ -177,15 +182,16 @@ async def end_current_round(
         )
 
         context.job_queue.run_once(
-            daily_reminder,
+            scheduled_reminder,
             when=int(TIME_PER_ROUND_HOURS * 3600 * 23 / 24),  # 23 hours
             chat_id=chat_id,
         )
 
         context.job_queue.run_once(
-            daily_round_finish,
+            scheduled_round_end,
             when=int(TIME_PER_ROUND_HOURS * 3600),
             chat_id=chat_id,
+            data={"next_challenge_creator": next_challenge_creator},
         )
 
         await context.bot.send_message(
@@ -249,7 +255,7 @@ async def show_leaderboard(
     )
 
 
-async def daily_reminder(
+async def scheduled_reminder(
     context: ContextTypes.DEFAULT_TYPE,
 ):
     global league_state
@@ -286,14 +292,21 @@ async def daily_reminder(
     )
 
 
-async def daily_round_finish(
+async def scheduled_round_end(
     context: ContextTypes.DEFAULT_TYPE,
 ):
     global league_state
     if league_state is None or not league_state.round_in_progress:
         return
 
-    await end_current_round(context, context.job.chat_id)
+    if context.job.data and "next_challenge_creator" in context.job.data:
+        next_challenge_creator = context.job.data["next_challenge_creator"]
+    else:
+        next_challenge_creator = None
+
+    await end_current_round(
+        context, context.job.chat_id, next_challenge_creator=next_challenge_creator
+    )
 
 
 async def remind_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -457,13 +470,13 @@ def main():
         )
 
         app.job_queue.run_once(
-            daily_reminder,
+            scheduled_reminder,
             when=league_state.get_time_left_seconds() * 23 / 24,  # 23 hours
             chat_id=ADMIN_ID,
         )
 
         app.job_queue.run_once(
-            daily_round_finish,
+            scheduled_round_end,
             when=league_state.get_time_left_seconds(),
             chat_id=ADMIN_ID,
         )
