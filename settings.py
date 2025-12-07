@@ -4,17 +4,6 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-PLAYER_ROUND_HANDICAPS = {
-    "Bosnia & GetsTheGoldSweena": 0,
-    "Grand Duchy of Gregdova": 0,
-    "St. Bics & Devitts": 2500,
-    "Ppl's Rep. Glorious Mickistan": 2500,
-    "Danminican Republic": 4000,
-    "Ellitorial Guinea": 5000,
-}
-
-NEW_ENTRANT_HANDICAP = 3000
-
 PLAYER_HANDICAP_MULTIPLIERS = {
     "Bosnia & GetsTheGoldSweena": 0.0,
     "Grand Duchy of Gregdova": 0.0,
@@ -57,9 +46,5 @@ class AppSettings(BaseSettings):
 
 
 @lru_cache()
-def get_settings(test_mode: bool = False) -> AppSettings:
-    settings = AppSettings()
-    if test_mode:
-        settings.league.time_per_round_hours = 0.01  # 36 seconds
-
-    return settings
+def get_settings() -> AppSettings:
+    return AppSettings()

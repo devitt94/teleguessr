@@ -135,6 +135,32 @@ class BotManager:
             ),
         )
 
+    async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            status_message = "No active league. Start a new league with /startleague."
+        else:
+            status_message = f"League Status:\n- Rounds completed: {self.league_state.last_round_finished_num}/{self.league_state.num_rounds}\n"
+            if self.league_state.round_in_progress:
+                players_played = await self.player_round_status()
+                time_left = self.league_state.get_time_left_seconds()
+                status_message += (
+                    f"- Current round in progress (ends in {format_time(time_left)})\n"
+                )
+                status_message += "- Players who have played this round:\n"
+                for player, finished in players_played.items():
+                    status_message += f"  - {player}: {'✅' if finished else '❌'}\n"
+
+            else:
+                status_message += "- No round currently in progress.\n"
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=status_message,
+        )
+
     async def remind_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
@@ -158,27 +184,28 @@ class BotManager:
         if chat_id is None:
             raise ValueError("chat_id must be provided to reminder")
 
-        challenge_url = self.league_state.current_round.challenge_url
-        chat_id = context.job.chat_id
-
-        current_result = await self.geoguessr_client.get_challenge_scores(challenge_url)
-        players_finished = current_result.players_finished
-
-        players_expected = set(PLAYER_SHORTNAMES.keys())
+        players_finished = await self.player_round_status()
 
         time_left = self.league_state.get_time_left_seconds()
         time_left_str = format_time(time_left)
 
-        players_pending = players_expected - players_finished
+        players_pending = {
+            player for player, finished in players_finished.items() if not finished
+        }
         if not players_pending:
+            logger.info("All players have finished the round; no reminder sent.")
             return
 
         pending_list = "\n".join(f"- {player}" for player in players_pending)
 
+        logger.info(
+            f"Sending reminder to chat {chat_id} for players: {players_pending}"
+        )
+
         message = (
             f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}.\n"
             f"The following players have not played yet:\n{pending_list}\n\n"
-            f"Round URL: {challenge_url}"
+            f"Round URL: {self.league_state.current_round.challenge_url}"
         )
 
         await context.bot.send_message(
@@ -289,3 +316,20 @@ class BotManager:
 
         # Still print to logs
         logger.info(f"Exception while handling update {update}: {context.error}")
+
+    async def player_round_status(self) -> dict[str, bool]:
+        if (
+            self.league_state is None
+            or self.league_state.is_finished
+            or not self.league_state.round_in_progress
+        ):
+            raise RuntimeError("No active round.")
+
+        challenge_url = self.league_state.current_round.challenge_url
+        current_result = await self.geoguessr_client.get_challenge_scores(challenge_url)
+        players_finished = current_result.players_finished
+
+        result = {player: False for player in PLAYER_SHORTNAMES.keys()}
+        for player in players_finished:
+            result[player] = True
+        return result

@@ -166,8 +166,10 @@ def format_time(seconds: int) -> str:
     elif seconds < 3600:
         minutes = seconds // 60
         seconds = seconds % 60
-        return f"{minutes} minutes" + (f" {seconds} seconds" if seconds > 0 else "")
+        return f"{minutes:.0f} minutes" + (
+            f" {seconds:.0f} seconds" if seconds > 0 else ""
+        )
     else:
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
-        return f"{hours} hours" + (f" {minutes} minutes" if minutes > 0 else "")
+        return f"{hours:.0f} hours" + (f" {minutes:.0f} minutes" if minutes > 0 else "")

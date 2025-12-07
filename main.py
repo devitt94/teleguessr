@@ -14,15 +14,13 @@ from telegram.ext import (
 async def initlise_bot_manager(
     settings: AppSettings, test_mode: bool = False
 ) -> BotManager:
-    settings = get_settings()
-
     settings.data_dir.mkdir(parents=True, exist_ok=True)
 
     geoguessr_client = GeoguessrClient(ncfa_cookie=settings.geoguessr_ncfa_cookie)
 
     if test_mode:
         geoguessr_client.create_challenge = create_fake_challenge
-        settings.league.time_per_round_hours = 0.002  # 7.2 seconds
+        settings.league.time_per_round_hours = 0.02  # 7.2 seconds
 
     bot_manager = BotManager(
         admin_id=settings.telegram_admin_id,
@@ -52,7 +50,7 @@ async def create_fake_challenge(
 
 
 def main(test_mode: bool = False):
-    settings = get_settings(test_mode)
+    settings = get_settings()
 
     settings.data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -63,7 +61,7 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("startleague", bot_manager.start_league_handler))
     app.add_handler(CommandHandler("endround", bot_manager.end_round_handler))
     app.add_handler(CommandHandler("remind", bot_manager.remind_handler))
-    # app.add_handler(CommandHandler("status", bot_manager.status_handler))
+    app.add_handler(CommandHandler("status", bot_manager.status_handler))
     app.add_handler(CommandHandler("leaderboard", bot_manager.show_leaderboard_handler))
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")
