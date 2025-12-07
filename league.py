@@ -25,6 +25,19 @@ def ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
     return scores
 
 
+def skewed_ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
+    # 1st: 10, 2nd: 7, 3rd: 5, 4th: 4, 5th: 3, 6th: 2, 7th+: 1
+    rank_points = [10, 7, 5, 4, 3, 2]
+    sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
+    scores: dict[str, int] = {}
+    for rank, round_score in enumerate(sorted_scores):
+        if rank < len(rank_points):
+            scores[round_score.player.name] = rank_points[rank]
+        else:
+            scores[round_score.player.name] = 1
+    return scores
+
+
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
@@ -155,7 +168,7 @@ class LeagueState(BaseModel):
 
     def add_round_result(self, result: ChallengeResult):
         self.results.append(result)
-        added_scores = ranking_score_manager(result)
+        added_scores = skewed_ranking_score_manager(result)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
             self.__round_results_by_player[player][str(self.current_round_num - 1)] = (

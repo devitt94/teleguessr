@@ -1,3 +1,4 @@
+from league import skewed_ranking_score_manager
 from models import ChallengeResult, RankedGuess
 from settings import PLAYER_SHORTNAMES
 
@@ -109,29 +110,34 @@ def format_awards_html(ranked_guesses: list[RankedGuess]) -> str:
 
 
 def format_round_result_html(
-    result: ChallengeResult, ranked_guesses: list[RankedGuess]
+    result: ChallengeResult,
+    ranked_guesses: list[RankedGuess],
 ) -> str:
     if not result.scores:
         return "⚠️ No scores available!"
 
-    sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
+    rank_scores = skewed_ranking_score_manager(result)
 
-    bonus_points = {rs.player.name: 0 for rs in sorted_scores}
+    sorted_player_scores = sorted(
+        result.scores, key=lambda rs: rs.net_score, reverse=True
+    )
+
+    bonus_points = {rs.player.name: 0 for rs in sorted_player_scores}
     best_guess_player = ranked_guesses[0].player.name
     worst_guess_player = ranked_guesses[-1].player.name
     bonus_points[best_guess_player] += 1  # Best Guess bonus
     bonus_points[worst_guess_player] -= 1  # Worst Guess penalty
 
-    num_players = len(sorted_scores)
+    num_players = len(sorted_player_scores)
 
     blocks = []
 
-    for i, rs in enumerate(sorted_scores):
+    for i, rs in enumerate(sorted_player_scores):
         pos = i + 1
         pos_str = get_position_str(pos)
 
         bonus = bonus_points[rs.player.name]
-        rank_points = num_players - i
+        rank_points = rank_scores[rs.player.name]
         total_points = rank_points + bonus
 
         points_str = f"{rank_points}"
