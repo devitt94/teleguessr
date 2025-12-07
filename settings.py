@@ -1,3 +1,6 @@
+from pydantic_settings import BaseSettings
+
+
 PLAYER_ROUND_HANDICAPS = {
     "Bosnia & GetsTheGoldSweena": 0,
     "Grand Duchy of Gregdova": 0,
@@ -31,5 +34,7 @@ PLAYER_SHORTNAMES = {
 }
 
 
-NUM_ROUNDS_PER_LEAGUE = 5
-TIME_PER_ROUND_HOURS = 24  # 5 minutes for testing
+class LeagueSettings(BaseSettings):
+    NUMBER_OF_ROUNDS: int = 5
+    TIME_PER_ROUND_HOURS: int = 24
+    TIME_PER_GUESS_SECONDS: int = 90

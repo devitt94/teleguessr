@@ -5,6 +5,8 @@ from models import Guess, Player, ChallengeResult, ChallengeScore
 from geoguessr_async import Geoguessr, GeoguessrScore
 from settings import NEW_ENTRANT_HANDICAP_MULTIPLIER, PLAYER_HANDICAP_MULTIPLIERS
 
+from loguru import logger
+
 
 MAX_ROUND_SCORE = 25_000
 
@@ -16,6 +18,9 @@ async def create_challenge(
     """
     Create a new GeoGuessr challenge and return its URL.
     """
+    logger.info(
+        f"Creating challenge for map_id={map_id} with time_limit_seconds={time_limit_seconds}"
+    )
 
     map_url = f"https://www.geoguessr.com/maps/{map_id}"
     client = Geoguessr(os.getenv("NCFA_COOKIE"))

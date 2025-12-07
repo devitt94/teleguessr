@@ -15,10 +15,6 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
 
     for round_score in round_result.scores:
         for i, guess in enumerate(round_score.guesses):
-            if i == 1 and round_score.player.name == "Danminican Republic":
-                # Skip invalid guess
-                print("Skipping invalid guess for Danminican Republic: ", guess)
-                continue
             all_distances[i].append(guess.distance_km)
             all_points[i].append(guess.score)
 

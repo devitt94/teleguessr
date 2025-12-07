@@ -52,10 +52,6 @@ def format_leaderboard_html(
 
         for player in players:
             round_results = []
-            print(
-                "Getting round results for player:",
-                player,
-            )
             player_round_positions: dict[int, int] = round_positions.get(player, {})
             for round_index in range(1, rounds_played + 1):
                 round_rank = player_round_positions.get(str(round_index), -1)

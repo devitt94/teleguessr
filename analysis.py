@@ -41,7 +41,6 @@ async def get_results_for_challenges(
 ) -> AsyncGenerator[ChallengeResult]:
     for challenge_id in challenge_ids:
         url = f"https://www.geoguessr.com/challenge/{challenge_id}"
-        print(f"Fetching challenge {challenge_id}...")
         try:
             result = await get_challenge_scores(url)
             yield result
