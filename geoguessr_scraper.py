@@ -1,4 +1,3 @@
-import os
 from models import Guess, Player, ChallengeResult, ChallengeScore
 
 
@@ -11,56 +10,59 @@ from loguru import logger
 MAX_ROUND_SCORE = 25_000
 
 
-async def create_challenge(
-    map_id: str,
-    time_limit_seconds: int,
-) -> str:
-    """
-    Create a new GeoGuessr challenge and return its URL.
-    """
-    logger.info(
-        f"Creating challenge for map_id={map_id} with time_limit_seconds={time_limit_seconds}"
-    )
+class GeoguessrClient:
+    def __init__(self, ncfa_cookie: str):
+        self.ncfa_cookie = ncfa_cookie
 
-    map_url = f"https://www.geoguessr.com/maps/{map_id}"
-    client = Geoguessr(os.getenv("NCFA_COOKIE"))
-    challenge_url = await client.generate_challenge(
-        map_url=map_url,
-        move=False,
-        pan=True,
-        zoom=True,
-        timeLimit=time_limit_seconds,
-        play_map=False,
-    )
-    return challenge_url
-
-
-async def get_challenge_scores(url: str) -> ChallengeResult:
-    """
-    Scrape player names and scores from a GeoGuessr challenge page.
-    (Assumes the challenge is public.)
-    """
-
-    client = Geoguessr(os.getenv("NCFA_COOKIE"))
-
-    geoguessr_scores: list[GeoguessrScore] = await client.get_challenge_score(url)
-    challenge_scores: list[ChallengeScore] = []
-    for geoguessr_score in geoguessr_scores:
-        playername = geoguessr_score.gamePlayerNick
-
-        hcap_multiplier = PLAYER_HANDICAP_MULTIPLIERS.get(
-            playername, NEW_ENTRANT_HANDICAP_MULTIPLIER
+    async def create_challenge(
+        self,
+        map_id: str,
+        time_limit_seconds: int,
+    ) -> str:
+        """
+        Create a new GeoGuessr challenge and return its URL.
+        """
+        logger.info(
+            f"Creating challenge for map_id={map_id} with time_limit_seconds={time_limit_seconds}"
         )
 
-        guess_points = geoguessr_score.gamePlayerGuessesRoundScoreInPoints
-        guess_distances = geoguessr_score.gamePlayerGuessesDistanceInMeters
-        guesses = [
-            Guess(score=score, distance_km=distance / 1000)
-            for score, distance in zip(guess_points, guess_distances)
-        ]
+        map_url = f"https://www.geoguessr.com/maps/{map_id}"
+        challenge_url = await Geoguessr(self.ncfa_cookie).generate_challenge(
+            map_url=map_url,
+            move=False,
+            pan=True,
+            zoom=True,
+            timeLimit=time_limit_seconds,
+            play_map=False,
+        )
+        return challenge_url
 
-        player = Player(name=playername, hcap_multiplier=hcap_multiplier)
-        round_score = ChallengeScore(player=player, guesses=guesses)
-        challenge_scores.append(round_score)
+    async def get_challenge_scores(self, url: str) -> ChallengeResult:
+        """
+        Scrape player names and scores from a GeoGuessr challenge page.
+        (Assumes the challenge is public.)
+        """
 
-    return ChallengeResult(challenge_url=url, scores=challenge_scores)
+        geoguessr_scores: list[GeoguessrScore] = await Geoguessr(
+            self.ncfa_cookie
+        ).get_challenge_score(url)
+        challenge_scores: list[ChallengeScore] = []
+        for geoguessr_score in geoguessr_scores:
+            playername = geoguessr_score.gamePlayerNick
+
+            hcap_multiplier = PLAYER_HANDICAP_MULTIPLIERS.get(
+                playername, NEW_ENTRANT_HANDICAP_MULTIPLIER
+            )
+
+            guess_points = geoguessr_score.gamePlayerGuessesRoundScoreInPoints
+            guess_distances = geoguessr_score.gamePlayerGuessesDistanceInMeters
+            guesses = [
+                Guess(score=score, distance_km=distance / 1000)
+                for score, distance in zip(guess_points, guess_distances)
+            ]
+
+            player = Player(name=playername, hcap_multiplier=hcap_multiplier)
+            round_score = ChallengeScore(player=player, guesses=guesses)
+            challenge_scores.append(round_score)
+
+        return ChallengeResult(challenge_url=url, scores=challenge_scores)

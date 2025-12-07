@@ -6,8 +6,6 @@ import json
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from settings import NUM_ROUNDS_PER_LEAGUE
-
 
 ScoreManager = Callable[[ChallengeResult], dict[str, int]]
 
@@ -34,8 +32,8 @@ class JSONEncoder(json.JSONEncoder):
 
 
 class LeagueState(BaseModel):
+    num_rounds: int
     filepath: Path = Field(frozen=True)
-    num_rounds: int = Field(default=NUM_ROUNDS_PER_LEAGUE)
     results: list[ChallengeResult] = Field(default_factory=list)
     chat_id: int | None = None
     current_round: ActiveRound | None = None

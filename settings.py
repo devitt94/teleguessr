@@ -1,4 +1,7 @@
-from pydantic_settings import BaseSettings
+from functools import lru_cache
+from pathlib import Path
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 PLAYER_ROUND_HANDICAPS = {
@@ -34,7 +37,29 @@ PLAYER_SHORTNAMES = {
 }
 
 
-class LeagueSettings(BaseSettings):
-    NUMBER_OF_ROUNDS: int = 5
-    TIME_PER_ROUND_HOURS: int = 24
-    TIME_PER_GUESS_SECONDS: int = 90
+class LeagueSettings(BaseModel):
+    map_id: str
+    number_of_rounds: int = 5
+    time_per_round_hours: int = 24
+    time_per_guess_seconds: int = 90
+
+
+class AppSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", env_nested_delimiter="__"
+    )
+
+    telegram_bot_token: str
+    telegram_admin_id: int
+    geoguessr_ncfa_cookie: str
+    data_dir: Path = Path("data/")
+    league: LeagueSettings
+
+
+@lru_cache()
+def get_settings(test_mode: bool = False) -> AppSettings:
+    settings = AppSettings()
+    if test_mode:
+        settings.league.time_per_round_hours = 0.01  # 36 seconds
+
+    return settings
