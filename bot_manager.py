@@ -2,6 +2,7 @@ from pathlib import Path
 import traceback
 
 from telegram import Update
+from telegram.ext import Application as TelegramApp
 
 from awards import get_ranked_guesses
 from formatters import format_leaderboard_html, format_round_result_html, format_time
@@ -52,10 +53,37 @@ class BotManager:
                 filepath=state_file, num_rounds=self.league_settings.number_of_rounds
             )
             self.league_state.load_from_file()
+
         else:
             logger.info("No active league found.")
 
         self.__initialised = True
+
+    async def resume_league_tasks(self, app: TelegramApp):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is not None and not self.league_state.is_finished:
+            if self.league_state.round_in_progress:
+                round_end_in_seconds = self.league_state.get_time_left_seconds()
+                logger.info(
+                    f"Resuming scheduled tasks for round {self.league_state.current_round_num}, "
+                    f"which ends in {round_end_in_seconds} seconds."
+                )
+
+                app.job_queue.run_once(
+                    self.remind_scheduled,
+                    when=(round_end_in_seconds * 11 / 12),
+                    chat_id=self.league_state.chat_id,
+                )
+                app.job_queue.run_once(
+                    self.end_round_scheduled,
+                    when=round_end_in_seconds,
+                    chat_id=self.league_state.chat_id,
+                )
+            else:
+                chat_id = self.league_state.chat_id
+                self.start_round(app.context_types.DEFAULT_TYPE, chat_id=chat_id)
 
     async def get_new_league_id(self) -> int:
         finished_leagues = list(self.finished_league_dir.iterdir())
@@ -94,6 +122,9 @@ class BotManager:
         )
 
         await update.message.reply_text("New league starting...")
+
+        self.league_state.chat_id = update.effective_chat.id
+        self.league_state.save()
 
         await self.start_round(context, chat_id=update.effective_chat.id)
 

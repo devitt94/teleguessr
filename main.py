@@ -66,6 +66,8 @@ def main(test_mode: bool = False):
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")
 
+    asyncio.run(bot_manager.resume_league_tasks(app))
+
     app.run_polling()
 
     logger.info("Bot stopped.")
