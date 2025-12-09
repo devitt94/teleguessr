@@ -26,8 +26,8 @@ def ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
 
 
 def skewed_ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
-    # 1st: 10, 2nd: 7, 3rd: 5, 4th: 4, 5th: 3, 6th: 2, 7th+: 1
-    rank_points = [10, 7, 5, 4, 3, 2]
+    # 1st: 9, 2nd: 7, 3rd: 5, 4th: 4, 5th: 3, 6th: 2, 7th+: 1
+    rank_points = [9, 7, 5, 4, 3, 2]
     sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
     scores: dict[str, int] = {}
     for rank, round_score in enumerate(sorted_scores):
