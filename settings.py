@@ -5,16 +5,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 PLAYER_HANDICAP_MULTIPLIERS = {
-    "Bosnia & GetsTheGoldSweena": 0.0,
+    "Bosnia & GetsTheGoldSweena": 0.05,
     "Grand Duchy of Gregdova": 0.0,
-    "St. Bics & Devitts": 0.2,
-    "Ppl's Rep. Glorious Mickistan": 0.2,
-    "Danminican Republic": 0.2,
-    "Ellitorial Guinea": 0.2,
-    "Kingdom of Gregoria I": 0.2,
+    "St. Bics & Devitts": 0.26,
+    "Ppl's Rep. Glorious Mickistan": 0.22,
+    "Danminican Republic": 0.21,
+    "Kingdom of Gregoria I": 0.24,
+    "Horanje": 0.25,
 }
 
-NEW_ENTRANT_HANDICAP_MULTIPLIER = 0.2
+NEW_ENTRANT_HANDICAP_MULTIPLIER = 0.25
 
 PLAYER_SHORTNAMES = {
     "Bosnia & GetsTheGoldSweena": "B&GGS",
@@ -23,6 +23,7 @@ PLAYER_SHORTNAMES = {
     "Danminican Republic": "Danminican",
     "St. Bics & Devitts": "St. Bics",
     "Kingdom of Gregoria I": "Gregoria",
+    "Horanje": "Horanje",
 }
 
 
