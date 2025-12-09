@@ -75,11 +75,13 @@ class BotManager:
                     self.remind_scheduled,
                     when=(round_end_in_seconds * 11 / 12),
                     chat_id=self.league_state.chat_id,
+                    name="round_reminder_job",
                 )
                 app.job_queue.run_once(
                     self.end_round_scheduled,
                     when=round_end_in_seconds,
                     chat_id=self.league_state.chat_id,
+                    name="end_round_job",
                 )
             else:
                 chat_id = self.league_state.chat_id
@@ -269,6 +271,15 @@ class BotManager:
 
         await self.end_round(context, update.effective_chat.id)
 
+        # Clear the job queue to avoid duplicate end round calls
+        current_jobs = context.job_queue.get_jobs_by_name("end_round_job")
+        for job in current_jobs:
+            job.schedule_removal()
+
+        current_jobs = context.job_queue.get_jobs_by_name("round_reminder_job")
+        for job in current_jobs:
+            job.schedule_removal()
+
     async def end_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         if chat_id is None:
             raise ValueError("chat_id must be provided to end_round")
@@ -297,6 +308,8 @@ class BotManager:
             await context.bot.send_message(
                 chat_id, f"🏆 League finished. Winner: {winner}"
             )
+
+            await self.end_league()
         else:
             await self.start_round(context, chat_id=chat_id)
 
@@ -364,3 +377,56 @@ class BotManager:
         for player in players_finished:
             result[player] = True
         return result
+
+    async def end_league(self):
+        if self.league_state is None:
+            raise RuntimeError("No active league to end.")
+
+        finished_league_path = (
+            self.finished_league_dir / self.league_state.filepath.name
+        )
+        self.league_state.filepath.rename(finished_league_path)
+        logger.info(
+            f"League ended. Moved league file to {finished_league_path.absolute()}"
+        )
+        self.league_state = None
+
+    async def show_current_round_scores_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        if self.league_state is None or self.league_state.is_finished:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="No active league.",
+            )
+            return
+        if not self.league_state.round_in_progress:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="No round in progress.",
+            )
+            return
+
+        message = await self.current_round_scores_message()
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=message,
+            parse_mode="HTML",
+        )
+
+    async def current_round_scores_message(self) -> str:
+        challenge_url = self.league_state.current_round.challenge_url
+        round_result = await self.geoguessr_client.get_challenge_scores(challenge_url)
+
+        net_scores = sorted(
+            [(score.player.name, score.net_score) for score in round_result.scores],
+            key=lambda x: x[1],
+            reverse=True,
+        )
+
+        round_text = "🏁 Current Round Scores:\n\n"
+        for name, score in net_scores:
+            round_text += f"- {name}: {score} pts\n"
+
+        return round_text
