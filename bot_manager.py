@@ -8,7 +8,7 @@ from awards import get_ranked_guesses
 from formatters import format_leaderboard_html, format_round_result_html, format_time
 from geoguessr_scraper import GeoguessrClient
 from league import LeagueState
-from settings import LeagueSettings, PLAYER_SHORTNAMES
+from settings import LeagueSettings
 from loguru import logger
 
 from telegram.ext import ContextTypes
@@ -285,7 +285,11 @@ class BotManager:
             raise ValueError("chat_id must be provided to end_round")
 
         challenge_url = self.league_state.current_round.challenge_url
-        round_result = await self.geoguessr_client.get_challenge_scores(challenge_url)
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            challenge_url,
+            handicaps=self.league_settings.handicap_multipliers,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+        )
 
         ranked_guesses = get_ranked_guesses(round_result)
 
@@ -370,10 +374,16 @@ class BotManager:
             raise RuntimeError("No active round.")
 
         challenge_url = self.league_state.current_round.challenge_url
-        current_result = await self.geoguessr_client.get_challenge_scores(challenge_url)
+        current_result = await self.geoguessr_client.get_challenge_scores(
+            challenge_url,
+            handicaps=self.league_settings.handicap_multipliers,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+        )
         players_finished = current_result.players_finished
 
-        result = {player: False for player in PLAYER_SHORTNAMES.keys()}
+        result = {
+            player: False for player in self.league_settings.handicap_multipliers.keys()
+        }
         for player in players_finished:
             result[player] = True
         return result
@@ -417,7 +427,11 @@ class BotManager:
 
     async def current_round_scores_message(self) -> str:
         challenge_url = self.league_state.current_round.challenge_url
-        round_result = await self.geoguessr_client.get_challenge_scores(challenge_url)
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            challenge_url,
+            handicaps=self.league_settings.handicap_multipliers,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+        )
 
         net_scores = sorted(
             [(score.player.name, score.net_score) for score in round_result.scores],

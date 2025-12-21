@@ -1,13 +1,5 @@
 from league import skewed_ranking_score_manager
 from models import ChallengeResult, RankedGuess
-from settings import PLAYER_SHORTNAMES
-
-
-def get_player_shortname(fullname: str) -> str:
-    try:
-        return PLAYER_SHORTNAMES[fullname]
-    except KeyError:
-        return f"{fullname[:7]}..."
 
 
 def format_scoreboard(scores: dict, header: str = "Total Score") -> str:

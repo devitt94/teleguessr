@@ -5,26 +5,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 PLAYER_HANDICAP_MULTIPLIERS = {
-    "Bosnia & GetsTheGoldSweena": 0.05,
+    "Bosnia & GetsTheGoldSweena": 0.01,
     "Grand Duchy of Gregdova": 0.0,
-    "St. Bics & Devitts": 0.26,
-    "Ppl's Rep. Glorious Mickistan": 0.22,
-    "Danminican Republic": 0.21,
-    "Kingdom of Gregoria I": 0.24,
-    "Horanje": 0.25,
+    "St. Bics & Devitts": 0.24,
+    "Ppl's Rep. Glorious Mickistan": 0.21,
+    "Danminican Republic": 0.18,
+    "Kingdom of Gregoria I": 0.26,
+    "Horanje": 0.26,
+    "Boothd": 0.25,
 }
 
 NEW_ENTRANT_HANDICAP_MULTIPLIER = 0.25
-
-PLAYER_SHORTNAMES = {
-    "Bosnia & GetsTheGoldSweena": "B&GGS",
-    "Grand Duchy of Gregdova": "Gregdova",
-    "Ppl's Rep. Glorious Mickistan": "Mickistan",
-    "Danminican Republic": "Danminican",
-    "St. Bics & Devitts": "St. Bics",
-    "Kingdom of Gregoria I": "Gregoria",
-    "Horanje": "Horanje",
-}
 
 
 class LeagueSettings(BaseModel):
@@ -32,6 +23,10 @@ class LeagueSettings(BaseModel):
     number_of_rounds: int = 5
     time_per_round_hours: int = 24
     time_per_guess_seconds: int = 90
+
+    handicap_multipliers: dict[str, float] = PLAYER_HANDICAP_MULTIPLIERS
+
+    default_handicap_multiplier: float = NEW_ENTRANT_HANDICAP_MULTIPLIER
 
 
 class AppSettings(BaseSettings):

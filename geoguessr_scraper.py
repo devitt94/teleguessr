@@ -2,7 +2,6 @@ from models import Guess, Player, ChallengeResult, ChallengeScore
 
 
 from geoguessr_async import Geoguessr, GeoguessrScore
-from settings import NEW_ENTRANT_HANDICAP_MULTIPLIER, PLAYER_HANDICAP_MULTIPLIERS
 
 from loguru import logger
 
@@ -37,7 +36,12 @@ class GeoguessrClient:
         )
         return challenge_url
 
-    async def get_challenge_scores(self, url: str) -> ChallengeResult:
+    async def get_challenge_scores(
+        self,
+        url: str,
+        handicaps: dict[str, float],
+        default_handicap: float,
+    ) -> ChallengeResult:
         """
         Scrape player names and scores from a GeoGuessr challenge page.
         (Assumes the challenge is public.)
@@ -50,9 +54,7 @@ class GeoguessrClient:
         for geoguessr_score in geoguessr_scores:
             playername = geoguessr_score.gamePlayerNick
 
-            hcap_multiplier = PLAYER_HANDICAP_MULTIPLIERS.get(
-                playername, NEW_ENTRANT_HANDICAP_MULTIPLIER
-            )
+            hcap_multiplier = handicaps.get(playername, default_handicap)
 
             guess_points = geoguessr_score.gamePlayerGuessesRoundScoreInPoints
             guess_distances = geoguessr_score.gamePlayerGuessesDistanceInMeters
