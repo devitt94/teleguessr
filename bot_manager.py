@@ -71,12 +71,24 @@ class BotManager:
                     f"which ends in {round_end_in_seconds} seconds."
                 )
 
-                app.job_queue.run_once(
-                    self.remind_scheduled,
-                    when=(round_end_in_seconds * 11 / 12),
-                    chat_id=self.league_state.chat_id,
-                    name="round_reminder_job",
+                total_round_time_seconds = (
+                    self.league_settings.time_per_round_hours * 3600
                 )
+                reminder_time_in_seconds = total_round_time_seconds * 1 / 12
+                if round_end_in_seconds < reminder_time_in_seconds:
+                    logger.info(
+                        "Round end is within reminder period; skipping reminder scheduling."
+                    )
+                else:
+                    logger.info("Scheduling round reminder job.")
+
+                    app.job_queue.run_once(
+                        self.remind_scheduled,
+                        when=round_end_in_seconds - reminder_time_in_seconds,
+                        chat_id=self.league_state.chat_id,
+                        name="round_reminder_job",
+                    )
+
                 app.job_queue.run_once(
                     self.end_round_scheduled,
                     when=round_end_in_seconds,

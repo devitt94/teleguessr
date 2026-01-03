@@ -5,17 +5,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 PLAYER_HANDICAP_MULTIPLIERS = {
-    "Bosnia & GetsTheGoldSweena": 0.01,
     "Grand Duchy of Gregdova": 0.0,
-    "St. Bics & Devitts": 0.24,
-    "Ppl's Rep. Glorious Mickistan": 0.21,
+    "Bosnia & GetsTheGoldSweena": 0.03,
     "Danminican Republic": 0.18,
-    "Kingdom of Gregoria I": 0.26,
-    "Horanje": 0.26,
-    "Boothd": 0.25,
+    "Ppl's Rep. Glorious Mickistan": 0.19,
+    "St. Bics & Devitts": 0.21,
+    "Kingdom of Gregoria I": 0.30,
+    "Horanje": 0.30,
+    "Boothd": 0.28,
+    "Theoland": 0.25,
+    "SandyAbyss149": 0.25,
 }
 
 NEW_ENTRANT_HANDICAP_MULTIPLIER = 0.25
+MAXIMUM_HANDICAP_MULTIPLIER = 0.30
 
 
 class LeagueSettings(BaseModel):
