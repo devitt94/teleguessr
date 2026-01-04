@@ -1,12 +1,12 @@
 from collections import defaultdict
 
-from geoguessr_scraper import GeoguessrClient
-from formatters import format_scoreboard
+from teleguessr.geoguessr_scraper import GeoguessrClient
+from teleguessr.formatters import format_scoreboard
 
 import pandas as pd
 import dotenv
 
-from settings import get_settings
+from teleguessr.settings import get_settings
 
 dotenv.load_dotenv()
 

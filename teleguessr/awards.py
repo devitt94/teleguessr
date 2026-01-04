@@ -1,6 +1,6 @@
 import statistics
 from typing import Callable
-from models import Guess, ChallengeResult, GuessStats, RankedGuess
+from teleguessr.models import Guess, ChallengeResult, GuessStats, RankedGuess
 
 
 def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:

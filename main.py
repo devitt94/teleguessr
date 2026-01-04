@@ -2,9 +2,9 @@ import asyncio
 import json
 
 from loguru import logger
-from geoguessr_scraper import GeoguessrClient
-from settings import AppSettings, get_settings
-from bot_manager import BotManager
+from teleguessr.geoguessr_scraper import GeoguessrClient
+from teleguessr.settings import AppSettings, get_settings
+from teleguessr.bot_manager import BotManager
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,

@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
 
-from awards import get_ranked_guesses
-from formatters import format_leaderboard_html
-from geoguessr_scraper import GeoguessrClient
-from league import LeagueState
+from teleguessr.awards import get_ranked_guesses
+from teleguessr.formatters import format_leaderboard_html
+from teleguessr.geoguessr_scraper import GeoguessrClient
+from teleguessr.league import LeagueState
 
 
 async def replay_league(
@@ -55,7 +55,7 @@ async def replay_league(
 
 if __name__ == "__main__":
     import asyncio
-    from settings import get_settings
+    from teleguessr.settings import get_settings
 
     settings = get_settings()
     league_file = settings.data_dir / "leagues" / "finished" / "league_3.json"

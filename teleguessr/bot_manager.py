@@ -4,15 +4,23 @@ import traceback
 from telegram import Update
 from telegram.ext import Application as TelegramApp
 
-from awards import get_ranked_guesses
-from formatters import format_leaderboard_html, format_round_result_html, format_time
-from geoguessr_scraper import GeoguessrClient
-from league import LeagueState
-from settings import LeagueSettings
+from teleguessr.awards import get_ranked_guesses
+from teleguessr.formatters import (
+    format_leaderboard_html,
+    format_round_result_html,
+    format_time,
+)
+from teleguessr.geoguessr_scraper import GeoguessrClient
+from teleguessr.league import LeagueState
+from teleguessr.settings import LeagueSettings
 from loguru import logger
 
-from handicaps import calculate_new_handicaps, get_latest_handicaps, update_handicaps
-from ranks import get_ranks_from_scores
+from teleguessr.handicaps import (
+    calculate_new_handicaps,
+    get_latest_handicaps,
+    update_handicaps,
+)
+from teleguessr.ranks import get_ranks_from_scores
 
 from telegram.ext import ContextTypes
 

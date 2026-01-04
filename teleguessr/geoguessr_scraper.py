@@ -1,4 +1,4 @@
-from models import Guess, Player, ChallengeResult, ChallengeScore
+from teleguessr.models import Guess, Player, ChallengeResult, ChallengeScore
 
 
 from geoguessr_async import Geoguessr, GeoguessrScore

@@ -1,5 +1,5 @@
-from handicaps import calculate_new_handicaps, get_adjustments
-from settings import LeagueSettings
+from teleguessr.handicaps import calculate_new_handicaps, get_adjustments
+from teleguessr.settings import LeagueSettings
 from unittest.mock import patch
 
 import pytest

@@ -2,7 +2,7 @@ import json
 
 from loguru import logger
 
-from settings import LeagueSettings
+from teleguessr.settings import LeagueSettings
 
 
 def get_latest_handicaps(league_settings: LeagueSettings) -> dict[str, float]:

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 from typing import Callable
-from models import ActiveRound, ChallengeResult, RankedGuess
+from teleguessr.models import ActiveRound, ChallengeResult, RankedGuess
 import json
 from pathlib import Path
 from pydantic import BaseModel, Field

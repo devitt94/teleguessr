@@ -1,5 +1,5 @@
-from league import skewed_ranking_score_manager
-from models import ChallengeResult, RankedGuess
+from teleguessr.league import skewed_ranking_score_manager
+from teleguessr.models import ChallengeResult, RankedGuess
 
 
 def format_scoreboard(scores: dict, header: str = "Total Score") -> str:

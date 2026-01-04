@@ -1,5 +1,5 @@
 import pytest
-from ranks import get_ranks_from_scores
+from teleguessr.ranks import get_ranks_from_scores
 
 
 @pytest.mark.parametrize(
