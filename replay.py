@@ -58,7 +58,7 @@ if __name__ == "__main__":
     from settings import get_settings
 
     settings = get_settings()
-    league_file = settings.data_dir / "leagues" / "finished" / "league_2.json"
+    league_file = settings.data_dir / "leagues" / "finished" / "league_3.json"
 
     asyncio.run(
         replay_league(

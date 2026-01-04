@@ -1,5 +1,5 @@
 import asyncio
-import random
+import json
 
 from loguru import logger
 from geoguessr_scraper import GeoguessrClient
@@ -19,8 +19,31 @@ async def initlise_bot_manager(
     geoguessr_client = GeoguessrClient(ncfa_cookie=settings.geoguessr_ncfa_cookie)
 
     if test_mode:
+        latest_league_file = list(
+            (settings.data_dir / "leagues" / "finished").glob("league_*.json")
+        )[0]
+
+        with open(latest_league_file, "r") as f:
+            league_data = json.load(f)
+
+        challenge_urls = [
+            round_info["challenge_url"] for round_info in league_data["results"]
+        ]
+        round_index = 0
+
+        async def create_fake_challenge(
+            map_id: str,
+            time_limit_seconds: int,
+        ) -> str:
+            """Create a fake challenge URL for testing purposes."""
+            nonlocal round_index
+
+            round_url = challenge_urls[round_index % len(challenge_urls)]
+            round_index += 1
+            return round_url
+
         geoguessr_client.create_challenge = create_fake_challenge
-        settings.league.time_per_round_hours = 0.02  # 7.2 seconds
+        settings.league.time_per_round_hours = 0.002  # 7.2 seconds
 
     bot_manager = BotManager(
         admin_id=settings.telegram_admin_id,
@@ -30,23 +53,6 @@ async def initlise_bot_manager(
     )
     await bot_manager.initialise()
     return bot_manager
-
-
-async def create_fake_challenge(
-    map_id: str,
-    time_limit_seconds: int,
-) -> str:
-    """Create a fake challenge URL for testing purposes."""
-
-    challenge_urls = [
-        "https://www.geoguessr.com/challenge/X37AfCqv57u8rGdz",
-        "https://www.geoguessr.com/challenge/J2tCBccFnlJq1eUD",
-        "https://www.geoguessr.com/challenge/gVmY1NVOqnaHnHy4",
-        "https://www.geoguessr.com/challenge/KGI2gHP15ejmDGVg",
-        "https://www.geoguessr.com/challenge/989O8zGW1iWsfrsu",
-    ]
-
-    return random.choice(challenge_urls)
 
 
 def main(test_mode: bool = False):

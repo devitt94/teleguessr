@@ -102,6 +102,10 @@ class LeagueState(BaseModel):
     def round_in_progress(self) -> bool:
         return self.current_round is not None
 
+    @property
+    def league_id(self) -> int:
+        return int(self.filepath.stem.split("_")[-1])
+
     def construct_leaderboard(self) -> dict[int, list[str]]:
         """Returns a mapping of rank to list of player names at that rank."""
         rank_map: dict[int, list[str]] = defaultdict(list)

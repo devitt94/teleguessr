@@ -11,6 +11,9 @@ from league import LeagueState
 from settings import LeagueSettings
 from loguru import logger
 
+from handicaps import calculate_new_handicaps, get_latest_handicaps, update_handicaps
+from ranks import get_ranks_from_scores
+
 from telegram.ext import ContextTypes
 
 
@@ -56,6 +59,8 @@ class BotManager:
 
         else:
             logger.info("No active league found.")
+
+        self.handicaps = get_latest_handicaps(self.league_settings)
 
         self.__initialised = True
 
@@ -299,7 +304,7 @@ class BotManager:
         challenge_url = self.league_state.current_round.challenge_url
         round_result = await self.geoguessr_client.get_challenge_scores(
             challenge_url,
-            handicaps=self.league_settings.handicap_multipliers,
+            handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
         )
 
@@ -325,7 +330,26 @@ class BotManager:
                 chat_id, f"🏆 League finished. Winner: {winner}"
             )
 
+            # Calculate and update handicaps
+            player_ranks = get_ranks_from_scores(
+                self.league_state.get_leaderboard_data()["scores"]
+            )
+            new_handicaps = calculate_new_handicaps(player_ranks, self.league_settings)
+
+            update_handicaps(
+                new_handicaps, self.league_state.league_id, self.league_settings
+            )
+
+            logger.info(f"Updated handicaps: {new_handicaps}")
+            await self.show_handicap_updates(
+                context,
+                chat_id,
+                prev_handicaps=self.handicaps,
+                new_handicaps=new_handicaps,
+            )
+            self.handicaps = new_handicaps
             await self.end_league()
+
         else:
             await self.start_round(context, chat_id=chat_id)
 
@@ -388,14 +412,12 @@ class BotManager:
         challenge_url = self.league_state.current_round.challenge_url
         current_result = await self.geoguessr_client.get_challenge_scores(
             challenge_url,
-            handicaps=self.league_settings.handicap_multipliers,
+            handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
         )
         players_finished = current_result.players_finished
 
-        result = {
-            player: False for player in self.league_settings.handicap_multipliers.keys()
-        }
+        result = {player: False for player in self.handicaps.keys()}
         for player in players_finished:
             result[player] = True
         return result
@@ -441,7 +463,7 @@ class BotManager:
         challenge_url = self.league_state.current_round.challenge_url
         round_result = await self.geoguessr_client.get_challenge_scores(
             challenge_url,
-            handicaps=self.league_settings.handicap_multipliers,
+            handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
         )
 
@@ -456,3 +478,24 @@ class BotManager:
             round_text += f"- {name}: {score} pts\n"
 
         return round_text
+
+    async def show_handicap_updates(
+        self,
+        context: ContextTypes.DEFAULT_TYPE,
+        chat_id: int,
+        prev_handicaps: dict[str, float],
+        new_handicaps: dict[str, float],
+    ):
+        message = "📉 Handicap Updates:\n\n"
+        for player, new_hcap in new_handicaps.items():
+            prev_hcap = prev_handicaps.get(
+                player, self.league_settings.default_handicap_multiplier
+            )
+            change = new_hcap - prev_hcap
+            change_str = f"+{change:.0%}" if change > 0 else f"{change:.0%}"
+            message += f"- {player}: {prev_hcap:.0%} -> {new_hcap:.0%} ({change_str})\n"
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=message,
+        )

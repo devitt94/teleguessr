@@ -3,20 +3,6 @@ from pathlib import Path
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-PLAYER_HANDICAP_MULTIPLIERS = {
-    "Grand Duchy of Gregdova": 0.0,
-    "Bosnia & GetsTheGoldSweena": 0.03,
-    "Danminican Republic": 0.18,
-    "Ppl's Rep. Glorious Mickistan": 0.19,
-    "St. Bics & Devitts": 0.21,
-    "Kingdom of Gregoria I": 0.30,
-    "Horanje": 0.30,
-    "Boothd": 0.28,
-    "Theoland": 0.25,
-    "SandyAbyss149": 0.25,
-}
-
 NEW_ENTRANT_HANDICAP_MULTIPLIER = 0.25
 MAXIMUM_HANDICAP_MULTIPLIER = 0.30
 
@@ -27,9 +13,11 @@ class LeagueSettings(BaseModel):
     time_per_round_hours: int = 24
     time_per_guess_seconds: int = 90
 
-    handicap_multipliers: dict[str, float] = PLAYER_HANDICAP_MULTIPLIERS
+    handicaps_dir: Path = Path("data/handicaps/")
 
     default_handicap_multiplier: float = NEW_ENTRANT_HANDICAP_MULTIPLIER
+
+    max_handicap_multiplier: float = MAXIMUM_HANDICAP_MULTIPLIER
 
 
 class AppSettings(BaseSettings):
