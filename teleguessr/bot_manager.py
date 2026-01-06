@@ -25,6 +25,20 @@ from teleguessr.ranks import get_ranks_from_scores
 from telegram.ext import ContextTypes
 
 
+NUMBER_EMOJI_MAP = {
+    1: "1️⃣",
+    2: "2️⃣",
+    3: "3️⃣",
+    4: "4️⃣",
+    5: "5️⃣",
+    6: "6️⃣",
+    7: "7️⃣",
+    8: "8️⃣",
+    9: "9️⃣",
+    10: "🔟",
+}
+
+
 class BotManager:
     def __init__(
         self,
@@ -207,9 +221,10 @@ class BotManager:
                 status_message += (
                     f"- Current round in progress (ends in {format_time(time_left)})\n"
                 )
-                status_message += "- Players who have played this round:\n"
-                for player, finished in players_played.items():
-                    status_message += f"  - {player}: {'✅' if finished else '❌'}\n"
+                status_message += "- Current rankings for this round:\n"
+                for player, rank in players_played.items():
+                    rank_emoji = NUMBER_EMOJI_MAP.get(rank, "❓")
+                    status_message += f"  -  {rank_emoji}: {player}:\n"
 
             else:
                 status_message += "- No round currently in progress.\n"
@@ -248,7 +263,7 @@ class BotManager:
         time_left_str = format_time(time_left)
 
         players_pending = {
-            player for player, finished in players_finished.items() if not finished
+            player for player, rank in players_finished.items() if rank is None
         }
         if not players_pending:
             logger.info("All players have finished the round; no reminder sent.")
@@ -409,7 +424,7 @@ class BotManager:
         # Still print to logs
         logger.info(f"Exception while handling update {update}: {context.error}")
 
-    async def player_round_status(self) -> dict[str, bool]:
+    async def player_round_status(self) -> dict[str, int | None]:
         if (
             self.league_state is None
             or self.league_state.is_finished
@@ -418,17 +433,26 @@ class BotManager:
             raise RuntimeError("No active round.")
 
         challenge_url = self.league_state.current_round.challenge_url
-        current_result = await self.geoguessr_client.get_challenge_scores(
+        round_result = await self.geoguessr_client.get_challenge_scores(
             challenge_url,
             handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
         )
-        players_finished = current_result.players_finished
+        net_scores = {
+            score.player.name: score.net_score for score in round_result.scores
+        }
+        ranks = get_ranks_from_scores(net_scores)
 
-        result = {player: False for player in self.handicaps.keys()}
-        for player in players_finished:
-            result[player] = True
-        return result
+        result = {player: None for player in self.handicaps.keys()}
+        result.update(ranks)
+
+        # Sort the result dict by rank (None values at the end)
+        return dict(
+            sorted(
+                result.items(),
+                key=lambda item: (item[1] is None, item[1]),
+            )
+        )
 
     async def end_league(self):
         if self.league_state is None:
@@ -442,50 +466,6 @@ class BotManager:
             f"League ended. Moved league file to {finished_league_path.absolute()}"
         )
         self.league_state = None
-
-    async def show_current_round_scores_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if self.league_state is None or self.league_state.is_finished:
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="No active league.",
-            )
-            return
-        if not self.league_state.round_in_progress:
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="No round in progress.",
-            )
-            return
-
-        message = await self.current_round_scores_message()
-
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=message,
-            parse_mode="HTML",
-        )
-
-    async def current_round_scores_message(self) -> str:
-        challenge_url = self.league_state.current_round.challenge_url
-        round_result = await self.geoguessr_client.get_challenge_scores(
-            challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
-        )
-
-        net_scores = sorted(
-            [(score.player.name, score.net_score) for score in round_result.scores],
-            key=lambda x: x[1],
-            reverse=True,
-        )
-
-        round_text = "🏁 Current Round Scores:\n\n"
-        for name, score in net_scores:
-            round_text += f"- {name}: {score} pts\n"
-
-        return round_text
 
     async def show_handicap_updates(
         self,

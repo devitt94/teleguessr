@@ -69,11 +69,6 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("remind", bot_manager.remind_handler))
     app.add_handler(CommandHandler("status", bot_manager.status_handler))
     app.add_handler(CommandHandler("leaderboard", bot_manager.show_leaderboard_handler))
-    app.add_handler(
-        CommandHandler(
-            "currentroundscores", bot_manager.show_current_round_scores_handler
-        )
-    )
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")
 
