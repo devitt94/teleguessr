@@ -6,6 +6,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 NEW_ENTRANT_HANDICAP_MULTIPLIER = 0.25
 MAXIMUM_HANDICAP_MULTIPLIER = 0.30
 
+PLAYER_NAME_TO_TELEGRAM_ID = {
+    "Bosnia & GetsTheGoldSweena": 8116505806,
+    "Grand Duchy of Gregdova": 6813515691,
+    "Danminican Republic": 8219004552,
+    "St. Bics & Devitts": 7776561844,
+    "Ppl's Rep. Glorious Mickistan": 1427830114,
+    "SandyAbyss149": 8193470489,
+    "Theoland": 6357450541,
+    "Kingdom of Gregoria I": 6724087132,
+    "Horanje": 1752908144,
+    "Boothd": 7495773616,
+}
+
+TELEGRAM_ID_TO_PLAYER_NAME = {v: k for k, v in PLAYER_NAME_TO_TELEGRAM_ID.items()}
+
 
 class LeagueSettings(BaseModel):
     map_id: str

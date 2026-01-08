@@ -2,6 +2,7 @@ from pathlib import Path
 import traceback
 
 from telegram import Update
+from telegram.constants import MessageOriginType
 from telegram.ext import Application as TelegramApp
 
 from teleguessr.awards import get_ranked_guesses
@@ -12,7 +13,7 @@ from teleguessr.formatters import (
 )
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import LeagueState
-from teleguessr.settings import LeagueSettings
+from teleguessr.settings import LeagueSettings, TELEGRAM_ID_TO_PLAYER_NAME
 from loguru import logger
 
 from teleguessr.handicaps import (
@@ -198,7 +199,7 @@ class BotManager:
 
         self.league_state.save()
 
-        await context.bot.send_message(
+        round_start_message = await context.bot.send_message(
             chat_id=chat_id,
             text=(
                 f"🏁 Round {self.league_state.current_round_num} has started!\n\n"
@@ -207,9 +208,18 @@ class BotManager:
             ),
         )
 
+        await context.bot.pin_chat_message(
+            chat_id=chat_id,
+            message_id=round_start_message.message_id,
+            disable_notification=True,
+        )
+
     async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
+
+        player_id = update.effective_user.id
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id, None)
 
         if self.league_state is None or self.league_state.is_finished:
             status_message = "No active league. Start a new league with /startleague."
@@ -217,22 +227,36 @@ class BotManager:
             status_message = f"League Status:\n- Rounds completed: {self.league_state.last_round_finished_num}/{self.league_state.num_rounds}\n"
             if self.league_state.round_in_progress:
                 players_played = await self.player_round_status()
+
                 time_left = self.league_state.get_time_left_seconds()
+                player_has_played = bool(players_played.get(player_name))
                 status_message += (
                     f"- Current round in progress (ends in {format_time(time_left)})\n"
                 )
-                status_message += "- Current rankings for this round:\n"
-                for player, rank in players_played.items():
-                    rank_emoji = NUMBER_EMOJI_MAP.get(rank, "❓")
-                    status_message += f"  -  {rank_emoji}: {player}:\n"
+                if player_has_played:
+                    status_message += "- Current rankings for this round:\n"
+                    for player, rank in players_played.items():
+                        rank_emoji = NUMBER_EMOJI_MAP.get(rank, "❓")
+                        status_message += f"  -  {rank_emoji}: {player}:\n"
+
+                    # Reply privately so that player who haven't played yet doesn't see rankings
+                    await context.bot.send_message(
+                        chat_id=player_id,
+                        text=status_message,
+                    )
+
+                    status_message = "You have already played this round. Sending current rankings privately.\n"
+
+                else:
+                    status_message += "- Players who have played this round\n"
+                    for player, rank in players_played.items():
+                        emoji = "✅" if rank is not None else "❌"
+                        status_message += f"  - {emoji} {player}\n"
 
             else:
                 status_message += "- No round currently in progress.\n"
 
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=status_message,
-        )
+        await update.message.reply_text(status_message)
 
     async def remind_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
@@ -301,6 +325,12 @@ class BotManager:
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
 
+        if update.effective_user.id != self.admin_id:
+            await update.message.reply_text(
+                "You are not authorized to use this command."
+            )
+            return
+
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text("No active league.")
             return
@@ -314,10 +344,12 @@ class BotManager:
         # Clear the job queue to avoid duplicate end round calls
         current_jobs = context.job_queue.get_jobs_by_name("end_round_job")
         for job in current_jobs:
+            logger.info("Removing duplicate end round job.")
             job.schedule_removal()
 
         current_jobs = context.job_queue.get_jobs_by_name("round_reminder_job")
         for job in current_jobs:
+            logger.info("Removing round reminder job.")
             job.schedule_removal()
 
     async def end_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
@@ -487,3 +519,35 @@ class BotManager:
             chat_id=chat_id,
             text=message,
         )
+
+    async def get_forwarded_user_id(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        msg = update.message
+
+        if not msg.forward_origin:
+            await msg.reply_text("❌ This message is not forwarded.")
+            return
+
+        origin = msg.forward_origin
+
+        # Case 1: forwarded from a user
+        if origin.type == MessageOriginType.USER:
+            user = origin.sender_user
+            await msg.reply_text(
+                f"👤 Forwarded user:\n" f"ID: `{user.id}`\n" f"Name: {user.full_name}",
+                parse_mode="Markdown",
+            )
+
+        # Case 2: forwarded from a channel
+        elif origin.type == MessageOriginType.CHANNEL:
+            chat = origin.chat
+            await msg.reply_text(
+                f"📢 Forwarded from channel:\n"
+                f"ID: `{chat.id}`\n"
+                f"Title: {chat.title}",
+                parse_mode="Markdown",
+            )
+
+        else:
+            await msg.reply_text("⚠️ Forwarded origin exists but sender is hidden.")
