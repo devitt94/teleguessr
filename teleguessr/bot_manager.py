@@ -13,6 +13,7 @@ from teleguessr.formatters import (
 )
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import LeagueState
+from teleguessr.models import AbbreviatedRoundScore
 from teleguessr.settings import LeagueSettings, TELEGRAM_ID_TO_PLAYER_NAME
 from loguru import logger
 
@@ -235,9 +236,17 @@ class BotManager:
                 )
                 if player_has_played:
                     status_message += "- Current rankings for this round:\n"
-                    for player, rank in players_played.items():
-                        rank_emoji = NUMBER_EMOJI_MAP.get(rank, "❓")
-                        status_message += f"  -  {rank_emoji}: {player}:\n"
+                    for player, abbreviated_score in players_played.items():
+                        if abbreviated_score is None:
+                            rank_emoji = "❓"
+                            net_score_str = ""
+                        else:
+                            rank_emoji = NUMBER_EMOJI_MAP.get(
+                                abbreviated_score.rank, "❓"
+                            )
+                            net_score_str = f" ({abbreviated_score.net_score} pts)"
+
+                        status_message += f"  {rank_emoji}: {player} {net_score_str}\n"
 
                     # Reply privately so that player who haven't played yet doesn't see rankings
                     await context.bot.send_message(
@@ -245,12 +254,18 @@ class BotManager:
                         text=status_message,
                     )
 
-                    status_message = "You have already played this round. Sending current rankings privately.\n"
+                    if update.effective_chat.id != player_id:
+                        await context.bot.send_message(
+                            chat_id=update.effective_chat.id,
+                            text="You have already played this round. Sending current rankings privately.",
+                        )
+                    else:
+                        return
 
                 else:
                     status_message += "- Players who have played this round\n"
-                    for player, rank in players_played.items():
-                        emoji = "✅" if rank is not None else "❌"
+                    for player, abbreviated_score in players_played.items():
+                        emoji = "✅" if abbreviated_score is not None else "❌"
                         status_message += f"  - {emoji} {player}\n"
 
             else:
@@ -287,7 +302,9 @@ class BotManager:
         time_left_str = format_time(time_left)
 
         players_pending = {
-            player for player, rank in players_finished.items() if rank is None
+            player
+            for player, abbreviated_score in players_finished.items()
+            if abbreviated_score is None
         }
         if not players_pending:
             logger.info("All players have finished the round; no reminder sent.")
@@ -456,7 +473,7 @@ class BotManager:
         # Still print to logs
         logger.info(f"Exception while handling update {update}: {context.error}")
 
-    async def player_round_status(self) -> dict[str, int | None]:
+    async def player_round_status(self) -> dict[str, AbbreviatedRoundScore | None]:
         if (
             self.league_state is None
             or self.league_state.is_finished
@@ -476,13 +493,18 @@ class BotManager:
         ranks = get_ranks_from_scores(net_scores)
 
         result = {player: None for player in self.handicaps.keys()}
-        result.update(ranks)
+        for player, rank in ranks.items():
+            result[player] = AbbreviatedRoundScore(
+                rank=rank, net_score=net_scores[player]
+            )
 
         # Sort the result dict by rank (None values at the end)
         return dict(
             sorted(
                 result.items(),
-                key=lambda item: (item[1] is None, item[1]),
+                key=lambda item: (
+                    item[1].rank if item[1] is not None else float("inf")
+                ),
             )
         )
 

@@ -100,3 +100,8 @@ class ChallengeResult(BaseModel):
                 f"Player {player_name} did not participate in round {round_index}"
             )
         return guess
+
+
+class AbbreviatedRoundScore(BaseModel):
+    rank: int
+    net_score: int
