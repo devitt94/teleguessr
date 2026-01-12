@@ -1,4 +1,5 @@
 from pathlib import Path
+import random
 import traceback
 
 from telegram import Update
@@ -259,12 +260,13 @@ class BotManager:
                             chat_id=update.effective_chat.id,
                             text="You have already played this round. Sending current rankings privately.",
                         )
-                    else:
-                        return
 
+                    return
                 else:
                     status_message += "- Players who have played this round\n"
-                    for player, abbreviated_score in players_played.items():
+                    shuffled_players = list(players_played.items())
+                    random.shuffle(shuffled_players)
+                    for player, abbreviated_score in shuffled_players:
                         emoji = "✅" if abbreviated_score is not None else "❌"
                         status_message += f"  - {emoji} {player}\n"
 

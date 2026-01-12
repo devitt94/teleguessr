@@ -1,7 +1,8 @@
 from collections import defaultdict
+import json
+from pathlib import Path
 
 from teleguessr.geoguessr_scraper import GeoguessrClient
-from teleguessr.formatters import format_scoreboard
 
 import pandas as pd
 import dotenv
@@ -10,7 +11,7 @@ from teleguessr.settings import get_settings
 
 dotenv.load_dotenv()
 
-CHALLENGE_URLS = [
+CHALLENGE_URLS = {
     "https://www.geoguessr.com/challenge/3qfccXf0H2LxVfKd",
     "https://www.geoguessr.com/challenge/5zDtniWpKjF9cL8I",
     "https://www.geoguessr.com/challenge/862qIpnYWI3V07S1",
@@ -46,7 +47,19 @@ CHALLENGE_URLS = [
     "https://www.geoguessr.com/challenge/sgTR0MdmQRJ9Ntdx",
     "https://www.geoguessr.com/challenge/svZKlxHTVebzd1m8",
     "https://www.geoguessr.com/challenge/uLRo3Nl2ZbMG3HnL",
-]
+}
+
+FINISHED_LEAGUES_DIR = Path("data/leagues/finished/")
+
+
+def get_challange_urls_from_finished_leagues() -> set[str]:
+    urls = set()
+    for league_file in FINISHED_LEAGUES_DIR.glob("league_*.json"):
+        with open(league_file, "r") as f:
+            league_data = json.load(f)
+        for round_info in league_data["results"]:
+            urls.add(round_info["challenge_url"])
+    return urls
 
 
 async def average_scores():
@@ -57,17 +70,32 @@ async def average_scores():
         ncfa_cookie=settings.geoguessr_ncfa_cookie
     )  # Add valid cookie if needed
 
-    for url in CHALLENGE_URLS:
-        result = await client.get_challenge_scores(url)
+    for url in CHALLENGE_URLS.union(get_challange_urls_from_finished_leagues()):
+        result = await client.get_challenge_scores(url, {}, 0.0)
+        if len(result.scores) < 3:
+            print(
+                f"Skipping challenge {url} due to insufficient players ({len(result.scores)})"
+            )
+            continue
+        else:
+            print(f"Processing challenge {url} with {len(result.scores)} players")
         for player_score in result.scores:
             totals[player_score.player.name] += player_score.gross_score
             rounds_played[player_score.player.name] += 1
 
-    averages = {
-        player: round(total_score / rounds_played[player])
-        for player, total_score in totals.items()
-    }
-    print(format_scoreboard(averages, header="Average Score"))
+    df = pd.DataFrame(
+        {
+            "average_score": {
+                player: totals[player] / rounds_played[player] for player in totals
+            },
+            "rounds_played": rounds_played,
+        }
+    )
+    df.index.name = "player"
+    df["average_score"] = df["average_score"].round(0)
+    df.sort_values(by=["average_score"], inplace=True, ascending=False)
+    print("Average Scores:")
+    print(df)
 
 
 async def round_analysis():
@@ -107,4 +135,4 @@ async def round_analysis():
 if __name__ == "__main__":
     import asyncio
 
-    asyncio.run(round_analysis())
+    asyncio.run(average_scores())
