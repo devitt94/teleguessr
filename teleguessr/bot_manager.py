@@ -8,6 +8,7 @@ from telegram.ext import Application as TelegramApp
 
 from teleguessr.awards import get_ranked_guesses
 from teleguessr.formatters import (
+    format_awards_html,
     format_leaderboard_html,
     format_round_result_html,
     format_time,
@@ -216,6 +217,27 @@ class BotManager:
             disable_notification=True,
         )
 
+    async def get_best_and_worst_guess_so_far(self) -> str:
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if (
+            self.league_state is None
+            or self.league_state.is_finished
+            or not self.league_state.round_in_progress
+        ):
+            raise RuntimeError("No active round.")
+
+        challenge_url = self.league_state.current_round.challenge_url
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            challenge_url,
+            handicaps=self.handicaps,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+        )
+
+        ranked_guesses = get_ranked_guesses(round_result)
+        return format_awards_html(ranked_guesses)
+
     async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
@@ -249,10 +271,14 @@ class BotManager:
 
                         status_message += f"  {rank_emoji}: {player} {net_score_str}\n"
 
+                    best_guess_str = await self.get_best_and_worst_guess_so_far()
+                    status_message += f"\nCurrent Awards:\n{best_guess_str}\n"
+
                     # Reply privately so that player who haven't played yet doesn't see rankings
                     await context.bot.send_message(
                         chat_id=player_id,
                         text=status_message,
+                        parse_mode="HTML",
                     )
 
                     if update.effective_chat.id != player_id:

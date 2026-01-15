@@ -70,7 +70,7 @@ async def average_scores():
         ncfa_cookie=settings.geoguessr_ncfa_cookie
     )  # Add valid cookie if needed
 
-    for url in CHALLENGE_URLS.union(get_challange_urls_from_finished_leagues()):
+    for url in get_challange_urls_from_finished_leagues():
         result = await client.get_challenge_scores(url, {}, 0.0)
         if len(result.scores) < 3:
             print(
