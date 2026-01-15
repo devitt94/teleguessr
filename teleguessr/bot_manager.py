@@ -238,18 +238,49 @@ class BotManager:
         ranked_guesses = get_ranked_guesses(round_result)
         return format_awards_html(ranked_guesses)
 
+    async def get_round_leaderboard_message(
+        self,
+        scores_hidden: bool,
+        players_played: dict[str, int | AbbreviatedRoundScore],
+    ) -> str:
+        leaderboard_message = ""
+        if not scores_hidden:
+            leaderboard_message += "- Current rankings for this round:\n"
+            for player, abbreviated_score in players_played.items():
+                if abbreviated_score is None:
+                    rank_emoji = "❓"
+                    net_score_str = ""
+                else:
+                    rank_emoji = NUMBER_EMOJI_MAP.get(abbreviated_score.rank, "❓")
+                    net_score_str = f" ({abbreviated_score.net_score} pts)"
+
+                leaderboard_message += f"  {rank_emoji}: {player} {net_score_str}\n"
+
+        else:
+            leaderboard_message += "- Players who have played this round\n"
+            shuffled_players = list(players_played.items())
+            random.shuffle(shuffled_players)
+            for player, abbreviated_score in shuffled_players:
+                emoji = "✅" if abbreviated_score is not None else "❌"
+                leaderboard_message += f"  - {emoji} {player}\n"
+
+        return leaderboard_message
+
     async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
 
         player_id = update.effective_user.id
         player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id, None)
+        chat_to_reply_in = update.effective_chat.id
 
         if self.league_state is None or self.league_state.is_finished:
             status_message = "No active league. Start a new league with /startleague."
         else:
             status_message = f"League Status:\n- Rounds completed: {self.league_state.last_round_finished_num}/{self.league_state.num_rounds}\n"
-            if self.league_state.round_in_progress:
+            if not self.league_state.round_in_progress:
+                status_message += "- No round currently in progress.\n"
+            else:
                 players_played = await self.player_round_status()
 
                 time_left = self.league_state.get_time_left_seconds()
@@ -257,49 +288,20 @@ class BotManager:
                 status_message += (
                     f"- Current round in progress (ends in {format_time(time_left)})\n"
                 )
+                status_message += await self.get_round_leaderboard_message(
+                    scores_hidden=not player_has_played,
+                    players_played=players_played,
+                )
+
                 if player_has_played:
-                    status_message += "- Current rankings for this round:\n"
-                    for player, abbreviated_score in players_played.items():
-                        if abbreviated_score is None:
-                            rank_emoji = "❓"
-                            net_score_str = ""
-                        else:
-                            rank_emoji = NUMBER_EMOJI_MAP.get(
-                                abbreviated_score.rank, "❓"
-                            )
-                            net_score_str = f" ({abbreviated_score.net_score} pts)"
+                    # Reply in private chat if the player has played
+                    chat_to_reply_in = player_id
 
-                        status_message += f"  {rank_emoji}: {player} {net_score_str}\n"
-
-                    best_guess_str = await self.get_best_and_worst_guess_so_far()
-                    status_message += f"\nCurrent Awards:\n{best_guess_str}\n"
-
-                    # Reply privately so that player who haven't played yet doesn't see rankings
-                    await context.bot.send_message(
-                        chat_id=player_id,
-                        text=status_message,
-                        parse_mode="HTML",
-                    )
-
-                    if update.effective_chat.id != player_id:
-                        await context.bot.send_message(
-                            chat_id=update.effective_chat.id,
-                            text="You have already played this round. Sending current rankings privately.",
-                        )
-
-                    return
-                else:
-                    status_message += "- Players who have played this round\n"
-                    shuffled_players = list(players_played.items())
-                    random.shuffle(shuffled_players)
-                    for player, abbreviated_score in shuffled_players:
-                        emoji = "✅" if abbreviated_score is not None else "❌"
-                        status_message += f"  - {emoji} {player}\n"
-
-            else:
-                status_message += "- No round currently in progress.\n"
-
-        await update.message.reply_text(status_message)
+        await context.bot.send_message(
+            chat_id=chat_to_reply_in,
+            text=status_message,
+            parse_mode="HTML",
+        )
 
     async def remind_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
