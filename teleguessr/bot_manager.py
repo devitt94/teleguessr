@@ -295,6 +295,8 @@ class BotManager:
 
                 if player_has_played:
                     # Reply in private chat if the player has played
+                    projected_awards = await self.get_best_and_worst_guess_so_far()
+                    status_message += f"\n{projected_awards}"
                     chat_to_reply_in = player_id
 
         await context.bot.send_message(
