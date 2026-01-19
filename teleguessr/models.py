@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, confloat, conlist
+from pydantic import BaseModel, Field, confloat, conlist
 
 
 MAX_ROUND_SCORE = 25_000
@@ -18,6 +18,7 @@ class Player(BaseModel):
 class ActiveRound(BaseModel):
     challenge_url: str
     end_time: datetime
+    players_finished: list[str] = Field(default_factory=list)
 
 
 class ChallengeScore(BaseModel):

@@ -126,6 +126,12 @@ class BotManager:
                     chat_id=self.league_state.chat_id,
                     name="end_round_job",
                 )
+
+                app.job_queue.run_repeating(
+                    self.poll_for_round_updates,
+                    interval=120,  # every 2 minutes
+                    first=0,  # start immediately
+                )
             else:
                 chat_id = self.league_state.chat_id
                 self.start_round(app.context_types.DEFAULT_TYPE, chat_id=chat_id)
@@ -173,6 +179,46 @@ class BotManager:
 
         await self.start_round(context, chat_id=update.effective_chat.id)
 
+    async def poll_for_round_updates(self, context: ContextTypes.DEFAULT_TYPE):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if (
+            self.league_state is None
+            or self.league_state.is_finished
+            or not self.league_state.round_in_progress
+        ):
+            return
+
+        logger.info("Polling for round updates.")
+
+        players_finished_before = self.league_state.get_players_finished_round()
+        current_round_played_status = await self.player_round_status()
+        finished_players = {
+            player
+            for player, abbreviated_score in current_round_played_status.items()
+            if abbreviated_score is not None
+        }
+        new_finished_players = finished_players - players_finished_before
+
+        if new_finished_players:
+            logger.info(f"New players finished this round: {new_finished_players}")
+            for player in new_finished_players:
+                self.league_state.add_player_finished(player)
+
+            self.league_state.save()
+
+            await self.status_update(
+                context,
+                chat_id=self.admin_id,
+                from_perspective_of_player_id=self.admin_id,
+            )
+
+        # if not still_pending_players:
+        #     logger.info("All players have finished the round; ending round early.")
+        #     await self.end_round(context, chat_id=self.league_state.chat_id)
+        #     return
+
     async def start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         challenge_url = await self.geoguessr_client.create_challenge(
             map_id=self.league_settings.map_id,
@@ -198,6 +244,12 @@ class BotManager:
             self.end_round_scheduled,
             when=round_ends_in_seconds,
             chat_id=chat_id,
+        )
+
+        context.job_queue.run_repeating(
+            self.poll_for_round_updates,
+            interval=120,  # every 2 minutes
+            first=0,  # start immediately
         )
 
         self.league_state.save()
@@ -270,37 +322,60 @@ class BotManager:
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
 
-        player_id = update.effective_user.id
-        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id, None)
-        chat_to_reply_in = update.effective_chat.id
-
         if self.league_state is None or self.league_state.is_finished:
-            status_message = "No active league. Start a new league with /startleague."
+            await update.message.reply_text(
+                "No active league. Start a new league with /startleague."
+            )
+            return
+
+        player_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+
+        logger.info(
+            f"Sending status update to chat {chat_id} for player ID {player_id}"
+        )
+
+        await self.status_update(context, chat_id, player_id)
+
+    async def status_update(
+        self,
+        context: ContextTypes.DEFAULT_TYPE,
+        chat_id: int,
+        from_perspective_of_player_id: int | None = None,
+    ) -> str:
+        status_message = f"League Status:\n- Rounds completed: {self.league_state.last_round_finished_num}/{self.league_state.num_rounds}\n"
+        if not self.league_state.round_in_progress:
+            status_message += "- No round currently in progress.\n"
         else:
-            status_message = f"League Status:\n- Rounds completed: {self.league_state.last_round_finished_num}/{self.league_state.num_rounds}\n"
-            if not self.league_state.round_in_progress:
-                status_message += "- No round currently in progress.\n"
-            else:
-                players_played = await self.player_round_status()
+            players_played = await self.player_round_status()
 
-                time_left = self.league_state.get_time_left_seconds()
+            time_left = self.league_state.get_time_left_seconds()
+
+            if from_perspective_of_player_id is not None:
+                player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(
+                    from_perspective_of_player_id
+                )
                 player_has_played = bool(players_played.get(player_name))
-                status_message += (
-                    f"- Current round in progress (ends in {format_time(time_left)})\n"
-                )
-                status_message += await self.get_round_leaderboard_message(
-                    scores_hidden=not player_has_played,
-                    players_played=players_played,
-                )
+            else:
+                player_has_played = True
 
-                if player_has_played:
-                    # Reply in private chat if the player has played
-                    projected_awards = await self.get_best_and_worst_guess_so_far()
-                    status_message += f"\n{projected_awards}"
-                    chat_to_reply_in = player_id
+            status_message += (
+                f"- Current round in progress (ends in {format_time(time_left)})\n"
+            )
+            status_message += await self.get_round_leaderboard_message(
+                scores_hidden=not player_has_played,
+                players_played=players_played,
+            )
+
+            if player_has_played:
+                # Reply in private chat if the player has played
+                projected_awards = await self.get_best_and_worst_guess_so_far()
+                status_message += f"\n{projected_awards}"
+                if self.league_state.chat_id == chat_id:
+                    chat_id = from_perspective_of_player_id
 
         await context.bot.send_message(
-            chat_id=chat_to_reply_in,
+            chat_id=chat_id,
             text=status_message,
             parse_mode="HTML",
         )

@@ -168,7 +168,9 @@ class LeagueState(BaseModel):
         from datetime import datetime, timedelta
 
         end_time = datetime.utcnow() + timedelta(hours=hours)
-        self.current_round = ActiveRound(challenge_url=url, end_time=end_time)
+        self.current_round = ActiveRound(
+            challenge_url=url, end_time=end_time, players_finished=set()
+        )
 
     def add_round_result(self, result: ChallengeResult):
         self.results.append(result)
@@ -209,3 +211,13 @@ class LeagueState(BaseModel):
         now = datetime.now(self.current_round.end_time.tzinfo)
         delta = self.current_round.end_time - now
         return max(0, int(delta.total_seconds()))
+
+    def add_player_finished(self, player_name: str):
+        if not self.round_in_progress:
+            raise ValueError("No round is currently in progress.")
+        self.current_round.players_finished.append(player_name)
+
+    def get_players_finished_round(self) -> set[str]:
+        if not self.round_in_progress:
+            return set()
+        return set(self.current_round.players_finished)
