@@ -14,8 +14,8 @@ from teleguessr.formatters import (
     format_time,
 )
 from teleguessr.geoguessr_scraper import GeoguessrClient
-from teleguessr.league import LeagueState
-from teleguessr.models import AbbreviatedRoundScore
+from teleguessr.league import LeagueState, skewed_ranking_score_manager
+from teleguessr.models import AbbreviatedRoundScore, ChallengeResult, RankedGuess
 from teleguessr.settings import LeagueSettings, TELEGRAM_ID_TO_PLAYER_NAME
 from loguru import logger
 
@@ -192,8 +192,14 @@ class BotManager:
 
         logger.info("Polling for round updates.")
 
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            self.league_state.current_round.challenge_url,
+            handicaps=self.handicaps,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+        )
+
         players_finished_before = self.league_state.get_players_finished_round()
-        current_round_played_status = await self.player_round_status()
+        current_round_played_status = await self.player_round_status(round_result)
         finished_players, still_pending_players = set(), set()
         for player, abbreviated_score in current_round_played_status.items():
             if abbreviated_score is not None:
@@ -271,7 +277,7 @@ class BotManager:
             disable_notification=True,
         )
 
-    async def get_best_and_worst_guess_so_far(self) -> str:
+    async def get_ranked_guesses(self) -> list[RankedGuess]:
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
 
@@ -290,16 +296,16 @@ class BotManager:
         )
 
         ranked_guesses = get_ranked_guesses(round_result)
-        return format_awards_html(ranked_guesses)
+        return ranked_guesses
 
     async def get_round_leaderboard_message(
         self,
         scores_hidden: bool,
-        players_played: dict[str, int | AbbreviatedRoundScore],
+        players_played: dict[str, AbbreviatedRoundScore | None],
     ) -> str:
         leaderboard_message = ""
         if not scores_hidden:
-            leaderboard_message += "- Current rankings for this round:\n"
+            leaderboard_message += "<b>Current rankings for this round:</b>\n"
             for player, abbreviated_score in players_played.items():
                 if abbreviated_score is None:
                     rank_emoji = "❓"
@@ -320,6 +326,55 @@ class BotManager:
 
         return leaderboard_message
 
+    async def get_league_projections_for_round(
+        self,
+        round_result: ChallengeResult,
+        best_guess_player: str,
+        worst_guess_player: str,
+    ) -> str:
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if (
+            self.league_state is None
+            or self.league_state.is_finished
+            or not self.league_state.round_in_progress
+        ):
+            raise RuntimeError("No active round.")
+
+        current_leaderboard = self.league_state.get_leaderboard_data()["scores"]
+        projected_scores = current_leaderboard.copy()
+        points_for_round = skewed_ranking_score_manager(round_result)
+        players_played = set()
+        for score in round_result.scores:
+            projected_scores[score.player.name] = (
+                projected_scores.get(score.player.name, 0)
+                + points_for_round[score.player.name]
+            )
+            players_played.add(score.player.name)
+
+        projected_scores[best_guess_player] += 1
+        projected_scores[worst_guess_player] -= 1
+
+        projected_ranks = get_ranks_from_scores(projected_scores)
+        sorted_projected = sorted(projected_ranks.items(), key=lambda x: x[1])
+        projection_message_lines = [
+            "<b>Projected league standings after this round:</b>"
+        ]
+        for player, rank in sorted_projected:
+            rank_emoji = NUMBER_EMOJI_MAP.get(rank, "❓")
+            if player not in players_played:
+                line = f"  <i>{rank_emoji}: {player} ({projected_scores[player]})*</i>"
+            else:
+                line = f"  <b>{rank_emoji}: {player} ({projected_scores[player]})</b>"
+
+            projection_message_lines.append(line)
+
+        projection_message_lines.append(
+            "\n*Players who have not played this round yet."
+        )
+        return "\n".join(projection_message_lines)
+
     async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
@@ -337,19 +392,26 @@ class BotManager:
             f"Sending status update to chat {chat_id} for player ID {player_id}"
         )
 
-        await self.status_update(context, chat_id, player_id)
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            self.league_state.current_round.challenge_url,
+            handicaps=self.handicaps,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+        )
+
+        await self.status_update(context, chat_id, round_result, player_id)
 
     async def status_update(
         self,
         context: ContextTypes.DEFAULT_TYPE,
         chat_id: int,
+        round_result: ChallengeResult,
         from_perspective_of_player_id: int | None = None,
     ) -> str:
         status_message = f"League Status:\n- Rounds completed: {self.league_state.last_round_finished_num}/{self.league_state.num_rounds}\n"
         if not self.league_state.round_in_progress:
             status_message += "- No round currently in progress.\n"
         else:
-            players_played = await self.player_round_status()
+            players_played = await self.player_round_status(round_result)
 
             time_left = self.league_state.get_time_left_seconds()
 
@@ -362,7 +424,7 @@ class BotManager:
                 player_has_played = True
 
             status_message += (
-                f"- Current round in progress (ends in {format_time(time_left)})\n"
+                f"- Current round in progress (ends in {format_time(time_left)})\n\n"
             )
             status_message += await self.get_round_leaderboard_message(
                 scores_hidden=not player_has_played,
@@ -371,10 +433,23 @@ class BotManager:
 
             if player_has_played:
                 # Reply in private chat if the player has played
-                projected_awards = await self.get_best_and_worst_guess_so_far()
-                status_message += f"\n{projected_awards}"
+                ranked_guesses = await self.get_ranked_guesses()
+                status_message += (
+                    f"\n<b>Projected Awards:</b>\n{format_awards_html(ranked_guesses)}"
+                )
                 if self.league_state.chat_id == chat_id:
                     chat_id = from_perspective_of_player_id
+
+                best_guess_player = ranked_guesses[0].player.name
+                worst_guess_player = ranked_guesses[-1].player.name
+                projected_leaderboard_message = (
+                    await self.get_league_projections_for_round(
+                        round_result=round_result,
+                        best_guess_player=best_guess_player,
+                        worst_guess_player=worst_guess_player,
+                    )
+                )
+                status_message += f"\n\n{projected_leaderboard_message}"
 
         await context.bot.send_message(
             chat_id=chat_id,
@@ -582,20 +657,9 @@ class BotManager:
         # Still print to logs
         logger.info(f"Exception while handling update {update}: {context.error}")
 
-    async def player_round_status(self) -> dict[str, AbbreviatedRoundScore | None]:
-        if (
-            self.league_state is None
-            or self.league_state.is_finished
-            or not self.league_state.round_in_progress
-        ):
-            raise RuntimeError("No active round.")
-
-        challenge_url = self.league_state.current_round.challenge_url
-        round_result = await self.geoguessr_client.get_challenge_scores(
-            challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
-        )
+    async def player_round_status(
+        self, round_result: ChallengeResult
+    ) -> dict[str, AbbreviatedRoundScore | None]:
         net_scores = {
             score.player.name: score.net_score for score in round_result.scores
         }
