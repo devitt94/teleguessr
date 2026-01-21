@@ -65,7 +65,9 @@ def test_get_adjustments(num_players, expected_adjustments):
 def test_calculate_new_handicaps(
     current_handicaps, player_ranks, expected_new_handicaps
 ):
-    with patch("handicaps.get_latest_handicaps") as mock_get_latest_handicaps:
+    with patch(
+        "teleguessr.handicaps.get_latest_handicaps"
+    ) as mock_get_latest_handicaps:
         mock_get_latest_handicaps.return_value = current_handicaps
         new_handicaps = calculate_new_handicaps(
             player_ranks, LeagueSettings(map_id="test_map")
