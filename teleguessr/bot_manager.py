@@ -194,11 +194,13 @@ class BotManager:
 
         players_finished_before = self.league_state.get_players_finished_round()
         current_round_played_status = await self.player_round_status()
-        finished_players = {
-            player
-            for player, abbreviated_score in current_round_played_status.items()
-            if abbreviated_score is not None
-        }
+        finished_players, still_pending_players = set(), set()
+        for player, abbreviated_score in current_round_played_status.items():
+            if abbreviated_score is not None:
+                finished_players.add(player)
+            else:
+                still_pending_players.add(player)
+
         new_finished_players = finished_players - players_finished_before
 
         if new_finished_players:
@@ -214,10 +216,10 @@ class BotManager:
                 from_perspective_of_player_id=self.admin_id,
             )
 
-        # if not still_pending_players:
-        #     logger.info("All players have finished the round; ending round early.")
-        #     await self.end_round(context, chat_id=self.league_state.chat_id)
-        #     return
+        if not still_pending_players:
+            logger.info("All players have finished the round; ending round early.")
+            await self.end_round(context, chat_id=self.league_state.chat_id)
+            return
 
     async def start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         challenge_url = await self.geoguessr_client.create_challenge(
