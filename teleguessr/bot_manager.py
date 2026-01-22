@@ -1,5 +1,4 @@
 from pathlib import Path
-import random
 import traceback
 
 from telegram import Update
@@ -319,9 +318,11 @@ class BotManager:
 
         else:
             leaderboard_message += "- Players who have played this round\n"
-            shuffled_players = list(players_played.items())
-            random.shuffle(shuffled_players)
-            for player, abbreviated_score in shuffled_players:
+
+            # Sort players by alphabetical order for consistent display
+            sorted_players = sorted(players_played.items())
+
+            for player, abbreviated_score in sorted_players:
                 emoji = "✅" if abbreviated_score is not None else "❌"
                 leaderboard_message += f"  - {emoji} {player}\n"
 
