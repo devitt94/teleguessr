@@ -25,7 +25,7 @@ TELEGRAM_ID_TO_PLAYER_NAME = {v: k for k, v in PLAYER_NAME_TO_TELEGRAM_ID.items(
 class LeagueSettings(BaseModel):
     map_id: str
     number_of_rounds: int = 5
-    time_per_round_hours: int = 24
+    round_end_time_hour_utc: int = 21  # 9 PM UTC
     time_per_guess_seconds: int = 90
 
     handicaps_dir: Path = Path("data/handicaps/")
@@ -44,6 +44,8 @@ class AppSettings(BaseSettings):
     telegram_admin_id: int
     geoguessr_ncfa_cookie: str
     data_dir: Path = Path("data/")
+    polling_interval_seconds: int = 120
+
     league: LeagueSettings
 
 

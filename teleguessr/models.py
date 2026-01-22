@@ -19,6 +19,7 @@ class ActiveRound(BaseModel):
     challenge_url: str
     end_time: datetime
     players_finished: list[str] = Field(default_factory=list)
+    reminder_sent: bool = False
 
 
 class ChallengeScore(BaseModel):

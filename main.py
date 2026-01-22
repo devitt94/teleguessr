@@ -43,7 +43,7 @@ async def initlise_bot_manager(
             return round_url
 
         geoguessr_client.create_challenge = create_fake_challenge
-        settings.league.time_per_round_hours = 0.002  # 7.2 seconds
+        settings.league.round_end_time_hour_utc = -1
 
     bot_manager = BotManager(
         admin_id=settings.telegram_admin_id,
@@ -66,9 +66,7 @@ def main(test_mode: bool = False):
     app = ApplicationBuilder().token(settings.telegram_bot_token).build()
     app.add_handler(CommandHandler("startleague", bot_manager.start_league_handler))
     app.add_handler(CommandHandler("endround", bot_manager.end_round_handler))
-    app.add_handler(CommandHandler("remind", bot_manager.remind_handler))
     app.add_handler(CommandHandler("status", bot_manager.status_handler))
-    app.add_handler(CommandHandler("leaderboard", bot_manager.show_leaderboard_handler))
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")
 

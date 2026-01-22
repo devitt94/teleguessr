@@ -33,7 +33,7 @@ async def replay_league(
     )
 
     for i, url in enumerate(challenge_urls, start=1):
-        league_state.start_round("Replayed League", 0)
+        league_state.start_round("Replayed League", -1)
         print(f"Replaying round {i}/{len(challenge_urls)}: {url}")
         round_result = await client.get_challenge_scores(
             url,

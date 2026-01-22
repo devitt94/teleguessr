@@ -1,9 +1,9 @@
+from datetime import datetime, timedelta
 from pathlib import Path
 import re
 import traceback
 
 from telegram import Update
-from telegram.constants import MessageOriginType
 from telegram.ext import Application as TelegramApp
 
 from teleguessr.awards import get_ranked_guesses
@@ -48,11 +48,13 @@ class BotManager:
         self,
         admin_id: int,
         data_dir: Path,
+        polling_interval_seconds: int,
         league_settings: LeagueSettings,
         geoguessr_client: GeoguessrClient,
     ):
         self.admin_id = admin_id
         self.data_dir = data_dir
+        self.polling_interval_seconds = polling_interval_seconds
         self.league_settings = league_settings
         self.league_state = None
         self.__initialised = False
@@ -101,42 +103,14 @@ class BotManager:
         if not self.league_state.round_in_progress:
             logger.info("No round in progress to resume tasks for. Starting new round.")
             chat_id = self.league_state.chat_id
-            self.start_round(app.context_types.DEFAULT_TYPE, chat_id=chat_id)
+            await self.start_round(app.context_types.DEFAULT_TYPE, chat_id=chat_id)
             return
 
-        round_end_in_seconds = self.league_state.get_time_left_seconds()
-        logger.info(
-            f"Resuming scheduled tasks for round {self.league_state.current_round_num}, "
-            f"which ends in {round_end_in_seconds} seconds."
-        )
-
-        total_round_time_seconds = self.league_settings.time_per_round_hours * 3600
-        reminder_time_in_seconds = total_round_time_seconds * 1 / 12
-        if round_end_in_seconds < reminder_time_in_seconds:
-            logger.info(
-                "Round end is within reminder period; skipping reminder scheduling."
-            )
-        else:
-            logger.info("Scheduling round reminder job.")
-
-            app.job_queue.run_once(
-                self.remind_scheduled,
-                when=round_end_in_seconds - reminder_time_in_seconds,
-                chat_id=self.league_state.chat_id,
-                name="round_reminder_job",
-            )
-
-        app.job_queue.run_once(
-            self.end_round_scheduled,
-            when=round_end_in_seconds,
-            chat_id=self.league_state.chat_id,
-            name="end_round_job",
-        )
-
+        logger.info("Resuming round update polling for active round.")
         app.job_queue.run_repeating(
             self.poll_for_round_updates,
-            interval=120,  # every 2 minutes
-            first=0,  # start immediately
+            interval=self.polling_interval_seconds,
+            first=0,
         )
 
     async def get_new_league_id(self) -> int:
@@ -242,10 +216,30 @@ class BotManager:
                 from_perspective_of_player_id=self.admin_id,
             )
 
-        if not still_pending_players:
-            logger.info("All players have finished the round; ending round early.")
+        should_end_round = not still_pending_players or (
+            self.league_state.round_in_progress
+            and self.league_state.current_round.end_time <= datetime.now()
+        )
+
+        if should_end_round:
+            logger.info("Ending round.")
             await self.end_round(context, chat_id=self.league_state.chat_id)
             return
+
+        round_reminder_time = self.league_state.current_round.end_time - timedelta(
+            hours=2
+        )
+        should_send_reminder = (
+            not self.league_state.current_round.reminder_sent
+            and self.league_settings.round_end_time_hour_utc >= 0
+            and datetime.now() >= round_reminder_time
+        )
+
+        if should_send_reminder:
+            logger.info("Sending round reminder.")
+            await self.reminder(context, chat_id=self.league_state.chat_id)
+            self.league_state.current_round.reminder_sent = True
+            self.league_state.save()
 
     async def start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         challenge_url = await self.geoguessr_client.create_challenge(
@@ -254,30 +248,19 @@ class BotManager:
         )
         self.league_state.start_round(
             url=challenge_url,
-            hours=self.league_settings.time_per_round_hours,
+            end_time_hours=self.league_settings.round_end_time_hour_utc,
         )
 
-        round_ends_in_seconds = self.league_settings.time_per_round_hours * 3600
+        round_ends_in_seconds = self.league_state.get_time_left_seconds()
         logger.info(
             f"Started round {self.league_state.current_round_num} with challenge URL: {challenge_url}. "
             f"Round ends in {round_ends_in_seconds} seconds."
         )
 
-        context.job_queue.run_once(
-            self.remind_scheduled,
-            when=(round_ends_in_seconds * 11 / 12),
-            chat_id=chat_id,
-        )
-        context.job_queue.run_once(
-            self.end_round_scheduled,
-            when=round_ends_in_seconds,
-            chat_id=chat_id,
-        )
-
         context.job_queue.run_repeating(
             self.poll_for_round_updates,
-            interval=120,  # every 2 minutes
-            first=0,  # start immediately
+            interval=self.polling_interval_seconds,
+            first=0,
         )
 
         self.league_state.save()
@@ -479,25 +462,6 @@ class BotManager:
             parse_mode="HTML",
         )
 
-    async def remind_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text("No active league.")
-            return
-
-        await self.reminder(context, update.effective_chat.id)
-
-    async def remind_scheduled(self, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
-        if self.league_state is None or self.league_state.is_finished:
-            return
-
-        await self.reminder(context, context.job.chat_id)
-
     async def reminder(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         if chat_id is None:
             raise ValueError("chat_id must be provided to reminder")
@@ -533,15 +497,6 @@ class BotManager:
             message,
         )
 
-    async def end_round_scheduled(self, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
-        if self.league_state is None or self.league_state.is_finished:
-            return
-
-        await self.end_round(context, context.job.chat_id)
-
     async def end_round_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -563,17 +518,6 @@ class BotManager:
             return
 
         await self.end_round(context, update.effective_chat.id)
-
-        # Clear the job queue to avoid duplicate end round calls
-        current_jobs = context.job_queue.get_jobs_by_name("end_round_job")
-        for job in current_jobs:
-            logger.info("Removing duplicate end round job.")
-            job.schedule_removal()
-
-        current_jobs = context.job_queue.get_jobs_by_name("round_reminder_job")
-        for job in current_jobs:
-            logger.info("Removing round reminder job.")
-            job.schedule_removal()
 
     async def end_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         if chat_id is None:
@@ -629,19 +573,11 @@ class BotManager:
             await self.end_league()
 
         else:
-            await self.start_round(context, chat_id=chat_id)
-
-    async def show_leaderboard_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text("No active league.")
-            return
-
-        await self.show_leaderboard(context, update.effective_chat.id)
+            await self.start_round(
+                context,
+                chat_id=chat_id,
+                end_time_hours=self.league_settings.round_end_time_hour_utc,
+            )
 
     async def show_leaderboard(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         leaderboard = self.league_state.get_leaderboard_data()
@@ -736,35 +672,3 @@ class BotManager:
             chat_id=chat_id,
             text=message,
         )
-
-    async def get_forwarded_user_id(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        msg = update.message
-
-        if not msg.forward_origin:
-            await msg.reply_text("❌ This message is not forwarded.")
-            return
-
-        origin = msg.forward_origin
-
-        # Case 1: forwarded from a user
-        if origin.type == MessageOriginType.USER:
-            user = origin.sender_user
-            await msg.reply_text(
-                f"👤 Forwarded user:\n" f"ID: `{user.id}`\n" f"Name: {user.full_name}",
-                parse_mode="Markdown",
-            )
-
-        # Case 2: forwarded from a channel
-        elif origin.type == MessageOriginType.CHANNEL:
-            chat = origin.chat
-            await msg.reply_text(
-                f"📢 Forwarded from channel:\n"
-                f"ID: `{chat.id}`\n"
-                f"Title: {chat.title}",
-                parse_mode="Markdown",
-            )
-
-        else:
-            await msg.reply_text("⚠️ Forwarded origin exists but sender is hidden.")

@@ -160,14 +160,20 @@ class LeagueState(BaseModel):
         )
         return top_players_sorted[0]
 
-    def start_round(self, url: str, hours: int):
+    def start_round(self, url: str, end_time_hours: int):
         if self.round_in_progress:
             raise ValueError("A round is already in progress.")
         if self.is_finished:
             raise ValueError("The league has already finished.")
         from datetime import datetime, timedelta
 
-        end_time = datetime.utcnow() + timedelta(hours=hours)
+        if end_time_hours < 0:
+            # Use immediate end time for testing
+            end_time = datetime.now()
+        else:
+            end_time = (datetime.now() + timedelta(hours=24)).replace(
+                hour=end_time_hours, minute=0, second=0, microsecond=0
+            )
         self.current_round = ActiveRound(
             challenge_url=url, end_time=end_time, players_finished=set()
         )
@@ -206,7 +212,6 @@ class LeagueState(BaseModel):
     def get_time_left_seconds(self) -> int:
         if not self.round_in_progress:
             return 0
-        from datetime import datetime
 
         now = datetime.now(self.current_round.end_time.tzinfo)
         delta = self.current_round.end_time - now
