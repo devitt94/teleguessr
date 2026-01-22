@@ -219,6 +219,7 @@ class BotManager:
             await self.status_update(
                 context,
                 chat_id=self.admin_id,
+                round_result=round_result,
                 from_perspective_of_player_id=self.admin_id,
             )
 
