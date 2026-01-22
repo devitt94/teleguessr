@@ -48,6 +48,7 @@ async def initlise_bot_manager(
     bot_manager = BotManager(
         admin_id=settings.telegram_admin_id,
         data_dir=settings.data_dir,
+        polling_interval_seconds=settings.polling_interval_seconds,
         league_settings=settings.league,
         geoguessr_client=geoguessr_client,
     )
