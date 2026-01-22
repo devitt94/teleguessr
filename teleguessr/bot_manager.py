@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import traceback
 
 from telegram import Update
@@ -93,51 +94,70 @@ class BotManager:
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
 
-        if self.league_state is not None and not self.league_state.is_finished:
-            if self.league_state.round_in_progress:
-                round_end_in_seconds = self.league_state.get_time_left_seconds()
-                logger.info(
-                    f"Resuming scheduled tasks for round {self.league_state.current_round_num}, "
-                    f"which ends in {round_end_in_seconds} seconds."
-                )
+        if self.league_state is None or self.league_state.is_finished:
+            logger.info("No active league to resume tasks for.")
+            return
 
-                total_round_time_seconds = (
-                    self.league_settings.time_per_round_hours * 3600
-                )
-                reminder_time_in_seconds = total_round_time_seconds * 1 / 12
-                if round_end_in_seconds < reminder_time_in_seconds:
-                    logger.info(
-                        "Round end is within reminder period; skipping reminder scheduling."
-                    )
-                else:
-                    logger.info("Scheduling round reminder job.")
+        if not self.league_state.round_in_progress:
+            logger.info("No round in progress to resume tasks for. Starting new round.")
+            chat_id = self.league_state.chat_id
+            self.start_round(app.context_types.DEFAULT_TYPE, chat_id=chat_id)
+            return
 
-                    app.job_queue.run_once(
-                        self.remind_scheduled,
-                        when=round_end_in_seconds - reminder_time_in_seconds,
-                        chat_id=self.league_state.chat_id,
-                        name="round_reminder_job",
-                    )
+        round_end_in_seconds = self.league_state.get_time_left_seconds()
+        logger.info(
+            f"Resuming scheduled tasks for round {self.league_state.current_round_num}, "
+            f"which ends in {round_end_in_seconds} seconds."
+        )
 
-                app.job_queue.run_once(
-                    self.end_round_scheduled,
-                    when=round_end_in_seconds,
-                    chat_id=self.league_state.chat_id,
-                    name="end_round_job",
-                )
+        total_round_time_seconds = self.league_settings.time_per_round_hours * 3600
+        reminder_time_in_seconds = total_round_time_seconds * 1 / 12
+        if round_end_in_seconds < reminder_time_in_seconds:
+            logger.info(
+                "Round end is within reminder period; skipping reminder scheduling."
+            )
+        else:
+            logger.info("Scheduling round reminder job.")
 
-                app.job_queue.run_repeating(
-                    self.poll_for_round_updates,
-                    interval=120,  # every 2 minutes
-                    first=0,  # start immediately
-                )
-            else:
-                chat_id = self.league_state.chat_id
-                self.start_round(app.context_types.DEFAULT_TYPE, chat_id=chat_id)
+            app.job_queue.run_once(
+                self.remind_scheduled,
+                when=round_end_in_seconds - reminder_time_in_seconds,
+                chat_id=self.league_state.chat_id,
+                name="round_reminder_job",
+            )
+
+        app.job_queue.run_once(
+            self.end_round_scheduled,
+            when=round_end_in_seconds,
+            chat_id=self.league_state.chat_id,
+            name="end_round_job",
+        )
+
+        app.job_queue.run_repeating(
+            self.poll_for_round_updates,
+            interval=120,  # every 2 minutes
+            first=0,  # start immediately
+        )
 
     async def get_new_league_id(self) -> int:
-        finished_leagues = list(self.finished_league_dir.iterdir())
-        return len(finished_leagues) + 1
+        league_id_from_filename_regex = r"league_(\d+)\.json"
+
+        def get_league_id_from_filepath(f: Path) -> int | None:
+            m = re.match(league_id_from_filename_regex, f.name)
+            if m is not None:
+                return int(m.group(1))
+            return None
+
+        finished_league_ids = [
+            league_id
+            for league_id in (
+                get_league_id_from_filepath(f)
+                for f in self.finished_league_dir.iterdir()
+            )
+            if league_id is not None
+        ]
+
+        return max(finished_league_ids, default=0) + 1
 
     async def start_league_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
