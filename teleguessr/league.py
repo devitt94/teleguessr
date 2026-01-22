@@ -177,7 +177,7 @@ class LeagueState(BaseModel):
         added_scores = skewed_ranking_score_manager(result)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
-            self.__round_results_by_player[player][self.current_round_num - 1] = (
+            self.__round_results_by_player[player][str(self.current_round_num - 1)] = (
                 result.get_player_position(player)
             )
 
