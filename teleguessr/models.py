@@ -56,17 +56,6 @@ class Award(BaseModel):
     location_index: int
 
 
-class Awards(BaseModel):
-    best_guess: Award
-    worst_guess: Award
-
-
-class PlayerPosition(BaseModel):
-    player: Player
-    score: int
-    position: int
-
-
 class RankedGuess(BaseModel):
     player: Player
     guess: Guess
@@ -91,17 +80,6 @@ class ChallengeResult(BaseModel):
                 return index + 1
 
         return -1
-
-    def get_round_guesses(self, round_index: int) -> dict[str, Guess]:
-        return {rs.player.name: rs.guesses[round_index] for rs in self.scores}
-
-    def get_guess(self, player_name: str, round_index: int) -> Guess:
-        guess = self.get_round_guesses(round_index).get(player_name)
-        if not guess:
-            raise ValueError(
-                f"Player {player_name} did not participate in round {round_index}"
-            )
-        return guess
 
 
 class AbbreviatedRoundScore(BaseModel):

@@ -73,8 +73,8 @@ def get_ranked_guesses(
     guess_ranker: GuessRanker = combined_ranker,
 ) -> list[RankedGuess]:
     """
-    Identify the best and worst guesses in a round based on z-scores.
-    Returns an Awards object containing the best and worst guesses.
+    Rank all guesses in the round based on the provided guess_ranker function.
+    Returns a list of RankedGuess objects sorted by adjusted score in descending order.
     """
 
     all_guess_stats = compute_stats(round_result)
