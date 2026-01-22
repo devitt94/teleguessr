@@ -2,27 +2,6 @@ from teleguessr.league import skewed_ranking_score_manager
 from teleguessr.models import ChallengeResult, RankedGuess
 
 
-def format_scoreboard(scores: dict, header: str = "Total Score") -> str:
-    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-    if not sorted_scores:
-        return "No scores available!"
-
-    # Determine column widths
-    name_width = max(len(name) for name, _ in sorted_scores) + 2
-    score_width = 10
-
-    lines = [
-        f"{'Player'.ljust(name_width)}| {header.rjust(score_width)}",
-        "-" * (name_width + score_width + 2),
-    ]
-    for name, score in sorted_scores:
-        lines.append(f"{name.ljust(name_width)}| {str(score).rjust(score_width)}")
-
-    table = "```\n" + "\n".join(lines) + "\n```"
-    return table
-
-
 def get_rank_emoji(position: int, total_participants: int) -> str:
     rank_emojis = {1: "🦈", 2: "🥈", 3: "🥉"}
     rank_emojis[total_participants] = "🐡"
@@ -32,9 +11,9 @@ def get_rank_emoji(position: int, total_participants: int) -> str:
 def format_leaderboard_html(
     leaderboard: dict[int, list[str]],
     scores: dict[str, int],
-    best_guesses: dict,
-    worst_guesses: dict,
-    round_positions: dict,
+    best_guesses: dict[str, int],
+    worst_guesses: dict[str, int],
+    round_positions: dict[str, dict[str, int]],
     rounds_played: int,
 ) -> str:
     blocks = []
@@ -45,7 +24,7 @@ def format_leaderboard_html(
 
         for player in players:
             round_results = []
-            player_round_positions: dict[int, int] = round_positions.get(player, {})
+            player_round_positions: dict[str, int] = round_positions.get(player, {})
             for round_index in range(1, rounds_played + 1):
                 round_rank = player_round_positions.get(str(round_index), -1)
                 round_results.append(get_position_str(round_rank))
@@ -72,7 +51,12 @@ def get_position_str(position: int, tied: bool = False) -> str:
     if position < 0:
         return "DNF"
 
-    suffix = {1: "st", 2: "nd", 3: "rd"}.get(position % 10, "th")
+    # Handle special cases for 11th, 12th, 13th
+    if 10 <= position % 100 <= 13:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(position % 10, "th")
+
     pos_str = f"{position}{suffix}"
     if tied:
         pos_str = f"={pos_str}"

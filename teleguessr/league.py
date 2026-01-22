@@ -56,7 +56,7 @@ class LeagueState(BaseModel):
         self.__scores: dict[str, int] = {}
         self.__best_guesses_by_player: dict[str, int] = defaultdict(int)
         self.__worst_guesses_by_player: dict[str, int] = defaultdict(int)
-        self.__round_results_by_player: dict[str, dict[int, int]] = defaultdict(dict)
+        self.__round_results_by_player: dict[str, dict[str, int]] = defaultdict(dict)
 
     def load_from_file(self):
         try:
@@ -177,7 +177,7 @@ class LeagueState(BaseModel):
         added_scores = skewed_ranking_score_manager(result)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
-            self.__round_results_by_player[player][str(self.current_round_num - 1)] = (
+            self.__round_results_by_player[player][self.current_round_num - 1] = (
                 result.get_player_position(player)
             )
 
