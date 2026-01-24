@@ -1,4 +1,3 @@
-from collections import defaultdict
 import json
 from pathlib import Path
 
@@ -63,13 +62,12 @@ def get_challange_urls_from_finished_leagues() -> set[str]:
 
 
 async def average_scores():
-    totals = defaultdict(int)
-    rounds_played = defaultdict(int)
     settings = get_settings()
     client = GeoguessrClient(
         ncfa_cookie=settings.geoguessr_ncfa_cookie
     )  # Add valid cookie if needed
 
+    data = []
     for url in get_challange_urls_from_finished_leagues():
         result = await client.get_challenge_scores(url, {}, 0.0)
         if len(result.scores) < 3:
@@ -80,22 +78,27 @@ async def average_scores():
         else:
             print(f"Processing challenge {url} with {len(result.scores)} players")
         for player_score in result.scores:
-            totals[player_score.player.name] += player_score.gross_score
-            rounds_played[player_score.player.name] += 1
+            data.append(
+                {
+                    "player": player_score.player.name,
+                    "gross_score": player_score.gross_score,
+                }
+            )
 
-    df = pd.DataFrame(
-        {
-            "average_score": {
-                player: totals[player] / rounds_played[player] for player in totals
-            },
-            "rounds_played": rounds_played,
-        }
+    df = pd.DataFrame(data)
+    df_grouped = df.groupby("player").agg(
+        average_gross_score=pd.NamedAgg(column="gross_score", aggfunc="mean"),
+        std_dev_gross_score=pd.NamedAgg(column="gross_score", aggfunc="std"),
+        games_played=pd.NamedAgg(column="gross_score", aggfunc="count"),
     )
-    df.index.name = "player"
-    df["average_score"] = df["average_score"].round(0)
-    df.sort_values(by=["average_score"], inplace=True, ascending=False)
     print("Average Scores:")
-    print(df)
+    df_grouped["average_gross_score"] = (
+        df_grouped["average_gross_score"].round(0).astype(int)
+    )
+    df_grouped["std_dev_gross_score"] = (
+        df_grouped["std_dev_gross_score"].round(0).astype(int)
+    )
+    print(df_grouped.sort_values(by=["average_gross_score"], ascending=False))
 
 
 async def round_analysis():

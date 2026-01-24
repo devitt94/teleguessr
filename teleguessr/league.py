@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
+import re
 from typing import Callable
 from teleguessr.models import ActiveRound, ChallengeResult, RankedGuess
 import json
@@ -42,6 +43,31 @@ class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
             return o.isoformat()
+
+
+def get_last_finished_league_id(finished_league_dir: Path) -> int:
+    league_id_from_filename_regex = r"league_(\d+)\.json"
+
+    def get_league_id_from_filepath(f: Path) -> int | None:
+        m = re.match(league_id_from_filename_regex, f.name)
+        if m is not None:
+            return int(m.group(1))
+        return None
+
+    finished_league_ids = [
+        league_id
+        for league_id in (
+            get_league_id_from_filepath(f)
+            for f in finished_league_dir.glob("league_*.json")
+        )
+        if league_id is not None
+    ]
+
+    return max(finished_league_ids, default=0)
+
+
+def get_new_league_id(finished_league_dir: Path) -> int:
+    return get_last_finished_league_id(finished_league_dir) + 1
 
 
 class LeagueState(BaseModel):

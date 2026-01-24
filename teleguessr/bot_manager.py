@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-import re
 import traceback
 
 from telegram import Update
@@ -14,7 +13,11 @@ from teleguessr.formatters import (
     format_time,
 )
 from teleguessr.geoguessr_scraper import GeoguessrClient
-from teleguessr.league import LeagueState, skewed_ranking_score_manager
+from teleguessr.league import (
+    LeagueState,
+    get_new_league_id,
+    skewed_ranking_score_manager,
+)
 from teleguessr.models import AbbreviatedRoundScore, ChallengeResult, RankedGuess
 from teleguessr.settings import LeagueSettings, TELEGRAM_ID_TO_PLAYER_NAME
 from loguru import logger
@@ -113,26 +116,6 @@ class BotManager:
             first=0,
         )
 
-    async def get_new_league_id(self) -> int:
-        league_id_from_filename_regex = r"league_(\d+)\.json"
-
-        def get_league_id_from_filepath(f: Path) -> int | None:
-            m = re.match(league_id_from_filename_regex, f.name)
-            if m is not None:
-                return int(m.group(1))
-            return None
-
-        finished_league_ids = [
-            league_id
-            for league_id in (
-                get_league_id_from_filepath(f)
-                for f in self.finished_league_dir.iterdir()
-            )
-            if league_id is not None
-        ]
-
-        return max(finished_league_ids, default=0) + 1
-
     async def start_league_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -154,7 +137,7 @@ class BotManager:
             )
             return
 
-        league_id = await self.get_new_league_id()
+        league_id = get_new_league_id(self.finished_league_dir)
         league_filepath = self.active_league_dir / f"league_{league_id}.json"
         self.league_state = LeagueState(
             filepath=league_filepath,
@@ -393,8 +376,10 @@ class BotManager:
         player_id = update.effective_user.id
         chat_id = update.effective_chat.id
 
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+
         logger.info(
-            f"Sending status update to chat {chat_id} for player ID {player_id}"
+            f"Sending status update to chat {chat_id} for player {player_name} (ID: {player_id})"
         )
 
         round_result = await self.geoguessr_client.get_challenge_scores(
@@ -466,7 +451,13 @@ class BotManager:
         if chat_id is None:
             raise ValueError("chat_id must be provided to reminder")
 
-        players_finished = await self.player_round_status()
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            self.league_state.current_round.challenge_url,
+            handicaps=self.handicaps,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+        )
+
+        players_finished = await self.player_round_status(round_result)
 
         time_left = self.league_state.get_time_left_seconds()
         time_left_str = format_time(time_left)
@@ -576,7 +567,6 @@ class BotManager:
             await self.start_round(
                 context,
                 chat_id=chat_id,
-                end_time_hours=self.league_settings.round_end_time_hour_utc,
             )
 
     async def show_leaderboard(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):

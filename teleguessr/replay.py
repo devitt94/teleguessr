@@ -70,37 +70,3 @@ async def replay_league(
                 player, league_settings.default_handicap_multiplier
             )
             print(f"{player}: {old_handicap:.0%} -> {new_handicap:.0%}")
-
-
-if __name__ == "__main__":
-    import asyncio
-    from teleguessr.settings import get_settings
-
-    league_id = 5
-
-    settings = get_settings()
-    league_file = (
-        settings.data_dir / "leagues" / "finished" / f"league_{league_id}.json"
-    )
-
-    include_handicaps = True
-
-    if include_handicaps:
-        handicaps_file = (
-            settings.data_dir / "handicaps" / f"handicaps_league_{league_id}.json"
-        )
-        with open(handicaps_file, "r") as f:
-            handicaps = json.load(f)
-
-    else:
-        handicaps = {}
-        settings.league.default_handicap_multiplier = 0.0
-
-    asyncio.run(
-        replay_league(
-            league_path=league_file,
-            handicaps=handicaps,
-            league_settings=settings.league,
-            geoguessr_cookie=settings.geoguessr_ncfa_cookie,
-        )
-    )

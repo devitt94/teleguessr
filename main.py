@@ -1,14 +1,19 @@
+#!/usr/bin/env python3
+
 import asyncio
 import json
 
 from loguru import logger
 from teleguessr.geoguessr_scraper import GeoguessrClient
+from teleguessr.league import get_last_finished_league_id
+from teleguessr.replay import replay_league
 from teleguessr.settings import AppSettings, get_settings
 from teleguessr.bot_manager import BotManager
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
 )
+import typer
 
 
 async def initlise_bot_manager(
@@ -78,15 +83,78 @@ def main(test_mode: bool = False):
     logger.info("Bot stopped.")
 
 
-if __name__ == "__main__":
-    import argparse
+app = typer.Typer(
+    help="Teleguessr Bot - Manage Geoguessr leagues via Telegram.",
+)
 
-    parser = argparse.ArgumentParser(description="Teleguessr Bot")
-    parser.add_argument(
-        "--test",
-        action="store_true",
-        default=False,
-        help="Run the bot in test mode.",
+
+@app.command()
+def run_bot(
+    test: bool = typer.Option(
+        False, "--test", "-t", help="Run the bot in test mode with replayed challenges."
+    ),
+):
+    """Run the Teleguessr Telegram Bot."""
+    main(test_mode=test)
+
+
+@app.command()
+def replay(
+    league_id: int = typer.Option(
+        None,
+        "--league-id",
+        "-l",
+        help="ID of the league to replay. Defaults to the latest finished league.",
+    ),
+    include_handicaps: bool = typer.Option(
+        False,
+        "--include-handicaps",
+        "-i",
+        help="Include handicaps when replaying the league.",
+    ),
+):
+    """Replay a finished league for analysis."""
+
+    settings = get_settings()
+
+    finished_league_dir = settings.data_dir / "leagues" / "finished"
+    if league_id is None:
+        league_id = get_last_finished_league_id(finished_league_dir)
+
+    league_file = finished_league_dir / f"league_{league_id}.json"
+
+    if not league_file.exists():
+        logger.error(f"League file {league_file} does not exist.")
+        return
+
+    if include_handicaps:
+        handicaps_file = (
+            settings.data_dir / "handicaps" / f"handicaps_league_{league_id}.json"
+        )
+        with open(handicaps_file, "r") as f:
+            handicaps = json.load(f)
+
+    else:
+        handicaps = {}
+        settings.league.default_handicap_multiplier = 0.0
+
+    asyncio.run(
+        replay_league(
+            league_path=league_file,
+            handicaps=handicaps,
+            league_settings=settings.league,
+            geoguessr_cookie=settings.geoguessr_ncfa_cookie,
+        )
     )
-    args = parser.parse_args()
-    main(test_mode=args.test)
+
+
+@app.command()
+def analysis():
+    """Run league analysis tools."""
+    from teleguessr.analysis import average_scores
+
+    asyncio.run(average_scores())
+
+
+if __name__ == "__main__":
+    app()
