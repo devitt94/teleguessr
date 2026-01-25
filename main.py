@@ -4,6 +4,8 @@ import asyncio
 import json
 
 from loguru import logger
+
+from teleguessr.analysis import average_scores, round_analysis
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import get_last_finished_league_id
 from teleguessr.replay import replay_league
@@ -151,9 +153,9 @@ def replay(
 @app.command()
 def analysis():
     """Run league analysis tools."""
-    from teleguessr.analysis import average_scores
 
     asyncio.run(average_scores())
+    asyncio.run(round_analysis())
 
 
 if __name__ == "__main__":

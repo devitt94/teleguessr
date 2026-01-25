@@ -3,7 +3,6 @@ from pathlib import Path
 
 from teleguessr.geoguessr_scraper import GeoguessrClient
 
-import pandas as pd
 import dotenv
 
 from teleguessr.settings import get_settings
@@ -85,20 +84,20 @@ async def average_scores():
                 }
             )
 
-    df = pd.DataFrame(data)
-    df_grouped = df.groupby("player").agg(
-        average_gross_score=pd.NamedAgg(column="gross_score", aggfunc="mean"),
-        std_dev_gross_score=pd.NamedAgg(column="gross_score", aggfunc="std"),
-        games_played=pd.NamedAgg(column="gross_score", aggfunc="count"),
-    )
     print("Average Scores:")
-    df_grouped["average_gross_score"] = (
-        df_grouped["average_gross_score"].round(0).astype(int)
-    )
-    df_grouped["std_dev_gross_score"] = (
-        df_grouped["std_dev_gross_score"].round(0).astype(int)
-    )
-    print(df_grouped.sort_values(by=["average_gross_score"], ascending=False))
+    player_totals = {}
+    player_counts = {}
+    for entry in data:
+        player = entry["player"]
+        score = entry["gross_score"]
+        if player not in player_totals:
+            player_totals[player] = 0
+            player_counts[player] = 0
+        player_totals[player] += score
+        player_counts[player] += 1
+    for player in player_totals:
+        average_score = player_totals[player] / player_counts[player]
+        print(f"{player}: {average_score:.2f} (played {player_counts[player]} rounds)")
 
 
 async def round_analysis():
@@ -124,18 +123,15 @@ async def round_analysis():
                 }
             )
 
-    df = pd.DataFrame(data)
+    print("Top 5 Gross Scores:")
+    sorted_by_gross = sorted(data, key=lambda x: x["gross_score"])
+    for entry in sorted_by_gross[:5]:
+        print(
+            f"{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}, Hcap Adj = {entry['hcap_adjustment']}, Net Score = {entry['net_score']}"
+        )
 
-    df.sort_values(by=["gross_score"], inplace=True)
-
-    print("Worst Gross Scores:")
-    print(df[["player", "round_id", "gross_score"]].head())
-
-    print("\nBest Gross Scores:")
-    print(df[["player", "round_id", "gross_score"]].tail().iloc[::-1])
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(average_scores())
+    print("Bottom 5 Gross Scores:")
+    for entry in sorted_by_gross[-5:]:
+        print(
+            f"{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}, Hcap Adj = {entry['hcap_adjustment']}, Net Score = {entry['net_score']}"
+        )
