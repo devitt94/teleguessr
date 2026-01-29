@@ -195,11 +195,21 @@ class BotManager:
             logger.info(f"New players finished this round: {new_finished_players}")
             for player in new_finished_players:
                 self.league_state.add_player_finished(player)
-                await self.invite_player_to_lounge(
-                    context,
-                    player_name=player,
-                )
-
+                try:
+                    await self.invite_player_to_lounge(
+                        context,
+                        player_name=player,
+                    )
+                except Exception as e:
+                    logger.exception(
+                        f"Failed to invite player {player} to lounge chat: {e}"
+                    )
+                    await context.bot.send_message(
+                        chat_id=self.admin_id,
+                        text=(
+                            f"⚠️ Failed to invite player {player} to lounge chat: {e}"
+                        ),
+                    )
                 await context.bot.send_message(
                     chat_id=self.players_lounge_group_id,
                     text=f"✅ {player} has finished their round!",
