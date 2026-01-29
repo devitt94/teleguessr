@@ -42,6 +42,7 @@ class AppSettings(BaseSettings):
 
     telegram_bot_token: str
     telegram_admin_id: int
+    telegram_players_lounge_group_id: int
     geoguessr_ncfa_cookie: str
     data_dir: Path = Path("data/")
     polling_interval_seconds: int = 120

@@ -19,7 +19,11 @@ from teleguessr.league import (
     skewed_ranking_score_manager,
 )
 from teleguessr.models import AbbreviatedRoundScore, ChallengeResult, RankedGuess
-from teleguessr.settings import LeagueSettings, TELEGRAM_ID_TO_PLAYER_NAME
+from teleguessr.settings import (
+    LeagueSettings,
+    TELEGRAM_ID_TO_PLAYER_NAME,
+    PLAYER_NAME_TO_TELEGRAM_ID,
+)
 from loguru import logger
 
 from teleguessr.handicaps import (
@@ -50,12 +54,14 @@ class BotManager:
     def __init__(
         self,
         admin_id: int,
+        players_lounge_group_id: int,
         data_dir: Path,
         polling_interval_seconds: int,
         league_settings: LeagueSettings,
         geoguessr_client: GeoguessrClient,
     ):
         self.admin_id = admin_id
+        self.players_lounge_group_id = players_lounge_group_id
         self.data_dir = data_dir
         self.polling_interval_seconds = polling_interval_seconds
         self.league_settings = league_settings
@@ -189,14 +195,23 @@ class BotManager:
             logger.info(f"New players finished this round: {new_finished_players}")
             for player in new_finished_players:
                 self.league_state.add_player_finished(player)
+                await self.invite_player_to_lounge(
+                    context,
+                    player_name=player,
+                )
+
+                await context.bot.send_message(
+                    chat_id=self.players_lounge_group_id,
+                    text=f"✅ {player} has finished their round!",
+                )
 
             self.league_state.save()
 
             await self.status_update(
                 context,
-                chat_id=self.admin_id,
+                chat_id=self.players_lounge_group_id,
                 round_result=round_result,
-                from_perspective_of_player_id=self.admin_id,
+                from_perspective_of_player_id=None,
             )
 
         should_end_round = not still_pending_players or (
@@ -535,6 +550,8 @@ class BotManager:
             parse_mode="HTML",
         )
 
+        await self.clear_players_from_lounge_chat(context)
+
         await self.show_leaderboard(context, chat_id)
 
         if self.league_state.is_finished:
@@ -542,7 +559,6 @@ class BotManager:
             await context.bot.send_message(
                 chat_id, f"🏆 League finished. Winner: {winner}"
             )
-
             # Calculate and update handicaps
             player_ranks = get_ranks_from_scores(
                 self.league_state.get_leaderboard_data()["scores"]
@@ -661,4 +677,123 @@ class BotManager:
         await context.bot.send_message(
             chat_id=chat_id,
             text=message,
+        )
+
+    async def invite_player_to_lounge(
+        self,
+        context: ContextTypes.DEFAULT_TYPE,
+        player_name: str,
+    ):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.players_lounge_group_id is None:
+            raise ValueError("players_lounge_group_id is not set.")
+
+        player_telegram_id = PLAYER_NAME_TO_TELEGRAM_ID.get(player_name)
+        if player_telegram_id is None:
+            logger.warning(f"No Telegram ID found for player {player_name}.")
+            return
+
+        invite_link = await context.bot.create_chat_invite_link(
+            chat_id=self.players_lounge_group_id,
+            member_limit=1,  # single-use
+            expire_date=datetime.utcnow() + timedelta(minutes=15),
+        )
+
+        await context.bot.send_message(
+            chat_id=player_telegram_id,
+            text=(
+                f"Hello {player_name}!\n\n"
+                f"You have been invited to join the Teleguessr Players' Lounge group chat.\n"
+                f"Click the link below to join:\n{invite_link.invite_link}\n\n"
+                f"This link will expire in 15 minutes - but you can request a new one by using the /lounge command."
+            ),
+        )
+
+    async def clear_players_from_lounge_chat(self, context: ContextTypes.DEFAULT_TYPE):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.players_lounge_group_id is None:
+            raise ValueError("players_lounge_group_id is not set.")
+
+        players_to_remove = []
+
+        for player_name in self.handicaps.keys():
+            player_telegram_id = PLAYER_NAME_TO_TELEGRAM_ID.get(player_name)
+            if player_telegram_id is None:
+                logger.warning(f"No Telegram ID found for player {player_name}.")
+                continue
+
+            try:
+                member = await context.bot.get_chat_member(
+                    self.players_lounge_group_id, player_telegram_id
+                )
+                if member.status not in ("creator", "administrator"):
+                    players_to_remove.append((player_name, player_telegram_id))
+            except Exception:
+                logger.exception(
+                    f"Failed to get chat member info for player {player_name}"
+                )
+
+        for player_name, player_telegram_id in players_to_remove:
+            logger.info(f"Removing player {player_name} from lounge chat.")
+            try:
+                await context.bot.ban_chat_member(
+                    chat_id=self.players_lounge_group_id,
+                    user_id=player_telegram_id,
+                    until_date=datetime.now() + timedelta(seconds=60),
+                )
+                await context.bot.unban_chat_member(
+                    chat_id=self.players_lounge_group_id,
+                    user_id=player_telegram_id,
+                )
+            except Exception as e:
+                logger.exception(
+                    f"Failed to remove player {player_name} from lounge chat: {e}"
+                )
+                await context.bot.send_message(
+                    chat_id=self.admin_id,
+                    text=f"⚠️ Failed to remove player {player_name} from lounge chat: {e}",
+                )
+
+    async def lounge_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            await update.message.reply_text(
+                "No active league. Start a new league with /startleague."
+            )
+            return
+
+        user_id = update.effective_user.id
+
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(user_id)
+
+        if player_name is None:
+            await update.message.reply_text(
+                "You are not registered as a player in this league."
+            )
+            return
+
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            self.league_state.current_round.challenge_url,
+            handicaps=self.handicaps,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+        )
+
+        round_status = await self.player_round_status(round_result)
+        player_score = round_status.get(player_name)
+
+        if player_score is None:
+            await update.message.reply_text(
+                "You have not played this round yet. Please complete your round to join the lounge."
+            )
+            return
+
+        await self.invite_player_to_lounge(
+            context,
+            player_name=player_name,
         )

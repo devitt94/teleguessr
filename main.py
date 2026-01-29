@@ -54,6 +54,7 @@ async def initlise_bot_manager(
 
     bot_manager = BotManager(
         admin_id=settings.telegram_admin_id,
+        players_lounge_group_id=settings.telegram_players_lounge_group_id,
         data_dir=settings.data_dir,
         polling_interval_seconds=settings.polling_interval_seconds,
         league_settings=settings.league,
@@ -75,6 +76,7 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("startleague", bot_manager.start_league_handler))
     app.add_handler(CommandHandler("endround", bot_manager.end_round_handler))
     app.add_handler(CommandHandler("status", bot_manager.status_handler))
+    app.add_handler(CommandHandler("lounge", bot_manager.lounge_handler))
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")
 
