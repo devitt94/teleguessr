@@ -74,8 +74,7 @@ async def average_scores():
                 f"Skipping challenge {url} due to insufficient players ({len(result.scores)})"
             )
             continue
-        else:
-            print(f"Processing challenge {url} with {len(result.scores)} players")
+
         for player_score in result.scores:
             data.append(
                 {
@@ -115,29 +114,26 @@ async def round_analysis():
 
     handicaps = {}
     default_handicap = 0.0
-    for url in CHALLENGE_URLS:
+    for url in CHALLENGE_URLS.union(get_challange_urls_from_finished_leagues()):
         result = await client.get_challenge_scores(url, handicaps, default_handicap)
-        print(f"Analyzing results for challenge: {url}")
         for player_score in result.scores:
             data.append(
                 {
                     "player": player_score.player.name,
                     "round_id": url.split("/")[-1],
                     "gross_score": player_score.gross_score,
-                    "hcap_adjustment": player_score.hcap_adjustment,
-                    "net_score": player_score.net_score,
                 }
             )
 
     print("Top 5 Gross Scores:")
-    sorted_by_gross = sorted(data, key=lambda x: x["gross_score"])
+    sorted_by_gross = sorted(data, key=lambda x: x["gross_score"], reverse=True)
     for entry in sorted_by_gross[:5]:
         print(
-            f"{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}, Hcap Adj = {entry['hcap_adjustment']}, Net Score = {entry['net_score']}"
+            f"{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}"
         )
 
     print("Bottom 5 Gross Scores:")
-    for entry in sorted_by_gross[-5:]:
+    for entry in sorted_by_gross[-5::-1]:
         print(
-            f"{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}, Hcap Adj = {entry['hcap_adjustment']}, Net Score = {entry['net_score']}"
+            f"{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}"
         )
