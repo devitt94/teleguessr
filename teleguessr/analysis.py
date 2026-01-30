@@ -95,9 +95,15 @@ async def average_scores():
             player_counts[player] = 0
         player_totals[player] += score
         player_counts[player] += 1
-    for player in player_totals:
-        average_score = player_totals[player] / player_counts[player]
-        print(f"{player}: {average_score:.2f} (played {player_counts[player]} rounds)")
+
+    player_average_count_triples = [
+        (player, player_totals[player] / player_counts[player], player_counts[player])
+        for player in player_totals
+    ]
+
+    player_average_count_triples.sort(key=lambda x: x[1], reverse=True)
+    for player, average_score, count in player_average_count_triples:
+        print(f"{player}: {average_score:.2f} (played {count} rounds)")
 
 
 async def round_analysis():
