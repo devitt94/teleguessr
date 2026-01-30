@@ -45,7 +45,7 @@ class AppSettings(BaseSettings):
     telegram_players_lounge_group_id: int
     geoguessr_ncfa_cookie: str
     data_dir: Path = Path("data/")
-    polling_interval_seconds: int = 120
+    polling_interval_seconds: int = 180
 
     league: LeagueSettings
 
