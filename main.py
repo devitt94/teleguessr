@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+from enum import Enum
 import json
 
 from loguru import logger
@@ -150,12 +151,34 @@ def replay(
     )
 
 
+class AnalysisType(str, Enum):
+    AVERAGE_SCORES = "avg"
+    BEST_AND_WORST = "min_max"
+    ALL = "all"
+
+
 @app.command()
-def analysis():
+def analysis(
+    _type: AnalysisType = typer.Option(
+        AnalysisType.ALL,
+        "--type",
+        "-t",
+        help="Type of analysis to run: 'avg', 'min_max', or 'all'.",
+    ),
+    include_legacy_rounds: bool = typer.Option(
+        False,
+        "--include-legacy-rounds",
+        "-i",
+        help="Include legacy rounds in the analysis. Will increase runtime and potentially spam geoguessr with requests, so use sparingly.",
+    ),
+):
     """Run league analysis tools."""
 
-    asyncio.run(average_scores())
-    asyncio.run(round_analysis())
+    if _type in (AnalysisType.AVERAGE_SCORES, AnalysisType.ALL):
+        logger.info("Running average scores analysis...")
+        asyncio.run(average_scores(include_legacy_rounds=include_legacy_rounds))
+    if _type in (AnalysisType.BEST_AND_WORST, AnalysisType.ALL):
+        asyncio.run(round_analysis(include_legacy_rounds=include_legacy_rounds))
 
 
 if __name__ == "__main__":

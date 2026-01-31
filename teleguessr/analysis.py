@@ -1,15 +1,19 @@
 import json
 from pathlib import Path
 
+from loguru import logger
+
 from teleguessr.geoguessr_scraper import GeoguessrClient
 
 import dotenv
 
+from teleguessr.models import ChallengeResult
 from teleguessr.settings import get_settings
 
 dotenv.load_dotenv()
 
-CHALLENGE_URLS = {
+LEGACY_CHALLENGE_URLS = {
+    # Legacy challenge URLs from previous leagues before recording was automated
     "https://www.geoguessr.com/challenge/3qfccXf0H2LxVfKd",
     "https://www.geoguessr.com/challenge/5zDtniWpKjF9cL8I",
     "https://www.geoguessr.com/challenge/862qIpnYWI3V07S1",
@@ -50,32 +54,56 @@ CHALLENGE_URLS = {
 FINISHED_LEAGUES_DIR = Path("data/leagues/finished/")
 
 
-def get_challange_urls_from_finished_leagues() -> set[str]:
-    urls = set()
+def get_challenge_results_from_finished_leagues() -> list[ChallengeResult]:
+    results = []
     for league_file in FINISHED_LEAGUES_DIR.glob("league_*.json"):
         with open(league_file, "r") as f:
             league_data = json.load(f)
         for round_info in league_data["results"]:
-            urls.add(round_info["challenge_url"])
-    return urls
+            results.append(ChallengeResult(**round_info))
+
+    return results
 
 
-async def average_scores():
-    settings = get_settings()
-    client = GeoguessrClient(
-        ncfa_cookie=settings.geoguessr_ncfa_cookie
-    )  # Add valid cookie if needed
+async def get_legacy_challenge_results(
+    geoguessr_client: GeoguessrClient,
+) -> list[ChallengeResult]:
+    results = []
+    for challenge_url in LEGACY_CHALLENGE_URLS:
+        result = await geoguessr_client.get_challenge_scores(challenge_url, {}, 0.0)
+        results.append(result)
+
+    return results
+
+
+async def get_all_challenge_results(
+    include_legacy_rounds: bool = False,
+) -> list[ChallengeResult]:
+    results = get_challenge_results_from_finished_leagues()
+    if include_legacy_rounds:
+        logger.info("Including legacy rounds in analysis...")
+        settings = get_settings()
+        client = GeoguessrClient(
+            ncfa_cookie=settings.geoguessr_ncfa_cookie
+        )  # Add valid cookie if needed
+        legacy_results = await get_legacy_challenge_results(client)
+        results.extend(legacy_results)
+
+    return results
+
+
+async def average_scores(include_legacy_rounds: bool = False):
+    results = await get_all_challenge_results(include_legacy_rounds)
 
     data = []
-    for url in get_challange_urls_from_finished_leagues():
-        result = await client.get_challenge_scores(url, {}, 0.0)
-        if len(result.scores) < 3:
-            print(
-                f"Skipping challenge {url} due to insufficient players ({len(result.scores)})"
+    for round_result in results:
+        if len(round_result.scores) < 3:
+            logger.info(
+                f"Skipping challenge {round_result.url} due to insufficient players ({len(round_result.scores)})"
             )
             continue
 
-        for player_score in result.scores:
+        for player_score in round_result.scores:
             data.append(
                 {
                     "player": player_score.player.name,
@@ -83,7 +111,7 @@ async def average_scores():
                 }
             )
 
-    print("Average Scores:")
+    logger.info("Average Scores:")
     player_totals = {}
     player_counts = {}
     for entry in data:
@@ -102,20 +130,16 @@ async def average_scores():
 
     player_average_count_triples.sort(key=lambda x: x[1], reverse=True)
     for player, average_score, count in player_average_count_triples:
-        print(f"{player}: {average_score:.2f} (played {count} rounds)")
+        logger.info(f"{player}: {average_score:.2f} (played {count} rounds)")
 
 
-async def round_analysis():
+async def round_analysis(
+    include_legacy_rounds: bool = False,
+):
     data = []
-    settings = get_settings()
-    client = GeoguessrClient(
-        ncfa_cookie=settings.geoguessr_ncfa_cookie
-    )  # Add valid cookie if needed
 
-    handicaps = {}
-    default_handicap = 0.0
-    for url in CHALLENGE_URLS.union(get_challange_urls_from_finished_leagues()):
-        result = await client.get_challenge_scores(url, handicaps, default_handicap)
+    for result in await get_all_challenge_results(include_legacy_rounds):
+        url = result.challenge_url
         for player_score in result.scores:
             data.append(
                 {
