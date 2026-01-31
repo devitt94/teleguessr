@@ -131,23 +131,21 @@ def replay(
         logger.error(f"League file {league_file} does not exist.")
         return
 
-    if include_handicaps:
-        handicaps_file = (
-            settings.data_dir / "handicaps" / f"handicaps_league_{league_id}.json"
-        )
-        with open(handicaps_file, "r") as f:
-            handicaps = json.load(f)
+    handicaps_file = (
+        settings.data_dir / "handicaps" / f"handicaps_league_{league_id}.json"
+    )
+    with open(handicaps_file, "r") as f:
+        handicaps = json.load(f)
 
-    else:
-        handicaps = {}
-        settings.league.default_handicap_multiplier = 0.0
+    if not include_handicaps:
+        handicaps = {player: 0.0 for player in handicaps.keys()}
 
     asyncio.run(
         replay_league(
             league_path=league_file,
             handicaps=handicaps,
             league_settings=settings.league,
-            geoguessr_cookie=settings.geoguessr_ncfa_cookie,
+            show_handicap_adjustments=include_handicaps,
         )
     )
 
