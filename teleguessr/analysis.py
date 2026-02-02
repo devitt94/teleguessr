@@ -153,11 +153,11 @@ async def round_analysis(
     sorted_by_gross = sorted(data, key=lambda x: x["gross_score"], reverse=True)
     for entry in sorted_by_gross[:5]:
         logger.info(
-            f"{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}"
+            f"\t{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}"
         )
 
     logger.info("Bottom 5 Gross Scores:")
     for entry in sorted_by_gross[-5::-1]:
         logger.info(
-            f"{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}"
+            f"\t{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}"
         )
