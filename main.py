@@ -77,6 +77,7 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("help", bot_manager.help_handler))
     app.add_handler(CommandHandler("startleague", bot_manager.start_league_handler))
     app.add_handler(CommandHandler("endround", bot_manager.end_round_handler))
+    app.add_handler(CommandHandler("handicaps", bot_manager.handicaps_handler))
     app.add_handler(CommandHandler("status", bot_manager.status_handler))
     app.add_handler(CommandHandler("lounge", bot_manager.lounge_handler))
     app.add_error_handler(bot_manager.error_handler)

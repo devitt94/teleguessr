@@ -128,6 +128,7 @@ class BotManager:
             "/startleague - Start a new league (admin only)\n"
             "/endround - End the current round (admin only)\n"
             "/status - Get the current status of the league and your round\n"
+            "/handicaps - Show current handicaps\n"
             "/lounge - Get an invite to the Players' Lounge group chat (after playing your round)\n"
             "/help - Show this help message\n\n"
         )
@@ -822,3 +823,17 @@ class BotManager:
             context,
             player_name=player_name,
         )
+
+    async def handicaps_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        sorted_handicaps = sorted(self.handicaps.items(), key=lambda item: item[1])
+
+        message = "📉 Current Handicaps:\n\n"
+        for player, handicap in sorted_handicaps:
+            message += f"- {player}: {handicap:.0%}\n"
+
+        await update.message.reply_text(message)
