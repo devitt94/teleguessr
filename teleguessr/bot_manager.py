@@ -122,6 +122,21 @@ class BotManager:
             first=0,
         )
 
+    async def help_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        help_message = (
+            "🤖 <b>Teleguessr Bot Commands</b> 🤖\n\n"
+            "/startleague - Start a new league (admin only)\n"
+            "/endround - End the current round (admin only)\n"
+            "/status - Get the current status of the league and your round\n"
+            "/lounge - Get an invite to the Players' Lounge group chat (after playing your round)\n"
+            "/help - Show this help message\n\n"
+        )
+
+        await update.message.reply_text(
+            help_message,
+            parse_mode="HTML",
+        )
+
     async def start_league_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):

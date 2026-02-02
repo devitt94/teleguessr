@@ -74,6 +74,7 @@ def main(test_mode: bool = False):
     logger.info("BotManager initialised.")
 
     app = ApplicationBuilder().token(settings.telegram_bot_token).build()
+    app.add_handler(CommandHandler("help", bot_manager.help_handler))
     app.add_handler(CommandHandler("startleague", bot_manager.start_league_handler))
     app.add_handler(CommandHandler("endround", bot_manager.end_round_handler))
     app.add_handler(CommandHandler("status", bot_manager.status_handler))
