@@ -1,7 +1,8 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 from typing import Callable
+from teleguessr.awards import get_ranked_guesses
 from teleguessr.models import ActiveRound, ChallengeResult, RankedGuess
 import json
 from pathlib import Path
@@ -202,6 +203,37 @@ class LeagueState(BaseModel):
             )
         self.current_round = ActiveRound(
             challenge_url=url, end_time=end_time, players_finished=set()
+        )
+
+    def undo_last_round(self):
+        if not self.results:
+            raise ValueError("No rounds to undo.")
+
+        last_result = self.results.pop()
+        removed_scores = skewed_ranking_score_manager(last_result)
+        for player, score in removed_scores.items():
+            self.__scores[player] = self.__scores.get(player, 0) - score
+            if str(self.current_round_num) in self.__round_results_by_player[player]:
+                del self.__round_results_by_player[player][str(self.current_round_num)]
+
+        ranked_guesses = get_ranked_guesses(last_result)
+        if ranked_guesses:
+            best_guess = ranked_guesses[0]
+            worst_guess = ranked_guesses[-1]
+            best_guess_player = best_guess.player.name
+            worst_guess_player = worst_guess.player.name
+            self.__scores[best_guess_player] -= 1
+            self.__scores[worst_guess_player] += 1
+
+            self.__best_guesses_by_player[best_guess_player] -= 1
+            self.__worst_guesses_by_player[worst_guess_player] -= 1
+
+        players_finished = last_result.players_finished
+        self.current_round = ActiveRound(
+            challenge_url=last_result.challenge_url,
+            end_time=datetime.now()
+            + timedelta(hours=24),  # Placeholder; actual end time unknown
+            players_finished=players_finished,
         )
 
     def add_round_result(self, result: ChallengeResult):

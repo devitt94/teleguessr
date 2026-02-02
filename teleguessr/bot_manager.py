@@ -127,6 +127,7 @@ class BotManager:
             "🤖 <b>Teleguessr Bot Commands</b> 🤖\n\n"
             "/startleague - Start a new league (admin only)\n"
             "/endround - End the current round (admin only)\n"
+            "/undo - Undo the last round (admin only)\n"
             "/status - Get the current status of the league and your round\n"
             "/handicaps - Show current handicaps\n"
             "/lounge - Get an invite to the Players' Lounge group chat (after playing your round)\n"
@@ -550,6 +551,35 @@ class BotManager:
             return
 
         await self.end_round(context, update.effective_chat.id)
+
+    async def undo_last_round_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if update.effective_user.id != self.admin_id:
+            await update.message.reply_text(
+                "You are not authorized to use this command."
+            )
+            return
+
+        if self.league_state is None or self.league_state.is_finished:
+            await update.message.reply_text("No active league.")
+            return
+
+        try:
+            self.league_state.undo_last_round()
+        except ValueError as e:
+            await update.message.reply_text(str(e))
+            return
+
+        logger.info(
+            f"Undid last round. Current round is now {self.league_state.current_round_num}."
+        )
+        await update.message.reply_text(
+            f"Last round undone. Current round is now {self.league_state.current_round_num}."
+        )
 
     async def end_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         if chat_id is None:
