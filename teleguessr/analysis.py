@@ -53,6 +53,10 @@ LEGACY_CHALLENGE_URLS = {
 
 FINISHED_LEAGUES_DIR = Path("data/leagues/finished/")
 
+NAME_CHANGES = {
+    "Boothd": "Boothlandia",
+}
+
 
 def get_challenge_results_from_finished_leagues() -> list[ChallengeResult]:
     results = []
@@ -104,9 +108,12 @@ async def average_scores(include_legacy_rounds: bool = False):
             continue
 
         for player_score in round_result.scores:
+            player_name = NAME_CHANGES.get(
+                player_score.player.name, player_score.player.name
+            )
             data.append(
                 {
-                    "player": player_score.player.name,
+                    "player": player_name,
                     "gross_score": player_score.gross_score,
                 }
             )
@@ -143,7 +150,9 @@ async def round_analysis(
         for player_score in result.scores:
             data.append(
                 {
-                    "player": player_score.player.name,
+                    "player": NAME_CHANGES.get(
+                        player_score.player.name, player_score.player.name
+                    ),
                     "round_id": url.split("/")[-1],
                     "gross_score": player_score.gross_score,
                 }
