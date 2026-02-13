@@ -6,8 +6,10 @@ from telegram import Update
 from telegram.ext import Application as TelegramApp
 
 from teleguessr.awards import get_ranked_guesses
+from teleguessr.challenge_settings_generators import mixed_challenge_settings_generator
 from teleguessr.formatters import (
     format_awards_html,
+    format_challenge_settings,
     format_leaderboard_html,
     format_round_result_html,
     format_time,
@@ -267,13 +269,16 @@ class BotManager:
             self.league_state.save()
 
     async def start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+        challenge_settings = mixed_challenge_settings_generator(
+            self.league_state.current_round_num
+        )
         challenge_url = await self.geoguessr_client.create_challenge(
-            map_id=self.league_settings.map_id,
-            time_limit_seconds=self.league_settings.time_per_guess_seconds,
+            challenge_settings=challenge_settings
         )
         self.league_state.start_round(
             url=challenge_url,
             end_time_hours=self.league_settings.round_end_time_hour_utc,
+            challenge_settings=challenge_settings,
         )
 
         round_ends_in_seconds = self.league_state.get_time_left_seconds()
@@ -295,7 +300,8 @@ class BotManager:
             text=(
                 f"🏁 Round {self.league_state.current_round_num} has started!\n\n"
                 f"Challenge URL: {challenge_url}\n"
-                f"This round will end in {format_time(round_ends_in_seconds)}."
+                f"This round will end in {format_time(round_ends_in_seconds)}.\n\n"
+                f"Format:\n{format_challenge_settings(challenge_settings)}"
             ),
         )
 
@@ -586,10 +592,12 @@ class BotManager:
             raise ValueError("chat_id must be provided to end_round")
 
         challenge_url = self.league_state.current_round.challenge_url
+        challenge_settings = self.league_state.current_round.challenge_settings
         round_result = await self.geoguessr_client.get_challenge_scores(
             challenge_url,
             handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
+            challenge_settings=challenge_settings,
         )
 
         ranked_guesses = get_ranked_guesses(round_result)

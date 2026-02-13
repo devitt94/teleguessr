@@ -1,4 +1,10 @@
-from teleguessr.models import Guess, Player, ChallengeResult, ChallengeScore
+from teleguessr.models import (
+    Guess,
+    Player,
+    ChallengeResult,
+    ChallengeScore,
+    ChallengeSettings,
+)
 
 from geoguessr_async import Geoguessr, GeoguessrScore
 
@@ -14,23 +20,22 @@ class GeoguessrClient:
 
     async def create_challenge(
         self,
-        map_id: str,
-        time_limit_seconds: int,
+        challenge_settings: ChallengeSettings,
     ) -> str:
         """
         Create a new GeoGuessr challenge and return its URL.
         """
         logger.info(
-            f"Creating challenge for map_id={map_id} with time_limit_seconds={time_limit_seconds}"
+            f"Creating challenge for map_id={challenge_settings.map_id} with time_limit_seconds={challenge_settings.time_limit_seconds} and move_allowed={challenge_settings.move_allowed} and pan_allowed={challenge_settings.pan_allowed} and zoom_allowed={challenge_settings.zoom_allowed}"
         )
 
-        map_url = f"https://www.geoguessr.com/maps/{map_id}"
+        map_url = f"https://www.geoguessr.com/maps/{challenge_settings.map_id}"
         challenge_url = await Geoguessr(self.ncfa_cookie).generate_challenge(
             map_url=map_url,
-            move=False,
-            pan=True,
-            zoom=True,
-            timeLimit=time_limit_seconds,
+            move=challenge_settings.move_allowed,
+            pan=challenge_settings.pan_allowed,
+            zoom=challenge_settings.zoom_allowed,
+            timeLimit=challenge_settings.time_limit_seconds,
             play_map=False,
         )
         return challenge_url
@@ -40,6 +45,7 @@ class GeoguessrClient:
         url: str,
         handicaps: dict[str, float],
         default_handicap: float,
+        challenge_settings: ChallengeSettings | None = None,
     ) -> ChallengeResult:
         """
         Scrape player names and scores from a GeoGuessr challenge page.
@@ -66,4 +72,8 @@ class GeoguessrClient:
             round_score = ChallengeScore(player=player, guesses=guesses)
             challenge_scores.append(round_score)
 
-        return ChallengeResult(challenge_url=url, scores=challenge_scores)
+        return ChallengeResult(
+            challenge_url=url,
+            scores=challenge_scores,
+            challenge_settings=challenge_settings,
+        )

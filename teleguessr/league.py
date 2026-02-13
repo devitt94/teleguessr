@@ -3,7 +3,12 @@ from datetime import datetime, timedelta
 import re
 from typing import Callable
 from teleguessr.awards import get_ranked_guesses
-from teleguessr.models import ActiveRound, ChallengeResult, RankedGuess
+from teleguessr.models import (
+    ActiveRound,
+    ChallengeResult,
+    ChallengeSettings,
+    RankedGuess,
+)
 import json
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -187,7 +192,9 @@ class LeagueState(BaseModel):
         )
         return top_players_sorted[0]
 
-    def start_round(self, url: str, end_time_hours: int):
+    def start_round(
+        self, url: str, end_time_hours: int, challenge_settings: ChallengeSettings
+    ):
         if self.round_in_progress:
             raise ValueError("A round is already in progress.")
         if self.is_finished:
@@ -202,7 +209,10 @@ class LeagueState(BaseModel):
                 hour=end_time_hours, minute=0, second=0, microsecond=0
             )
         self.current_round = ActiveRound(
-            challenge_url=url, end_time=end_time, players_finished=set()
+            challenge_url=url,
+            end_time=end_time,
+            challenge_settings=challenge_settings,
+            players_finished=set(),
         )
 
     def undo_last_round(self):

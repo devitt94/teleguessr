@@ -15,8 +15,17 @@ class Player(BaseModel):
     hcap_multiplier: confloat(ge=0.0, le=1.0)
 
 
+class ChallengeSettings(BaseModel):
+    map_id: str
+    time_limit_seconds: int
+    pan_allowed: bool
+    zoom_allowed: bool
+    move_allowed: bool
+
+
 class ActiveRound(BaseModel):
     challenge_url: str
+    challenge_settings: ChallengeSettings
     end_time: datetime
     players_finished: list[str] = Field(default_factory=list)
     reminder_sent: bool = False
@@ -68,6 +77,7 @@ class ChallengeResult(BaseModel):
     challenge_url: str
     scores: list[ChallengeScore] = conlist(ChallengeScore, min_length=1)
     ranked_guesses: list[RankedGuess] | None = None
+    challenge_settings: ChallengeSettings | None = None
 
     @property
     def players_finished(self) -> set[str]:

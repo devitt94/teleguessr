@@ -23,10 +23,8 @@ TELEGRAM_ID_TO_PLAYER_NAME = {v: k for k, v in PLAYER_NAME_TO_TELEGRAM_ID.items(
 
 
 class LeagueSettings(BaseModel):
-    map_id: str
     number_of_rounds: int = 5
     round_end_time_hour_utc: int = 21  # 9 PM UTC
-    time_per_guess_seconds: int = 90
 
     handicaps_dir: Path = Path("data/handicaps/")
 

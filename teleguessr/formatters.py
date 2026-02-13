@@ -1,5 +1,5 @@
 from teleguessr.league import skewed_ranking_score_manager
-from teleguessr.models import ChallengeResult, RankedGuess
+from teleguessr.models import ChallengeResult, ChallengeSettings, RankedGuess
 
 
 def get_rank_emoji(position: int, total_participants: int) -> str:
@@ -155,3 +155,15 @@ def format_time(seconds: int) -> str:
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
         return f"{hours:.0f} hours" + (f" {minutes:.0f} minutes" if minutes > 0 else "")
+
+
+def format_challenge_settings(challenge_settings: ChallengeSettings) -> str:
+    move_str = "Yes" if challenge_settings.move_allowed else "No"
+    pan_str = "Yes" if challenge_settings.pan_allowed else "No"
+    zoom_str = "Yes" if challenge_settings.zoom_allowed else "No"
+    return (
+        f"Time Limit: {format_time(challenge_settings.time_limit_seconds)}\n"
+        f"Move: {move_str}\n"
+        f"Pan: {pan_str}\n"
+        f"Zoom: {zoom_str}"
+    )
