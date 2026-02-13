@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NEW_ENTRANT_HANDICAP_MULTIPLIER = 0.25
-MAXIMUM_HANDICAP_MULTIPLIER = 0.30
+MAXIMUM_HANDICAP_MULTIPLIER = 0.35
 
 PLAYER_NAME_TO_TELEGRAM_ID = {
     "Bosnia & GetsTheGoldSweena": 8116505806,
