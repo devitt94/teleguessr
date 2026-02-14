@@ -326,14 +326,14 @@ wheels = [
 
 [[package]]
 name = "geoguessr-async"
-version = "1.0.13"
+version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e1/d7/7366d224e78d3fcff210d5b48a3755d70aa8aa80e22d446c0d555f62b88d/geoguessr_async-1.0.13.tar.gz", hash = "sha256:01f45e76d9dd4e0c5892bc968d85c4321ad2b5b51e4edbd14fbaa88a6db336f9", size = 11185, upload-time = "2025-02-06T14:40:46.558Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/01/11419e20b80d7abfd6da777875464adf2130e8b46599b5baa0c8d30b4d5b/geoguessr_async-1.1.0.tar.gz", hash = "sha256:68b610d3cb2f2df3c07eb17e80060c6d2a4127bc1e6f1e330ed606a08a7d2f69", size = 12479, upload-time = "2026-02-13T21:10:28.881Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/a2/45f3674fe5ddac0782c605bd06c4806f711e45f9b48c04dcd6f7f3bbbb6c/geoguessr_async-1.0.13-py3-none-any.whl", hash = "sha256:692e23e4454ef408b973481658f3b3bf6c199107ed5a4320fd6d347e298e6a87", size = 10416, upload-time = "2025-02-06T14:40:44.794Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/5c/c57bfd755f2b7a77db50f3394cecda7067ba3ab12f601be655c5789129ac/geoguessr_async-1.1.0-py3-none-any.whl", hash = "sha256:69cfcc7870e30608e3158425cb329b7b4954ea1ec76f9db00a032ba2f7990361", size = 10656, upload-time = "2026-02-13T21:10:27.454Z" },
 ]
 
 [[package]]
@@ -1069,7 +1069,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.1" },
     { name = "bs4", specifier = ">=0.0.2" },
-    { name = "geoguessr-async", specifier = ">=1.0.13" },
+    { name = "geoguessr-async", specifier = ">=1.1.0" },
     { name = "html2text", specifier = ">=2025.4.15" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "pydantic", specifier = ">=2.12.2" },
