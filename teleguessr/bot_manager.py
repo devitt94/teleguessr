@@ -303,6 +303,7 @@ class BotManager:
                 f"This round will end in {format_time(round_ends_in_seconds)}.\n\n"
                 f"Format:\n{format_challenge_settings(challenge_settings)}"
             ),
+            parse_mode="HTML",
         )
 
         await context.bot.pin_chat_message(

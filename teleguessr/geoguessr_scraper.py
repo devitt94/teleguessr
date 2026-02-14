@@ -31,12 +31,13 @@ class GeoguessrClient:
 
         map_url = f"https://www.geoguessr.com/maps/{challenge_settings.map_id}"
         challenge_url = await Geoguessr(self.ncfa_cookie).generate_challenge(
-            map_url=map_url,
+            mapUrl=map_url,
             move=challenge_settings.move_allowed,
             pan=challenge_settings.pan_allowed,
             zoom=challenge_settings.zoom_allowed,
             timeLimit=challenge_settings.time_limit_seconds,
-            play_map=False,
+            playMap=False,
+            numRounds=challenge_settings.number_of_locations,
         )
         return challenge_url
 

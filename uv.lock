@@ -327,13 +327,9 @@ wheels = [
 [[package]]
 name = "geoguessr-async"
 version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/devitt94/geoguessr_async#b42058951dd9f20f0171703629a4c283520a2335" }
 dependencies = [
     { name = "aiohttp" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/01/11419e20b80d7abfd6da777875464adf2130e8b46599b5baa0c8d30b4d5b/geoguessr_async-1.1.0.tar.gz", hash = "sha256:68b610d3cb2f2df3c07eb17e80060c6d2a4127bc1e6f1e330ed606a08a7d2f69", size = 12479, upload-time = "2026-02-13T21:10:28.881Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/5c/c57bfd755f2b7a77db50f3394cecda7067ba3ab12f601be655c5789129ac/geoguessr_async-1.1.0-py3-none-any.whl", hash = "sha256:69cfcc7870e30608e3158425cb329b7b4954ea1ec76f9db00a032ba2f7990361", size = 10656, upload-time = "2026-02-13T21:10:27.454Z" },
 ]
 
 [[package]]
@@ -1069,7 +1065,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.1" },
     { name = "bs4", specifier = ">=0.0.2" },
-    { name = "geoguessr-async", specifier = ">=1.1.0" },
+    { name = "geoguessr-async", git = "https://github.com/devitt94/geoguessr_async" },
     { name = "html2text", specifier = ">=2025.4.15" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "pydantic", specifier = ">=2.12.2" },

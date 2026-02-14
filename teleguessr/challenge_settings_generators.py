@@ -15,7 +15,9 @@ class ChallengeSettingsGenerator(Protocol):
         ...
 
 
-def classic_challenge_settings_generator(round_number: int) -> ChallengeSettings:
+def classic_challenge_settings_generator(
+    round_number: int, number_of_locations: int = 5
+) -> ChallengeSettings:
     """
     Original challenge settings generator used in the first few leagues. Always returns the same settings.
     90 seconds, community world map, no move.
@@ -27,6 +29,7 @@ def classic_challenge_settings_generator(round_number: int) -> ChallengeSettings
         pan_allowed=True,
         zoom_allowed=True,
         move_allowed=False,
+        number_of_locations=number_of_locations,
     )
 
 
@@ -42,6 +45,7 @@ def mixed_challenge_settings_generator(round_number: int) -> ChallengeSettings:
             pan_allowed=True,
             zoom_allowed=True,
             move_allowed=True,
+            number_of_locations=5,
         )
     elif round_number == 3:
         return ChallengeSettings(
@@ -50,6 +54,9 @@ def mixed_challenge_settings_generator(round_number: int) -> ChallengeSettings:
             pan_allowed=True,
             zoom_allowed=True,
             move_allowed=False,
+            number_of_locations=10,
         )
     else:
-        return classic_challenge_settings_generator(round_number)
+        return classic_challenge_settings_generator(
+            round_number, number_of_locations=10
+        )

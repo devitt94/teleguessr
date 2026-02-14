@@ -21,6 +21,7 @@ class ChallengeSettings(BaseModel):
     pan_allowed: bool
     zoom_allowed: bool
     move_allowed: bool
+    number_of_locations: int = 5
 
 
 class ActiveRound(BaseModel):

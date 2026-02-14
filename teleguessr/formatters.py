@@ -162,8 +162,9 @@ def format_challenge_settings(challenge_settings: ChallengeSettings) -> str:
     pan_str = "Yes" if challenge_settings.pan_allowed else "No"
     zoom_str = "Yes" if challenge_settings.zoom_allowed else "No"
     return (
+        f"Number of Locations: <b>{challenge_settings.number_of_locations}</b>\n"
         f"Time Limit: {format_time(challenge_settings.time_limit_seconds)}\n"
-        f"Move: {move_str}\n"
-        f"Pan: {pan_str}\n"
-        f"Zoom: {zoom_str}"
+        f"Move: <b>{move_str}</b>\n"
+        f"Pan: <b>{pan_str}</b>\n"
+        f"Zoom: <b>{zoom_str}</b>"
     )
