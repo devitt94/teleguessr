@@ -20,12 +20,18 @@ ScoreManager = Callable[[ChallengeResult], dict[str, int]]
 def default_score_manager(result: ChallengeResult) -> dict[str, int]:
     scores: dict[str, int] = {}
     for round_score in result.scores:
-        scores[round_score.player.name] = round_score.net_score
+        scores[round_score.player.name] = round_score.compute_net_score(
+            result.num_rounds
+        )
     return scores
 
 
 def ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
-    sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
+    sorted_scores = sorted(
+        result.scores,
+        key=lambda rs: rs.compute_net_score(result.num_rounds),
+        reverse=True,
+    )
     scores: dict[str, int] = {}
     for rank, round_score in enumerate(sorted_scores, start=1):
         scores[round_score.player.name] = len(sorted_scores) - rank + 1
@@ -35,7 +41,11 @@ def ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
 def skewed_ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
     # 1st: 12 points, 2nd: 10 points, 3rd: 8 points, 4th: 7 points, ..., 10th: 1 point
     rank_points = [12, 10, 8, 7, 6, 5, 4, 3, 2, 1]
-    sorted_scores = sorted(result.scores, key=lambda rs: rs.net_score, reverse=True)
+    sorted_scores = sorted(
+        result.scores,
+        key=lambda rs: rs.compute_net_score(result.num_rounds),
+        reverse=True,
+    )
     scores: dict[str, int] = {}
     for rank, round_score in enumerate(sorted_scores):
         if rank < len(rank_points):
@@ -186,7 +196,10 @@ class LeagueState(BaseModel):
             return top_players[0]
 
         last_round = self.results[-1]
-        last_round_scores = {rs.player.name: rs.net_score for rs in last_round.scores}
+        last_round_scores = {
+            rs.player.name: rs.compute_net_score(last_round.num_rounds)
+            for rs in last_round.scores
+        }
         top_players_sorted = sorted(
             top_players, key=lambda p: last_round_scores.get(p, 0), reverse=True
         )

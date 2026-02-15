@@ -11,9 +11,6 @@ from geoguessr_async import Geoguessr, GeoguessrScore
 from loguru import logger
 
 
-MAX_ROUND_SCORE = 25_000
-
-
 class GeoguessrClient:
     def __init__(self, ncfa_cookie: str):
         self.ncfa_cookie = ncfa_cookie

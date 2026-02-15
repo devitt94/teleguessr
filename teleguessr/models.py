@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, confloat, conlist
 
 
-MAX_ROUND_SCORE = 25_000
+MAX_ROUND_SCORE = 5000
 
 
 class Guess(BaseModel):
@@ -40,13 +40,14 @@ class ChallengeScore(BaseModel):
     def gross_score(self) -> int:
         return sum(guess.score for guess in self.guesses)
 
-    @property
-    def hcap_adjustment(self) -> int:
-        return int(self.player.hcap_multiplier * (MAX_ROUND_SCORE - self.gross_score))
+    def compute_hcap_adjustment(self, num_rounds: int) -> int:
+        max_challenge_score = MAX_ROUND_SCORE * num_rounds
+        return int(
+            self.player.hcap_multiplier * (max_challenge_score - self.gross_score)
+        )
 
-    @property
-    def net_score(self) -> int:
-        return self.gross_score + self.hcap_adjustment
+    def compute_net_score(self, num_rounds: int) -> int:
+        return self.gross_score + self.compute_hcap_adjustment(num_rounds=num_rounds)
 
 
 class GuessStats(BaseModel):
@@ -84,8 +85,20 @@ class ChallengeResult(BaseModel):
     def players_finished(self) -> set[str]:
         return {score.player.name for score in self.scores}
 
+    @property
+    def num_rounds(self) -> int:
+        return (
+            self.challenge_settings.number_of_locations
+            if self.challenge_settings
+            else 5
+        )
+
     def get_player_position(self, player_name: str) -> int:
-        sorted_scores = sorted(self.scores, key=lambda rs: rs.net_score, reverse=True)
+        sorted_scores = sorted(
+            self.scores,
+            key=lambda rs: rs.compute_net_score(self.num_rounds),
+            reverse=True,
+        )
         for index, rs in enumerate(sorted_scores):
             if rs.player.name == player_name:
                 return index + 1

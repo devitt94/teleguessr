@@ -690,7 +690,8 @@ class BotManager:
         self, round_result: ChallengeResult
     ) -> dict[str, AbbreviatedRoundScore | None]:
         net_scores = {
-            score.player.name: score.net_score for score in round_result.scores
+            score.player.name: score.compute_net_score(round_result.num_rounds)
+            for score in round_result.scores
         }
         ranks = get_ranks_from_scores(net_scores)
 
