@@ -53,6 +53,7 @@ class GeoguessrClient:
         geoguessr_scores: list[GeoguessrScore] = await Geoguessr(
             self.ncfa_cookie
         ).get_challenge_score(url)
+
         challenge_scores: list[ChallengeScore] = []
         for geoguessr_score in geoguessr_scores:
             playername = geoguessr_score.gamePlayerNick
@@ -65,6 +66,12 @@ class GeoguessrClient:
                 Guess(score=score, distance_km=distance / 1000)
                 for score, distance in zip(guess_points, guess_distances)
             ]
+
+            if len(guesses) != challenge_settings.number_of_locations:
+                logger.warning(
+                    f"Player {playername} has only completed {len(guesses)} rounds, expected {challenge_settings.number_of_locations}."
+                )
+                continue
 
             player = Player(name=playername, hcap_multiplier=hcap_multiplier)
             round_score = ChallengeScore(player=player, guesses=guesses)

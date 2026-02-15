@@ -6,7 +6,10 @@ from telegram import Update
 from telegram.ext import Application as TelegramApp
 
 from teleguessr.awards import get_ranked_guesses
-from teleguessr.challenge_settings_generators import mixed_challenge_settings_generator
+from teleguessr.challenge_settings_generators import (
+    CHALLENGE_SETTINGS,
+    ChallengeSettingsGenerator,
+)
 from teleguessr.formatters import (
     format_awards_html,
     format_challenge_settings,
@@ -14,6 +17,7 @@ from teleguessr.formatters import (
     format_round_result_html,
     format_time,
 )
+from teleguessr.replay import replay_league
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import (
     LeagueState,
@@ -56,7 +60,7 @@ class BotManager:
     def __init__(
         self,
         admin_id: int,
-        players_lounge_group_id: int,
+        players_lounge_group_id: int | None,
         data_dir: Path,
         polling_interval_seconds: int,
         league_settings: LeagueSettings,
@@ -70,6 +74,10 @@ class BotManager:
         self.league_state = None
         self.__initialised = False
         self.geoguessr_client = geoguessr_client
+
+        self.challenge_settings_generator: ChallengeSettingsGenerator = (
+            CHALLENGE_SETTINGS[league_settings.challenge_settings_name]
+        )
 
     @property
     def active_league_dir(self) -> Path:
@@ -197,6 +205,7 @@ class BotManager:
             self.league_state.current_round.challenge_url,
             handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
+            challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
         players_finished_before = self.league_state.get_players_finished_round()
@@ -214,6 +223,10 @@ class BotManager:
             logger.info(f"New players finished this round: {new_finished_players}")
             for player in new_finished_players:
                 self.league_state.add_player_finished(player)
+
+                if self.players_lounge_group_id is None:
+                    continue
+
                 try:
                     await self.invite_player_to_lounge(
                         context,
@@ -236,12 +249,13 @@ class BotManager:
 
             self.league_state.save()
 
-            await self.status_update(
-                context,
-                chat_id=self.players_lounge_group_id,
-                round_result=round_result,
-                from_perspective_of_player_id=None,
-            )
+            if self.players_lounge_group_id is not None:
+                await self.status_update(
+                    context,
+                    chat_id=self.players_lounge_group_id,
+                    round_result=round_result,
+                    from_perspective_of_player_id=None,
+                )
 
         should_end_round = not still_pending_players or (
             self.league_state.round_in_progress
@@ -269,7 +283,7 @@ class BotManager:
             self.league_state.save()
 
     async def start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-        challenge_settings = mixed_challenge_settings_generator(
+        challenge_settings = self.challenge_settings_generator(
             self.league_state.current_round_num
         )
         challenge_url = await self.geoguessr_client.create_challenge(
@@ -328,6 +342,7 @@ class BotManager:
             challenge_url,
             handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
+            challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
         ranked_guesses = get_ranked_guesses(round_result)
@@ -435,6 +450,7 @@ class BotManager:
             self.league_state.current_round.challenge_url,
             handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
+            challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
         await self.status_update(context, chat_id, round_result, player_id)
@@ -504,6 +520,7 @@ class BotManager:
             self.league_state.current_round.challenge_url,
             handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
+            challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
         players_finished = await self.player_round_status(round_result)
@@ -642,6 +659,29 @@ class BotManager:
                 new_handicaps=new_handicaps,
             )
             self.handicaps = new_handicaps
+            logger.info("Starting replay without handicaps.")
+
+            gross_replay_league_state = await replay_league(
+                league_path=self.league_state.filepath,
+                handicaps={},
+                league_settings=self.league_settings,
+            )
+
+            replayed_leaderboard_text = format_leaderboard_html(
+                **gross_replay_league_state.get_leaderboard_data()
+            )
+            await context.bot.send_message(
+                chat_id,
+                f"📊 Gross Results:\n\n{replayed_leaderboard_text}",
+                parse_mode="HTML",
+            )
+
+            gross_replay_league_state.filepath.unlink(missing_ok=True)
+
+            logger.info(
+                "Leageue finished, ending league and moving file to finished directory."
+            )
+
             await self.end_league()
 
         else:
@@ -782,7 +822,10 @@ class BotManager:
             raise RuntimeError("BotManager not initialised!")
 
         if self.players_lounge_group_id is None:
-            raise ValueError("players_lounge_group_id is not set.")
+            logger.info(
+                "No players lounge group ID set, skipping clearing lounge chat."
+            )
+            return
 
         players_to_remove = []
 
@@ -848,6 +891,7 @@ class BotManager:
             self.league_state.current_round.challenge_url,
             handicaps=self.handicaps,
             default_handicap=self.league_settings.default_handicap_multiplier,
+            challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
         round_status = await self.player_round_status(round_result)

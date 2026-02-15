@@ -60,3 +60,25 @@ def mixed_challenge_settings_generator(round_number: int) -> ChallengeSettings:
         return classic_challenge_settings_generator(
             round_number, number_of_locations=10
         )
+
+
+def test_challenge_settings_generator(round_number: int) -> ChallengeSettings:
+    """
+    Challenge settings generator for testing purposes.
+    """
+
+    return ChallengeSettings(
+        time_limit_seconds=10,
+        map_id=COMMUNITY_WORLD_MAP_ID,
+        pan_allowed=True,
+        zoom_allowed=True,
+        move_allowed=True,
+        number_of_locations=2,
+    )
+
+
+CHALLENGE_SETTINGS: dict[str, ChallengeSettingsGenerator] = {
+    "CLASSIC": classic_challenge_settings_generator,
+    "MIXED": mixed_challenge_settings_generator,
+    "TEST": test_challenge_settings_generator,
+}

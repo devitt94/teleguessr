@@ -3,7 +3,6 @@ from pathlib import Path
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-NEW_ENTRANT_HANDICAP_MULTIPLIER = 0.25
 MAXIMUM_HANDICAP_MULTIPLIER = 0.35
 
 PLAYER_NAME_TO_TELEGRAM_ID = {
@@ -28,9 +27,11 @@ class LeagueSettings(BaseModel):
 
     handicaps_dir: Path = Path("data/handicaps/")
 
-    default_handicap_multiplier: float = NEW_ENTRANT_HANDICAP_MULTIPLIER
+    default_handicap_multiplier: float = 0.0
 
     max_handicap_multiplier: float = MAXIMUM_HANDICAP_MULTIPLIER
+
+    challenge_settings_name: str = "MIXED"
 
 
 class AppSettings(BaseSettings):
@@ -40,10 +41,10 @@ class AppSettings(BaseSettings):
 
     telegram_bot_token: str
     telegram_admin_id: int
-    telegram_players_lounge_group_id: int
     geoguessr_ncfa_cookie: str
     data_dir: Path = Path("data/")
     polling_interval_seconds: int = 180
+    telegram_players_lounge_group_id: int | None = None
 
     league: LeagueSettings
 

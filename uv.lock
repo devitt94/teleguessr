@@ -327,7 +327,7 @@ wheels = [
 [[package]]
 name = "geoguessr-async"
 version = "1.1.0"
-source = { git = "https://github.com/devitt94/geoguessr_async#b42058951dd9f20f0171703629a4c283520a2335" }
+source = { git = "https://github.com/devitt94/geoguessr_async#fe1b38bc0a32d528667c21ede0bc68b6d1f6c6c8" }
 dependencies = [
     { name = "aiohttp" },
 ]
