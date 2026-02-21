@@ -40,11 +40,20 @@ class ChallengeScore(BaseModel):
     def gross_score(self) -> int:
         return sum(guess.score for guess in self.guesses)
 
-    def compute_hcap_adjustment(self, num_rounds: int) -> int:
+    def compute_uncapped_hcap_adjustment(self, num_rounds: int) -> int:
         max_challenge_score = MAX_ROUND_SCORE * num_rounds
         return int(
             self.player.hcap_multiplier * (max_challenge_score - self.gross_score)
         )
+
+    def compute_hcap_adjustment(self, num_rounds: int) -> int:
+        uncapped_adjustment = self.compute_uncapped_hcap_adjustment(
+            num_rounds=num_rounds
+        )
+        max_adjustment = int(
+            ((MAX_ROUND_SCORE * num_rounds) // 2) * self.player.hcap_multiplier
+        )
+        return min(uncapped_adjustment, max_adjustment)
 
     def compute_net_score(self, num_rounds: int) -> int:
         return self.gross_score + self.compute_hcap_adjustment(num_rounds=num_rounds)
@@ -90,7 +99,7 @@ class ChallengeResult(BaseModel):
         return (
             self.challenge_settings.number_of_locations
             if self.challenge_settings
-            else 5
+            else max(len(score.guesses) for score in self.scores)
         )
 
     def get_player_position(self, player_name: str) -> int:
