@@ -14,6 +14,8 @@ def apply_handicaps_to_challenge_result(
     for score in challenge_result.scores:
         if score.player.name in handicaps:
             score.player.hcap_multiplier = handicaps[score.player.name]
+        else:
+            score.player.hcap_multiplier = 0.0
     return challenge_result
 
 
