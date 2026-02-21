@@ -67,7 +67,10 @@ class GeoguessrClient:
                 for score, distance in zip(guess_points, guess_distances)
             ]
 
-            if len(guesses) != challenge_settings.number_of_locations:
+            if (
+                challenge_settings
+                and len(guesses) != challenge_settings.number_of_locations
+            ):
                 logger.warning(
                     f"Player {playername} has only completed {len(guesses)} rounds, expected {challenge_settings.number_of_locations}."
                 )
