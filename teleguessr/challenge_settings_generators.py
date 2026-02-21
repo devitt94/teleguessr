@@ -49,7 +49,7 @@ def mixed_challenge_settings_generator(round_number: int) -> ChallengeSettings:
         )
     elif round_number == 3:
         return ChallengeSettings(
-            time_limit_seconds=10,
+            time_limit_seconds=15,
             map_id=COMMUNITY_WORLD_MAP_ID,
             pan_allowed=True,
             zoom_allowed=True,
@@ -68,7 +68,7 @@ def test_challenge_settings_generator(round_number: int) -> ChallengeSettings:
     """
 
     return ChallengeSettings(
-        time_limit_seconds=10,
+        time_limit_seconds=15,
         map_id=COMMUNITY_WORLD_MAP_ID,
         pan_allowed=True,
         zoom_allowed=True,
