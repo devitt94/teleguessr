@@ -14,41 +14,54 @@ dotenv.load_dotenv()
 
 LEGACY_CHALLENGE_URLS = {
     # Legacy challenge URLs from previous leagues before recording was automated
-    "https://www.geoguessr.com/challenge/3qfccXf0H2LxVfKd",
-    "https://www.geoguessr.com/challenge/5zDtniWpKjF9cL8I",
-    "https://www.geoguessr.com/challenge/862qIpnYWI3V07S1",
-    "https://www.geoguessr.com/challenge/8YpJQusdcr2DkNjV",
-    "https://www.geoguessr.com/challenge/92KcQzZWwNGfb0eB",
-    "https://www.geoguessr.com/challenge/989O8zGW1iWsfrsu",
-    "https://www.geoguessr.com/challenge/ALvkMtCyioXjXJfj",
-    "https://www.geoguessr.com/challenge/DT3pVBmF4MVZt0QS",
-    "https://www.geoguessr.com/challenge/EO15fho3VkzB41CX",
-    "https://www.geoguessr.com/challenge/GaE9HCgVPNUVAAtD",
-    "https://www.geoguessr.com/challenge/HhBflrIkGTGPr1uo",
-    "https://www.geoguessr.com/challenge/J2tCBccFnlJq1eUD",
-    "https://www.geoguessr.com/challenge/KGI2gHP15ejmDGVg",
-    "https://www.geoguessr.com/challenge/OEViUK0CsXsO7BcB",
-    "https://www.geoguessr.com/challenge/Rszuuy3Erzra0VVs",
-    "https://www.geoguessr.com/challenge/TBoioOIrdqrFZJIQ",
-    "https://www.geoguessr.com/challenge/Wl7VfeHU0W6R7Eu3",
-    "https://www.geoguessr.com/challenge/X37AfCqv57u8rGdz",
-    "https://www.geoguessr.com/challenge/b1xLYaAyVSEmR8t9",
-    "https://www.geoguessr.com/challenge/bJMNpBrnnH9tTguW",
-    "https://www.geoguessr.com/challenge/cU0tALpAOGT6iLET",
-    "https://www.geoguessr.com/challenge/ctNxp7ksqHuKyBWd",
-    "https://www.geoguessr.com/challenge/gVmY1NVOqnaHnHy4",
-    "https://www.geoguessr.com/challenge/iOgqSZ2AFXV0k1ku",
-    "https://www.geoguessr.com/challenge/jnPeVIR9cMMcaHKL",
-    "https://www.geoguessr.com/challenge/nDlRf0Nfg9f19lyR",
-    "https://www.geoguessr.com/challenge/o6HtQ5XfgdXzY7hO",
-    "https://www.geoguessr.com/challenge/p3gCJv07XI8WhI2I",
-    "https://www.geoguessr.com/challenge/q1jl07AoTdu9XqVr",
-    "https://www.geoguessr.com/challenge/qYfz8PCNsvSEcEpo",
-    "https://www.geoguessr.com/challenge/rRE1qeaeU7butj9q",
-    "https://www.geoguessr.com/challenge/sGBNv6Sy0axvixlc",
-    "https://www.geoguessr.com/challenge/sgTR0MdmQRJ9Ntdx",
-    "https://www.geoguessr.com/challenge/svZKlxHTVebzd1m8",
-    "https://www.geoguessr.com/challenge/uLRo3Nl2ZbMG3HnL",
+    "https://www.geoguessr.com/challenge/07YmhmGm8GGWkvqk",
+    "https://www.geoguessr.com/challenge/0FbrbTeS2iebcJ5p",
+    "https://www.geoguessr.com/challenge/0Op7RL0HQrBuuiEH",
+    "https://www.geoguessr.com/challenge/1AXQo2ZhvZNKWf3m",
+    "https://www.geoguessr.com/challenge/1BskAmL7qZPwHtc7",
+    "https://www.geoguessr.com/challenge/3nwNDCuiIB2FcakK",
+    "https://www.geoguessr.com/challenge/4psl92OpHr4PPbPd",
+    "https://www.geoguessr.com/challenge/4rLqwPsFiGqdb0H0",
+    "https://www.geoguessr.com/challenge/5WZvm8hdnzw97f5M",
+    "https://www.geoguessr.com/challenge/6eNCF3REhfmW23YN",
+    "https://www.geoguessr.com/challenge/6wPlUsUgjQHtAbYw",
+    "https://www.geoguessr.com/challenge/7n9kRNbdXHHNmkJU",
+    "https://www.geoguessr.com/challenge/8mlulFdDRIQ560n9",
+    "https://www.geoguessr.com/challenge/AdXr1FPo7oukdSHh",
+    "https://www.geoguessr.com/challenge/B2Fd2UeSvlCrj4x1",
+    "https://www.geoguessr.com/challenge/CjeCMC1w8bhRPuUS",
+    "https://www.geoguessr.com/challenge/F1a0CJ2zEzU7MFvX",
+    "https://www.geoguessr.com/challenge/FDJefDJKQt3KEQ4m",
+    "https://www.geoguessr.com/challenge/IkFE3xkmSEwuKN2p",
+    "https://www.geoguessr.com/challenge/JS7SSlJOT7qhS2WZ",
+    "https://www.geoguessr.com/challenge/KpCrkYYN5Ps9auH4",
+    "https://www.geoguessr.com/challenge/MRD3Q3ZJv8CblhrJ",
+    "https://www.geoguessr.com/challenge/NW5zhdlXHN4cGr2T",
+    "https://www.geoguessr.com/challenge/Od9jempwRGjv85a0",
+    "https://www.geoguessr.com/challenge/TPF2H2QoGahBwBbI",
+    "https://www.geoguessr.com/challenge/UCDRId930Z9dBi40",
+    "https://www.geoguessr.com/challenge/UWNm6R5AkoWMxsk4",
+    "https://www.geoguessr.com/challenge/Us1oCYKKga5mjSHm",
+    "https://www.geoguessr.com/challenge/ViWGMvi4AT68u3qa",
+    "https://www.geoguessr.com/challenge/WdCalSH2HvpSz8yQ",
+    "https://www.geoguessr.com/challenge/WvbdX0rQal3n3tCR",
+    "https://www.geoguessr.com/challenge/ZR5KuMYAbptcUXJY",
+    "https://www.geoguessr.com/challenge/ZeM71qobK673WG5U",
+    "https://www.geoguessr.com/challenge/dxNQNpm2Kq3FY40M",
+    "https://www.geoguessr.com/challenge/e6o4lPRb8pplt4WN",
+    "https://www.geoguessr.com/challenge/eghmKGH0l3kxmw8x",
+    "https://www.geoguessr.com/challenge/fVZyhw9DACjglhRt",
+    "https://www.geoguessr.com/challenge/hgXMTze1n5YQMm2n",
+    "https://www.geoguessr.com/challenge/jYq1U9Tz1iCg2QOx",
+    "https://www.geoguessr.com/challenge/kMM7KPqv8NRLyHAI",
+    "https://www.geoguessr.com/challenge/ltvNfFHZ9WxktRYb",
+    "https://www.geoguessr.com/challenge/mimM6MJFIi0rmfGz",
+    "https://www.geoguessr.com/challenge/rHFDspYYFQtHwRQO",
+    "https://www.geoguessr.com/challenge/sljCBcLoBY0VsBMX",
+    "https://www.geoguessr.com/challenge/vdDpVWYbrsmVnfkq",
+    "https://www.geoguessr.com/challenge/xUMqtBmmA0CgDF2z",
+    "https://www.geoguessr.com/challenge/xa6eMHpfS6jI5fSx",
+    "https://www.geoguessr.com/challenge/zqNphEoeQLOuaPnu",
 }
 
 FINISHED_LEAGUES_DIR = Path("data/leagues/finished/")
@@ -103,7 +116,7 @@ async def average_scores(include_legacy_rounds: bool = False):
     for round_result in results:
         if len(round_result.scores) < 3:
             logger.info(
-                f"Skipping challenge {round_result.url} due to insufficient players ({len(round_result.scores)})"
+                f"Skipping challenge {round_result.challenge_url} due to insufficient players ({len(round_result.scores)})"
             )
             continue
 
@@ -115,6 +128,7 @@ async def average_scores(include_legacy_rounds: bool = False):
                 {
                     "player": player_name,
                     "gross_score": player_score.gross_score,
+                    "num_guesses": round_result.num_rounds,
                 }
             )
 
@@ -128,7 +142,7 @@ async def average_scores(include_legacy_rounds: bool = False):
             player_totals[player] = 0
             player_counts[player] = 0
         player_totals[player] += score
-        player_counts[player] += 1
+        player_counts[player] += entry["num_guesses"]
 
     player_average_count_triples = [
         (player, player_totals[player] / player_counts[player], player_counts[player])
