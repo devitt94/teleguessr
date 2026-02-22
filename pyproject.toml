@@ -32,3 +32,7 @@ dev = [
 
 [tool.uv.sources]
 geoguessr-async = { git = "https://github.com/devitt94/geoguessr_async" }
+
+[tool.setuptools.packages.find]
+include = ["teleguessr*"]
+exclude = ["data*"]
