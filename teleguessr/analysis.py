@@ -9,6 +9,14 @@ import dotenv
 
 from teleguessr.models import ChallengeResult
 from teleguessr.settings import get_settings
+from teleguessr.handicaps import get_latest_handicaps
+
+try:
+    import polars as pl
+except ImportError:
+    raise ImportError(
+        "Polars is required for analysis. `pip install -e .[analysis]` to install the required dependencies."
+    )
 
 dotenv.load_dotenv()
 
@@ -184,3 +192,66 @@ async def round_analysis(
         logger.info(
             f"\t{entry['player']} - Round {entry['round_id']}: Gross Score = {entry['gross_score']}"
         )
+
+
+async def handicap_analysis(
+    include_legacy_rounds: bool = False,
+):
+    data = []
+
+    current_handicaps = get_latest_handicaps()
+
+    for result in await get_all_challenge_results(include_legacy_rounds):
+        url = result.challenge_url
+        for player_score in result.scores:
+            for i, guess in enumerate(player_score.guesses):
+                data.append(
+                    {
+                        "player": NAME_CHANGES.get(
+                            player_score.player.name, player_score.player.name
+                        ),
+                        "round_id": url.split("/")[-1],
+                        "guess_index": i + 1,
+                        "guess_score": guess.score,
+                    }
+                )
+    df = pl.DataFrame(data)
+
+    if df.is_empty():
+        logger.warning("No guess data available for handicap analysis.")
+        return
+
+    average_scores = df.group_by("player").agg(
+        pl.col("guess_score").mean().alias("average_guess")
+    )
+    average_scores = average_scores.sort("average_guess", descending=True)
+
+    max_average_guess = average_scores["average_guess"].max()
+    average_scores = average_scores.with_columns(
+        pl.Series(
+            "fair_handicap_pct",
+            [
+                100 * (max_average_guess - avg) / (5000 - avg)
+                for avg in average_scores["average_guess"]
+            ],
+        )
+    )
+    average_scores = average_scores.with_columns(
+        pl.Series(
+            "current_handicap_pct",
+            [
+                current_handicaps.get(player, 0) * 100
+                for player in average_scores["player"]
+            ],
+        )
+    )
+    average_scores = average_scores.with_columns(
+        pl.Series(
+            "diff",
+            average_scores["fair_handicap_pct"]
+            - average_scores["current_handicap_pct"],
+        )
+    )
+
+    logger.info("Fair Handicap Analysis:")
+    print(average_scores.sort("fair_handicap_pct"))

@@ -6,7 +6,7 @@ import json
 
 from loguru import logger
 
-from teleguessr.analysis import average_scores, round_analysis
+from teleguessr.analysis import average_scores, handicap_analysis, round_analysis
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.handicaps import calculate_new_handicaps
@@ -180,6 +180,7 @@ def replay(
 class AnalysisType(str, Enum):
     AVERAGE_SCORES = "avg"
     BEST_AND_WORST = "min_max"
+    HANDICAPS = "handicaps"
     ALL = "all"
 
 
@@ -205,6 +206,10 @@ def analysis(
         asyncio.run(average_scores(include_legacy_rounds=include_legacy_rounds))
     if _type in (AnalysisType.BEST_AND_WORST, AnalysisType.ALL):
         asyncio.run(round_analysis(include_legacy_rounds=include_legacy_rounds))
+
+    if _type in (AnalysisType.HANDICAPS, AnalysisType.ALL):
+        logger.info("Analysing handicaps...")
+        asyncio.run(handicap_analysis(include_legacy_rounds=include_legacy_rounds))
 
 
 if __name__ == "__main__":
