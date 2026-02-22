@@ -51,8 +51,8 @@ def mixed_challenge_settings_generator(round_number: int) -> ChallengeSettings:
         return ChallengeSettings(
             time_limit_seconds=15,
             map_id=COMMUNITY_WORLD_MAP_ID,
-            pan_allowed=True,
-            zoom_allowed=True,
+            pan_allowed=False,
+            zoom_allowed=False,
             move_allowed=False,
             number_of_locations=10,
         )

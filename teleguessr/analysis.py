@@ -11,12 +11,17 @@ from teleguessr.models import ChallengeResult
 from teleguessr.settings import get_settings
 from teleguessr.handicaps import get_latest_handicaps
 
+_POLARS_AVAILABLE = False
+
 try:
     import polars as pl
+
+    _POLARS_AVAILABLE = True
 except ImportError:
-    raise ImportError(
-        "Polars is required for analysis. `pip install -e .[analysis]` to install the required dependencies."
+    logger.warning(
+        "Polars is not installed. Install it with 'pip install polars' to enable handicap analysis."
     )
+
 
 dotenv.load_dotenv()
 
@@ -198,6 +203,12 @@ async def handicap_analysis(
     include_legacy_rounds: bool = False,
 ):
     data = []
+
+    if not _POLARS_AVAILABLE:
+        logger.error(
+            "Polars is required for handicap analysis. Please install it with 'pip install polars'."
+        )
+        return
 
     current_handicaps = get_latest_handicaps()
 
