@@ -84,9 +84,6 @@ def get_ranked_guesses(
     for round_score in round_result.scores:
         for i, guess in enumerate(round_score.guesses):
             guess_stats = all_guess_stats[i]
-            if i == 1 and round_score.player.name == "Danminican Republic":
-                # Skip invalid guess
-                continue
 
             adjusted_score = guess_ranker(guess, guess_stats)
             guess_data_with_adjusted_score.append(

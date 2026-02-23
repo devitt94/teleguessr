@@ -81,6 +81,7 @@ FINISHED_LEAGUES_DIR = Path("data/leagues/finished/")
 
 NAME_CHANGES = {
     "Boothd": "Boothlandia",
+    "Danminican Republic": "Danquador Junta State",
 }
 
 

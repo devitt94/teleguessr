@@ -8,7 +8,7 @@ MAXIMUM_HANDICAP_MULTIPLIER = 0.35
 PLAYER_NAME_TO_TELEGRAM_ID = {
     "Bosnia & GetsTheGoldSweena": 8116505806,
     "Grand Duchy of Gregdova": 6813515691,
-    "Danminican Republic": 8219004552,
+    "Danquador Junta State": 8219004552,
     "St. Bics & Devitts": 7776561844,
     "Ppl's Rep. Glorious Mickistan": 1427830114,
     "SandyAbyss149": 8193470489,
