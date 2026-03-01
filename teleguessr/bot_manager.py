@@ -21,7 +21,6 @@ from teleguessr.replay import replay_league
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import (
     LeagueState,
-    get_new_league_id,
     skewed_ranking_score_manager,
 )
 from teleguessr.models import AbbreviatedRoundScore, ChallengeResult, RankedGuess
@@ -170,18 +169,26 @@ class BotManager:
             )
             return
 
-        league_id = get_new_league_id(self.finished_league_dir)
-        league_filepath = self.active_league_dir / f"league_{league_id}.json"
+        league_start_date = datetime.now().strftime("%Y%m%d")
+        league_filepath = self.active_league_dir / f"league_{league_start_date}.json"
         self.league_state = LeagueState(
             filepath=league_filepath,
             num_rounds=self.league_settings.number_of_rounds,
         )
 
-        logger.info(
-            f"Starting new league with ID {league_id} at {league_filepath.absolute()}"
-        )
+        logger.info(f"Starting new league at {league_filepath.absolute()}")
 
         await update.message.reply_text("New league starting...")
+
+        sorted_handicaps = sorted(self.handicaps.items(), key=lambda item: item[1])
+
+        handicap_message = "📉 Handicaps:\n\n"
+        for player, handicap in sorted_handicaps:
+            handicap_message += f"- {player}: {handicap:.0%}\n"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=handicap_message,
+        )
 
         self.league_state.chat_id = update.effective_chat.id
         self.league_state.save()
@@ -648,7 +655,7 @@ class BotManager:
             new_handicaps = calculate_new_handicaps(player_ranks, self.league_settings)
 
             update_handicaps(
-                new_handicaps, self.league_state.league_id, self.league_settings
+                new_handicaps, self.league_state.league_start_date, self.league_settings
             )
 
             logger.info(f"Updated handicaps: {new_handicaps}")

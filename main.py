@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+import datetime
 from enum import Enum
 import json
 
@@ -10,7 +11,7 @@ from teleguessr.analysis import average_scores, handicap_analysis, round_analysi
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.handicaps import calculate_new_handicaps
-from teleguessr.league import get_last_finished_league_id
+from teleguessr.league import get_last_finished_league_date
 from teleguessr.ranks import get_ranks_from_scores
 from teleguessr.replay import replay_league
 from teleguessr.settings import AppSettings, get_settings
@@ -111,11 +112,11 @@ def run_bot(
 
 @app.command()
 def replay(
-    league_id: int = typer.Option(
+    league_date: str = typer.Option(
         None,
-        "--league-id",
+        "--league-date",
         "-l",
-        help="ID of the league to replay. Defaults to the latest finished league.",
+        help="Date of the league to replay in YYYYMMDD format. Defaults to the latest finished league.",
     ),
     include_handicaps: bool = typer.Option(
         False,
@@ -129,17 +130,21 @@ def replay(
     settings = get_settings()
 
     finished_league_dir = settings.data_dir / "leagues" / "finished"
-    if league_id is None:
-        league_id = get_last_finished_league_id(finished_league_dir)
+    if league_date is None:
+        league_date = get_last_finished_league_date(finished_league_dir)
+    else:
+        league_date = datetime.datetime.strptime(league_date, "%Y%m%d").date()
 
-    league_file = finished_league_dir / f"league_{league_id}.json"
+    league_file = finished_league_dir / f"league_{league_date.strftime('%Y%m%d')}.json"
 
     if not league_file.exists():
         logger.error(f"League file {league_file} does not exist.")
         return
 
     handicaps_file = (
-        settings.data_dir / "handicaps" / f"handicaps_league_{league_id}.json"
+        settings.data_dir
+        / "handicaps"
+        / f"handicaps_league_{league_date.strftime('%Y%m%d')}.json"
     )
     with open(handicaps_file, "r") as f:
         handicaps = json.load(f)

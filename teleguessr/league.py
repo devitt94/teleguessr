@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import re
 from typing import Callable
 from teleguessr.awards import get_ranked_guesses
@@ -61,29 +61,25 @@ class JSONEncoder(json.JSONEncoder):
             return o.isoformat()
 
 
-def get_last_finished_league_id(finished_league_dir: Path) -> int:
-    league_id_from_filename_regex = r"league_(\d+)\.json"
+def get_last_finished_league_date(finished_league_dir: Path) -> date:
+    league_date_from_filename_regex = r"league_(\d{4}\d{2}\d{2})\.json"
 
-    def get_league_id_from_filepath(f: Path) -> int | None:
-        m = re.match(league_id_from_filename_regex, f.name)
+    def get_league_date_from_filepath(f: Path) -> date | None:
+        m = re.match(league_date_from_filename_regex, f.name)
         if m is not None:
-            return int(m.group(1))
+            return datetime.strptime(m.group(1), "%Y%m%d").date()
         return None
 
-    finished_league_ids = [
-        league_id
-        for league_id in (
-            get_league_id_from_filepath(f)
+    finished_league_dates = [
+        league_date
+        for league_date in (
+            get_league_date_from_filepath(f)
             for f in finished_league_dir.glob("league_*.json")
         )
-        if league_id is not None
+        if league_date is not None
     ]
 
-    return max(finished_league_ids, default=0)
-
-
-def get_new_league_id(finished_league_dir: Path) -> int:
-    return get_last_finished_league_id(finished_league_dir) + 1
+    return max(finished_league_dates, default=date.min)
 
 
 class LeagueState(BaseModel):
@@ -145,8 +141,8 @@ class LeagueState(BaseModel):
         return self.current_round is not None
 
     @property
-    def league_id(self) -> int:
-        return int(self.filepath.stem.split("_")[-1])
+    def league_start_date(self) -> date:
+        return datetime.strptime(self.filepath.stem.split("_")[-1], "%Y%m%d").date()
 
     def construct_leaderboard(self) -> dict[int, list[str]]:
         """Returns a mapping of rank to list of player names at that rank."""

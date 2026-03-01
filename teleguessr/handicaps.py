@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 import json
 
 from loguru import logger
@@ -86,10 +87,14 @@ def calculate_new_handicaps(
 
 
 def update_handicaps(
-    new_handicaps: dict[str, float], league_id: int, league_settings: LeagueSettings
+    new_handicaps: dict[str, float], league_date: date, league_settings: LeagueSettings
 ) -> None:
     league_settings.handicaps_dir.mkdir(parents=True, exist_ok=True)
-    latest_file = league_settings.handicaps_dir / f"handicaps_league_{league_id+1}.json"
+    next_league_start_date = league_date + timedelta(days=7)
+    latest_file = (
+        league_settings.handicaps_dir
+        / f"handicaps_league_{next_league_start_date.strftime('%Y%m%d')}.json"
+    )
 
     with latest_file.open("w") as f:
         json.dump(new_handicaps, f, indent=4)
