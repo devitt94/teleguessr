@@ -138,34 +138,24 @@ async def average_scores(include_legacy_rounds: bool = False):
             player_name = NAME_CHANGES.get(
                 player_score.player.name, player_score.player.name
             )
-            data.append(
-                {
-                    "player": player_name,
-                    "gross_score": player_score.gross_score,
-                    "num_guesses": round_result.num_rounds,
-                }
-            )
+            for i, guess in enumerate(player_score.guesses):
+                data.append(
+                    {
+                        "player": player_name,
+                        "score": guess.score,
+                        "round_id": round_result.challenge_url.split("/")[-1],
+                        "location_index": i + 1,
+                    }
+                )
 
-    logger.info("Average Scores:")
-    player_totals = {}
-    player_counts = {}
-    for entry in data:
-        player = entry["player"]
-        score = entry["gross_score"]
-        if player not in player_totals:
-            player_totals[player] = 0
-            player_counts[player] = 0
-        player_totals[player] += score
-        player_counts[player] += entry["num_guesses"]
-
-    player_average_count_triples = [
-        (player, player_totals[player] / player_counts[player], player_counts[player])
-        for player in player_totals
-    ]
-
-    player_average_count_triples.sort(key=lambda x: x[1], reverse=True)
-    for player, average_score, count in player_average_count_triples:
-        logger.info(f"{player}: {average_score:.2f} (played {count} rounds)")
+    df = pl.DataFrame(data)
+    average_scores = df.group_by("player").agg(
+        pl.col("score").mean().alias("average_score"),
+        pl.col("score").std().alias("std_dev_score"),
+        pl.count("score").alias("num_guesses"),
+    )
+    average_scores = average_scores.sort("average_score", descending=True)
+    logger.info(f"Average Gross Scores:\n\n{average_scores}\n")
 
 
 async def round_analysis(
