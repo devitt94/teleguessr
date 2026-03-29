@@ -3,7 +3,7 @@ from pathlib import Path
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-MAXIMUM_HANDICAP_MULTIPLIER = 0.4
+MAXIMUM_HANDICAP_MULTIPLIER = 0.5
 
 PLAYER_NAME_TO_TELEGRAM_ID = {
     "Bosnia & GetsTheGoldSweena": 8116505806,
