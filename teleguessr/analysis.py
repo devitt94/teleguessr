@@ -11,18 +11,7 @@ import dotenv
 from teleguessr.models import ChallengeResult
 from teleguessr.settings import get_settings
 from teleguessr.handicaps import get_latest_handicaps
-
-_STATS_PACKAGES_AVAILABLE = False
-
-try:
-    from teleguessr import stats  # noqa: F401
-    import polars as pl
-
-    _STATS_PACKAGES_AVAILABLE = True
-except ImportError:
-    logger.warning(
-        "Stats packages are not installed. Install them with 'pip install teleguessr[analysis]'."
-    )
+import polars as pl
 
 
 dotenv.load_dotenv()
@@ -208,12 +197,6 @@ async def handicap_analysis(
     include_legacy_rounds: bool = False,
 ):
     data = []
-
-    if not _STATS_PACKAGES_AVAILABLE:
-        logger.error(
-            "Extras are required for handicap analysis. Please install them with 'pip install teleguessr[analysis]'."
-        )
-        return
 
     current_handicaps = get_latest_handicaps()
 

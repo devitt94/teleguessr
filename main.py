@@ -7,7 +7,6 @@ import json
 
 from loguru import logger
 
-from teleguessr.analysis import average_scores, handicap_analysis, round_analysis
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.handicaps import calculate_new_handicaps
@@ -205,6 +204,17 @@ def analysis(
     ),
 ):
     """Run league analysis tools."""
+    try:
+        from teleguessr.analysis import (
+            average_scores,
+            handicap_analysis,
+            round_analysis,
+        )
+    except ImportError:
+        logger.warning(
+            "Analysis packages are not installed. Please install them with 'pip install teleguessr[analysis]'."
+        )
+        return
 
     if _type in (AnalysisType.AVERAGE_SCORES, AnalysisType.ALL):
         logger.info("Running average scores analysis...")
