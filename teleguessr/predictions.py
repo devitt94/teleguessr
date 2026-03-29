@@ -4,7 +4,8 @@ from pathlib import Path
 import numpy as np
 from loguru import logger
 
-from teleguessr.analysis import FitResult, fit_all_players, get_score_data
+from teleguessr.stats import FitResult, fit_all_players
+from teleguessr.analysis import get_score_data
 from teleguessr.awards import get_ranked_guesses
 from teleguessr.handicaps import get_latest_handicaps
 from teleguessr.league import LeagueState
