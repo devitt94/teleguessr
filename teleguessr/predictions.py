@@ -1,0 +1,227 @@
+import asyncio
+from pathlib import Path
+
+import numpy as np
+from loguru import logger
+
+from teleguessr.analysis import FitResult, fit_all_players, get_score_data
+from teleguessr.awards import get_ranked_guesses
+from teleguessr.handicaps import get_latest_handicaps
+from teleguessr.league import LeagueState
+
+import polars as pl
+
+from teleguessr.models import (
+    ChallengeResult,
+    ChallengeScore,
+    ChallengeSettings,
+    Guess,
+    Player,
+)
+from teleguessr.settings import LeagueSettings, get_settings
+from teleguessr.challenge_settings_generators import (
+    CHALLENGE_SETTINGS,
+    ChallengeSettingsGenerator,
+)
+
+
+def _simulate_round(
+    lognormal_fits: dict[str, FitResult],
+    hcaps: dict[str, float],
+    challenge_settings: ChallengeSettings,
+) -> ChallengeResult:
+    scores: list[ChallengeScore] = []
+    for player, fit in lognormal_fits.items():
+        handicap_multiplier = hcaps.get(player, 0.0)
+
+        player_guesses: list[Guess] = []
+        for i in range(challenge_settings.number_of_locations):
+            simulated_guess_distance = fit.simulate_guess()
+            simulated_guess_score = compute_geoguessr_score(simulated_guess_distance)
+            player_guesses.append(
+                Guess(score=simulated_guess_score, distance_km=simulated_guess_distance)
+            )
+
+        scores.append(
+            ChallengeScore(
+                player=Player(name=player, hcap_multiplier=handicap_multiplier),
+                guesses=player_guesses,
+            )
+        )
+
+    return ChallengeResult(
+        challenge_url="simulated", scores=scores, challenge_settings=challenge_settings
+    )
+
+
+def _simulate_league(
+    i: int,
+    lognormal_fits: dict[str, FitResult],
+    league_state: LeagueState,
+    challenge_settings_generator: ChallengeSettingsGenerator,
+    n_rounds: int,
+    hcaps: dict[str, float],
+) -> LeagueState:
+    for i in range(n_rounds):
+        challenge_settings = challenge_settings_generator(i)
+        round_result = _simulate_round(lognormal_fits, hcaps, challenge_settings)
+        ranked_guesses = get_ranked_guesses(round_result)
+        league_state.add_round_result(round_result)
+        league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
+    return league_state
+
+
+def simulate_league(
+    lognormal_fits: dict[str, FitResult],
+    n_sims: int,
+    league_settings: LeagueSettings,
+    hcaps: dict[str, float],
+    output_dir: Path,
+) -> pl.DataFrame:
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    league_final_leaderboards = []
+
+    logger.info(f"Running {n_sims} simulations")
+    challenge_settings_generator = CHALLENGE_SETTINGS[
+        league_settings.challenge_settings_name
+    ]
+
+    for i in range(n_sims):
+        league_state = LeagueState(
+            filepath="/tmp/simulated_league.json",
+            num_rounds=league_settings.number_of_rounds,
+        )
+        final_state: LeagueState = _simulate_league(
+            i,
+            lognormal_fits,
+            league_state,
+            challenge_settings_generator,
+            league_settings.number_of_rounds,
+            hcaps,
+        )
+        final_leaderboard = final_state.get_leaderboard_data()
+        player_scores = final_leaderboard["scores"]
+        league_final_leaderboards.append(player_scores)
+
+    df = pl.DataFrame(league_final_leaderboards)
+
+    return df
+
+
+def outright_win_probabilities(sim_df: pl.DataFrame):
+    """
+    Input dataframe contains a column for each player, and row i represents the player scores for simulation i.
+
+    Based on this, compute the probabilities of each player coming first.
+    """
+
+    player_cols = sim_df.columns
+
+    return (
+        sim_df.with_columns(
+            pl.Series(
+                [
+                    player_cols[max(range(len(player_cols)), key=lambda i: row[i])]
+                    for row in sim_df.select(player_cols).iter_rows()
+                ]
+            ).alias("player")
+        )
+        .group_by("player")
+        .agg((pl.len() / sim_df.height).alias("win_probability"))
+        .sort("win_probability", descending=True)
+    )
+
+
+def compute_geoguessr_score(distance_km: float) -> int:
+    k = 0.000539
+    return int(5000 * np.exp(-k * distance_km))
+
+
+def compute_h2h(
+    sim_df: pl.DataFrame, player_a: str, player_b: str
+) -> tuple[float, float, float]:
+    """Compute the win/draw/loss probabilities of player A vs player B based on the simulation results"""
+    if not (player_a in sim_df.columns and player_b in sim_df.columns):
+        raise ValueError(f"Player missing {player_a=} {player_b=} {sim_df.columns=}")
+
+    result = sim_df.select(
+        [
+            (pl.col(player_a) > pl.col(player_b)).mean().alias(f"{player_a}_W"),
+            (pl.col(player_a) == pl.col(player_b)).mean().alias("draws"),
+            (pl.col(player_a) < pl.col(player_b)).mean().alias(f"{player_b}_wins"),
+        ]
+    )
+    return result.row(0)
+
+
+if __name__ == "__main__":
+    N_SIMS = 10000
+    score_data: pl.DataFrame = asyncio.run(get_score_data(include_legacy_rounds=False))
+    settings = get_settings()
+    league_settings = settings.league
+    output_dir = settings.data_dir / "leagues" / "simulated"
+    hcaps = get_latest_handicaps(league_settings)
+
+    lognormal_fits = fit_all_players(score_data)
+
+    sim_results = simulate_league(
+        lognormal_fits,
+        n_sims=N_SIMS,
+        league_settings=league_settings,
+        hcaps=hcaps,
+        output_dir=output_dir,
+    )
+    outright_preds = outright_win_probabilities(sim_results)
+
+    # Join handicap and model fit data to preds table
+    all_df = outright_preds.with_columns(
+        pl.Series(
+            "handicap_multiplier",
+            [hcaps.get(player, 0.0) for player in outright_preds["player"]],
+        ),
+        pl.Series(
+            "mean_guess_distance_km",
+            [lognormal_fits[player].mean_km for player in outright_preds["player"]],
+        ),
+        pl.Series(
+            "median_guess_distance_km",
+            [lognormal_fits[player].median_km for player in outright_preds["player"]],
+        ),
+        pl.Series(
+            "num_guesses",
+            [lognormal_fits[player].n_rounds for player in outright_preds["player"]],
+        ),
+        pl.Series(
+            "fit_mu", [lognormal_fits[player].mu for player in outright_preds["player"]]
+        ),
+        pl.Series(
+            "fit_sigma",
+            [lognormal_fits[player].sigma for player in outright_preds["player"]],
+        ),
+    )
+
+    all_df = all_df.with_columns(
+        (pl.col("handicap_multiplier") * 100)
+        .round(0)
+        .cast(pl.String)
+        .alias("handicap_pct"),
+        (pl.col("win_probability") * 100).round(2).cast(pl.String).alias("win_pct"),
+        pl.col("mean_guess_distance_km").round(2).alias("mean_guess_distance_km"),
+        pl.col("median_guess_distance_km").round(2).alias("median_guess_distance_km"),
+    ).select(
+        "player",
+        "handicap_pct",
+        "win_pct",
+        "mean_guess_distance_km",
+        "median_guess_distance_km",
+    )
+
+    print(all_df)
+
+    players = sim_results.columns
+    import itertools
+
+    for p1, p2 in itertools.permutations(players, 2):
+        win, draw, loss = compute_h2h(sim_results, p1, p2)
+        print(f"{p1} vs {p2}: W={win}, D={draw}, L={loss}")

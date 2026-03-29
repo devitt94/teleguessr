@@ -19,7 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 analysis = [
+    "numpy>=2.4.3",
     "polars>=1.38.1",
+    "scipy>=1.17.1",
 ]
 
 [dependency-groups]
