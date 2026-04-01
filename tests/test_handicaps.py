@@ -96,6 +96,25 @@ def test_get_adjustments(num_players, expected_adjustments):
                 "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.01, 2),
             },
         ),
+        (
+            {"Bob": 2, "Charlie": 3, "Dave": 1},
+            {
+                "Alice": 0.00,
+                "Bob": 0.02,
+                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.02, 2),
+                "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.01, 2),
+            },
+        ),
+        (
+            {"Bob": 1, "Charlie": 2, "Dave": 3, "Eve": 4},
+            {
+                "Alice": 0.00,
+                "Bob": 0.00,
+                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.04, 2),
+                "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
+                "Eve": 0.02,
+            },
+        ),
     ],
 )
 def test_calculate_new_handicaps(
