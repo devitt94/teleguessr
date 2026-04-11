@@ -1,4 +1,6 @@
 import asyncio
+from copy import deepcopy
+import itertools
 from pathlib import Path
 
 import numpy as np
@@ -63,7 +65,7 @@ def _simulate_league(
     n_rounds: int,
     hcaps: dict[str, float],
 ) -> LeagueState:
-    for i in range(n_rounds):
+    while not league_state.is_finished:
         challenge_settings = challenge_settings_generator(i)
         round_result = _simulate_round(lognormal_fits, hcaps, challenge_settings)
         ranked_guesses = get_ranked_guesses(round_result)
@@ -77,10 +79,8 @@ def simulate_league(
     n_sims: int,
     league_settings: LeagueSettings,
     hcaps: dict[str, float],
-    output_dir: Path,
+    league_state_file: Path | None = None,
 ) -> pl.DataFrame:
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     league_final_leaderboards = []
 
     logger.info(f"Running {n_sims} simulations")
@@ -88,15 +88,31 @@ def simulate_league(
         league_settings.challenge_settings_name
     ]
 
-    for i in range(n_sims):
+    if league_state_file is None:
+        logger.info("No active league state found, simulating from scratch")
         league_state = LeagueState(
             filepath="/tmp/simulated_league.json",
             num_rounds=league_settings.number_of_rounds,
         )
+    else:
+        logger.info(f"Loading active league state from {league_state_file}")
+        league_state = LeagueState(
+            filepath=league_state_file, num_rounds=league_settings.number_of_rounds
+        )
+        league_state.load_from_file()
+        current_round = league_state.current_round_num
+        scores = league_state.get_leaderboard_data()["scores"]
+        logger.info(f"Simulating from state {current_round=} with {scores=}")
+
+    for i in range(n_sims):
+        sim_init_state: LeagueState = deepcopy(league_state)
+        if i % 100 == 0:
+            logger.info(f"Simulating league {i+1}/{n_sims}")
+
         final_state: LeagueState = _simulate_league(
             i,
             lognormal_fits,
-            league_state,
+            sim_init_state,
             challenge_settings_generator,
             league_settings.number_of_rounds,
             hcaps,
@@ -161,7 +177,13 @@ if __name__ == "__main__":
     score_data: pl.DataFrame = asyncio.run(get_score_data(include_legacy_rounds=False))
     settings = get_settings()
     league_settings = settings.league
-    output_dir = settings.data_dir / "leagues" / "simulated"
+    active_dir = settings.data_dir / "leagues" / "active"
+    try:
+        latest_active_league_file = sorted(active_dir.glob("*.json"), reverse=True)[0]
+    except IndexError:
+        logger.warning("No active league found.")
+        latest_active_league_file = None
+
     hcaps = get_latest_handicaps(league_settings)
 
     lognormal_fits = fit_all_players(score_data)
@@ -171,7 +193,7 @@ if __name__ == "__main__":
         n_sims=N_SIMS,
         league_settings=league_settings,
         hcaps=hcaps,
-        output_dir=output_dir,
+        league_state_file=latest_active_league_file,
     )
     outright_preds = outright_win_probabilities(sim_results)
 
@@ -220,9 +242,6 @@ if __name__ == "__main__":
 
     print(all_df)
 
-    players = sim_results.columns
-    import itertools
-
-    for p1, p2 in itertools.permutations(players, 2):
+    for p1, p2 in itertools.permutations(sim_results.columns, 2):
         win, draw, loss = compute_h2h(sim_results, p1, p2)
         print(f"{p1} vs {p2}: W={win}, D={draw}, L={loss}")
