@@ -62,6 +62,7 @@ async def initlise_bot_manager(
         data_dir=settings.data_dir,
         polling_interval_seconds=settings.polling_interval_seconds,
         league_settings=settings.league,
+        model_settings=settings.model,
         geoguessr_client=geoguessr_client,
     )
     await bot_manager.initialise()

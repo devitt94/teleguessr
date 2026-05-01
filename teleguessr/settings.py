@@ -34,6 +34,11 @@ class LeagueSettings(BaseModel):
     challenge_settings_name: str = "MIXED"
 
 
+class ModelSettings(BaseModel):
+    n_sims: int = 40_000
+    overround: float = 0.25
+
+
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", env_nested_delimiter="__"
@@ -47,6 +52,7 @@ class AppSettings(BaseSettings):
     telegram_players_lounge_group_id: int | None = None
 
     league: LeagueSettings
+    model: ModelSettings
 
 
 @lru_cache()

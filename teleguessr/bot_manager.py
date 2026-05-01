@@ -17,6 +17,7 @@ from teleguessr.formatters import (
     format_round_result_html,
     format_time,
 )
+from teleguessr.predictions import generate_outright_odds_predictions
 from teleguessr.replay import replay_league
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import (
@@ -28,6 +29,7 @@ from teleguessr.settings import (
     LeagueSettings,
     TELEGRAM_ID_TO_PLAYER_NAME,
     PLAYER_NAME_TO_TELEGRAM_ID,
+    ModelSettings,
 )
 from loguru import logger
 
@@ -63,6 +65,7 @@ class BotManager:
         data_dir: Path,
         polling_interval_seconds: int,
         league_settings: LeagueSettings,
+        model_settings: ModelSettings,
         geoguessr_client: GeoguessrClient,
     ):
         self.admin_id = admin_id
@@ -70,6 +73,7 @@ class BotManager:
         self.data_dir = data_dir
         self.polling_interval_seconds = polling_interval_seconds
         self.league_settings = league_settings
+        self.model_settings = model_settings
         self.league_state = None
         self.__initialised = False
         self.geoguessr_client = geoguessr_client
@@ -331,6 +335,26 @@ class BotManager:
             chat_id=chat_id,
             message_id=round_start_message.message_id,
             disable_notification=True,
+        )
+
+        await self.display_odds(context, chat_id)
+
+    async def display_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+        logger.info(f"Generating and sending odds update to chat {chat_id}.")
+        odds_df = await generate_outright_odds_predictions(
+            n_sims=self.model_settings.n_sims, overround=self.model_settings.overround
+        )
+        logger.info(f"Odds predictions generated\n\n{odds_df}")
+
+        odds_message = "📊 Current Odds:\n\n"
+        for row in odds_df.iter_rows(named=True):
+            player = row["player"]
+            odds = row["back_win_odds"]
+            odds_message += f"- {player}: {odds}\n"
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=odds_message,
         )
 
     async def get_ranked_guesses(self) -> list[RankedGuess]:

@@ -289,8 +289,10 @@ def compute_h2h(
     return result.row(0)
 
 
-def generate_outright_odds_predictions(n_sims: int, overround: float) -> pl.DataFrame:
-    score_data: pl.DataFrame = asyncio.run(get_score_data(include_legacy_rounds=False))
+async def generate_outright_odds_predictions(
+    n_sims: int, overround: float
+) -> pl.DataFrame:
+    score_data: pl.DataFrame = await get_score_data(include_legacy_rounds=False)
     settings = get_settings()
     league_settings = settings.league
     active_dir = settings.data_dir / "leagues" / "active"
@@ -389,5 +391,7 @@ def generate_outright_odds_predictions(n_sims: int, overround: float) -> pl.Data
 
 
 if __name__ == "__main__":
-    preds = generate_outright_odds_predictions(n_sims=40_000, overround=0.25)
+    preds = asyncio.run(
+        generate_outright_odds_predictions(n_sims=40_000, overround=0.25)
+    )
     print(preds)
