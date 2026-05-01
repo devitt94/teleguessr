@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from loguru import logger
 import numpy as np
 import polars as pl
@@ -11,18 +13,20 @@ M = 20015  # km
 # --- Model ---
 
 
-def neg_log_likelihood(params, data):
+def neg_log_likelihood(
+    params: np.ndarray,
+    distances: np.ndarray,
+    weights: np.ndarray,
+) -> float:
     mu, log_sigma = params
     sigma = np.exp(log_sigma)
-    log_data = np.log(data)
+
     a = (np.log(M) - mu) / sigma
-    ll = (
-        -np.sum(log_data)
-        - len(data) * np.log(sigma)
-        - np.sum((log_data - mu) ** 2) / (2 * sigma**2)
-        - len(data) * np.log(stats.norm.cdf(a))
-    )
-    return -ll
+    log_norm_const = np.log(stats.norm.cdf(a))
+
+    log_pdf = stats.lognorm.logpdf(distances, s=sigma, scale=np.exp(mu))
+    weighted_nll = -np.sum(weights * (log_pdf - log_norm_const))
+    return weighted_nll
 
 
 @dataclass
@@ -45,7 +49,7 @@ class FitResult:
 
 
 def fit_player(
-    player: str, distances: np.ndarray, min_rounds: int = 100
+    player: str, distances: np.ndarray, weights: np.ndarray, min_rounds: int = 100
 ) -> FitResult | None:
     """Fit truncated lognormal for a single player. Returns None if insufficient data."""
     distances = distances[(distances > 0) & (distances < M)]
@@ -62,7 +66,7 @@ def fit_player(
     result = optimize.minimize(
         neg_log_likelihood,
         x0=[mu0, np.log(max(sigma0, 1e-3))],
-        args=(distances,),
+        args=(distances, weights),
         method="L-BFGS-B",
     )
 
@@ -94,9 +98,27 @@ def fit_player(
 def fit_all_players(df: pl.DataFrame, min_rounds: int = 100) -> dict[str, FitResult]:
     results = {}
 
+    default_challenge_date = df["challenge_date"].min() - timedelta(days=7)
+    current_date = df["challenge_date"].max()
+    # Fill null challenge dates with the minimum date to avoid issues in grouping
+    df = df.with_columns(pl.col("challenge_date").fill_null(default_challenge_date))
+
+    df = df.with_columns(
+        ((current_date - pl.col("challenge_date")).dt.total_days() / 7).alias(
+            "weeks_ago"
+        )
+    )
+
+    df = df.with_columns(
+        pl.col("weeks_ago")
+        .map_elements(lambda x: 0.5 ** (x / 6))
+        .alias("decay_weight")  # half-life of 6 weeks
+    )
+
     for player, group in df.group_by("player"):
         distances = group["distance_km"].to_numpy()
-        fit = fit_player(player[0], distances, min_rounds=min_rounds)
+        weights = group["decay_weight"].to_numpy()
+        fit = fit_player(player[0], distances, weights, min_rounds=min_rounds)
         if fit is not None:
             results[player[0]] = fit
 

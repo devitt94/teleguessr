@@ -1,5 +1,7 @@
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
+from typing import Optional
 
 from loguru import logger
 
@@ -80,10 +82,15 @@ NAME_CHANGES = {
 def get_challenge_results_from_finished_leagues() -> list[ChallengeResult]:
     results = []
     for league_file in FINISHED_LEAGUES_DIR.glob("league_*.json"):
+        league_start_date = datetime.strptime(
+            league_file.stem.split("_")[1], "%Y%m%d"
+        ).date()
+
         with open(league_file, "r") as f:
             league_data = json.load(f)
-        for round_info in league_data["results"]:
-            results.append(ChallengeResult(**round_info))
+        for i, round_info in enumerate(league_data["results"]):
+            challenge_date = league_start_date + timedelta(days=i)
+            results.append((ChallengeResult(**round_info), challenge_date))
 
     return results
 
@@ -101,7 +108,7 @@ async def get_legacy_challenge_results(
 
 async def get_all_challenge_results(
     include_legacy_rounds: bool = False,
-) -> list[ChallengeResult]:
+) -> list[tuple[ChallengeResult, Optional[datetime.date]]]:
     results = get_challenge_results_from_finished_leagues()
     if include_legacy_rounds:
         logger.info("Including legacy rounds in analysis...")
@@ -110,7 +117,7 @@ async def get_all_challenge_results(
             ncfa_cookie=settings.geoguessr_ncfa_cookie
         )  # Add valid cookie if needed
         legacy_results = await get_legacy_challenge_results(client)
-        results.extend(legacy_results)
+        results.extend((result, None) for result in legacy_results)
 
     return results
 
@@ -121,7 +128,7 @@ async def get_score_data(
     results = await get_all_challenge_results(include_legacy_rounds)
 
     data = []
-    for round_result in results:
+    for round_result, challenge_date in results:
         if len(round_result.scores) < 3:
             logger.info(
                 f"Skipping challenge {round_result.challenge_url} due to insufficient players ({len(round_result.scores)})"
@@ -140,6 +147,7 @@ async def get_score_data(
                         "distance_km": guess.distance_km,
                         "challenge_id": round_result.challenge_url.split("/")[-1],
                         "round_index": i + 1,
+                        "challenge_date": challenge_date,
                     }
                 )
 
@@ -253,3 +261,9 @@ async def handicap_analysis(
     ).sort("fair_handicap_pct")
 
     logger.info(f"Fair Handicap Analysis:\n\n{average_scores}\n")
+
+
+def gross_score_needed(
+    handicap: float, net_score_to_beat: float, max_score: float = 50_000
+):
+    return (net_score_to_beat - (max_score * handicap)) / (1 - handicap)
