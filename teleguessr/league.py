@@ -127,6 +127,10 @@ class LeagueState(BaseModel):
         return len(self.results) + 1 if self.round_in_progress else len(self.results)
 
     @property
+    def start_date(self) -> date:
+        return datetime.strptime(self.filepath.stem.split("_")[-1], "%Y%m%d").date()
+
+    @property
     def last_round_finished_num(self) -> int:
         if self.results:
             return len(self.results)

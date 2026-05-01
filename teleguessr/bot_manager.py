@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 from pathlib import Path
 import traceback
 
@@ -90,9 +91,14 @@ class BotManager:
     def finished_league_dir(self) -> Path:
         return self.data_dir / "leagues" / "finished"
 
+    @property
+    def odds_dir(self) -> Path:
+        return self.data_dir / "odds"
+
     async def initialise(self):
         self.active_league_dir.mkdir(parents=True, exist_ok=True)
         self.finished_league_dir.mkdir(parents=True, exist_ok=True)
+        self.odds_dir.mkdir(parents=True, exist_ok=True)
 
         active_leagues = list(self.active_league_dir.glob("*.json"))
 
@@ -340,17 +346,35 @@ class BotManager:
         await self.display_odds(context, chat_id)
 
     async def display_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+        logger.info(
+            f"Writing empty odds file for round {self.league_state.current_round_num} to {self.odds_dir}."
+        )
+        odds_file = (
+            self.odds_dir
+            / f"league_{self.league_state.start_date:%Y%m%d}_round_{self.league_state.current_round_num}.json"
+        )
+
+        with odds_file.open("w") as f:
+            json.dump({}, f, indent=2)
+
         logger.info(f"Generating and sending odds update to chat {chat_id}.")
         odds_df = await generate_outright_odds_predictions(
             n_sims=self.model_settings.n_sims, overround=self.model_settings.overround
         )
         logger.info(f"Odds predictions generated\n\n{odds_df}")
+        odds_dict = dict(zip(odds_df["player"], odds_df["back_win_odds"]))
 
         odds_message = "📊 Current Odds:\n\n"
-        for row in odds_df.iter_rows(named=True):
-            player = row["player"]
-            odds = row["back_win_odds"]
+        for player, odds in odds_dict.items():
             odds_message += f"- {player}: {odds}\n"
+
+        decimal_odds_dict = dict(
+            zip(odds_df["player"], odds_df["back_win_odds_decimal"])
+        )
+
+        with odds_file.open("w") as f:
+            json.dump(decimal_odds_dict, f, indent=2)
+            logger.info(f"Saved decimal odds to {odds_file}")
 
         await context.bot.send_message(
             chat_id=chat_id,

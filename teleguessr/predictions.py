@@ -289,6 +289,14 @@ def compute_h2h(
     return result.row(0)
 
 
+def fractional_odds_to_decimal(odds: str) -> float:
+    try:
+        numerator, denominator = map(float, odds.split("/"))
+    except Exception:
+        return float("nan")
+    return numerator / denominator + 1
+
+
 async def generate_outright_odds_predictions(
     n_sims: int, overround: float
 ) -> pl.DataFrame:
@@ -385,6 +393,12 @@ async def generate_outright_odds_predictions(
         "back_win_pct",
         "adjusted_win_probability_multiplicative",
         "adjusted_win_probability_additive",
+    )
+
+    all_df = all_df.with_columns(
+        pl.col("back_win_odds")
+        .map_elements(fractional_odds_to_decimal)
+        .alias("back_win_odds_decimal")
     )
 
     return all_df
