@@ -289,9 +289,7 @@ def compute_h2h(
     return result.row(0)
 
 
-if __name__ == "__main__":
-    N_SIMS = 40_000
-    OVERROUND = 0.25
+def generate_outright_odds_predictions(n_sims: int, overround: float) -> pl.DataFrame:
     score_data: pl.DataFrame = asyncio.run(get_score_data(include_legacy_rounds=False))
     settings = get_settings()
     league_settings = settings.league
@@ -308,7 +306,7 @@ if __name__ == "__main__":
 
     sim_results = simulate_league(
         lognormal_fits,
-        n_sims=N_SIMS,
+        n_sims=n_sims,
         league_settings=league_settings,
         hcaps=hcaps,
         league_state_file=latest_active_league_file,
@@ -342,10 +340,10 @@ if __name__ == "__main__":
         ),
     )
 
-    additive_overround_per_runner = OVERROUND / all_df.height
+    additive_overround_per_runner = overround / all_df.height
 
     all_df = all_df.with_columns(
-        (pl.col("win_probability") * (1 + OVERROUND)).alias(
+        (pl.col("win_probability") * (1 + overround)).alias(
             "adjusted_win_probability_multiplicative"
         ),
         (pl.col("win_probability") + additive_overround_per_runner).alias(
@@ -387,9 +385,9 @@ if __name__ == "__main__":
         "adjusted_win_probability_additive",
     )
 
-    # Print the player and adjusted_win_odds columns only
-    print(all_df)
+    return all_df
 
-    # for p1, p2 in itertools.permutations(sim_results.columns, 2):
-    #     win, draw, loss = compute_h2h(sim_results, p1, p2)
-    #     print(f"{p1} vs {p2}: W={win}, D={draw}, L={loss}")
+
+if __name__ == "__main__":
+    preds = generate_outright_odds_predictions(n_sims=40_000, overround=0.25)
+    print(preds)
