@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
-import json
 from pathlib import Path
 import traceback
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application as TelegramApp
+from telegram.ext import Application as TelegramApp, ConversationHandler
 
 from teleguessr.awards import get_ranked_guesses
+from teleguessr.bets import BetManager
 from teleguessr.challenge_settings_generators import (
     CHALLENGE_SETTINGS,
     ChallengeSettingsGenerator,
@@ -44,6 +44,8 @@ from teleguessr.ranks import get_ranks_from_scores
 from telegram.ext import ContextTypes
 
 
+BET_SELECT_PLAYER, BET_SELECT_AMOUNT = range(2)
+
 NUMBER_EMOJI_MAP = {
     1: "1️⃣",
     2: "2️⃣",
@@ -76,6 +78,7 @@ class BotManager:
         self.league_settings = league_settings
         self.model_settings = model_settings
         self.league_state = None
+        self.bet_manager = None
         self.__initialised = False
         self.geoguessr_client = geoguessr_client
 
@@ -91,14 +94,9 @@ class BotManager:
     def finished_league_dir(self) -> Path:
         return self.data_dir / "leagues" / "finished"
 
-    @property
-    def odds_dir(self) -> Path:
-        return self.data_dir / "odds"
-
     async def initialise(self):
         self.active_league_dir.mkdir(parents=True, exist_ok=True)
         self.finished_league_dir.mkdir(parents=True, exist_ok=True)
-        self.odds_dir.mkdir(parents=True, exist_ok=True)
 
         active_leagues = list(self.active_league_dir.glob("*.json"))
 
@@ -117,6 +115,12 @@ class BotManager:
             logger.info("No active league found.")
 
         self.handicaps = get_latest_handicaps(self.league_settings)
+
+        self.bet_manager = BetManager(
+            model_settings=self.model_settings,
+            data_dir=self.data_dir,
+            league_date=datetime.now().date(),
+        )
 
         self.__initialised = True
 
@@ -347,15 +351,11 @@ class BotManager:
 
     async def display_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         logger.info(
-            f"Writing empty odds file for round {self.league_state.current_round_num} to {self.odds_dir}."
+            f"Writing empty odds file for round {self.league_state.current_round_num}"
         )
-        odds_file = (
-            self.odds_dir
-            / f"league_{self.league_state.start_date:%Y%m%d}_round_{self.league_state.current_round_num}.json"
+        self.bet_manager.update_odds(
+            round_num=self.league_state.current_round_num, odds={}
         )
-
-        with odds_file.open("w") as f:
-            json.dump({}, f, indent=2)
 
         logger.info(f"Generating and sending odds update to chat {chat_id}.")
         odds_df = await generate_outright_odds_predictions(
@@ -368,13 +368,14 @@ class BotManager:
         for player, odds in odds_dict.items():
             odds_message += f"- {player}: {odds}\n"
 
-        decimal_odds_dict = dict(
-            zip(odds_df["player"], odds_df["back_win_odds_decimal"])
+        decimal_odds_dict = {
+            player: odds
+            for player, odds in zip(odds_df["player"], odds_df["back_win_odds_decimal"])
+            if odds > 1.0
+        }
+        self.bet_manager.update_odds(
+            round_num=self.league_state.current_round_num, odds=decimal_odds_dict
         )
-
-        with odds_file.open("w") as f:
-            json.dump(decimal_odds_dict, f, indent=2)
-            logger.info(f"Saved decimal odds to {odds_file}")
 
         await context.bot.send_message(
             chat_id=chat_id,
@@ -977,186 +978,7 @@ class BotManager:
 
         await update.message.reply_text(message)
 
-    async def get_current_odds(self) -> dict[str, float] | None:
-        if self.league_state is None or self.league_state.is_finished:
-            return None
-
-        odds_file = (
-            self.odds_dir
-            / f"league_{self.league_state.start_date:%Y%m%d}_round_{self.league_state.current_round_num}.json"
-        )
-
-        if not odds_file.exists():
-            logger.warning(f"Odds file {odds_file} does not exist.")
-            return None
-
-        with odds_file.open("r") as f:
-            odds_dict = json.load(f)
-
-        return odds_dict
-
-    async def bet_selection_callback_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
-        query = update.callback_query
-        await query.answer()
-        logger.info(
-            f"Received selection callback with data: {query.data} from user {update.effective_user.id}"
-        )
-
-        selected_answer = query.data
-
-        if selected_answer.startswith("bet_amount_"):
-            logger.info(
-                f"Received bet amount selection: {selected_answer} from user {update.effective_user.id}, ignoring in player selection handler."
-            )
-
-            bet_amount_str, selected_player = selected_answer[
-                len("bet_amount_") :
-            ].split("_", 1)
-            try:
-                bet_amount = float(bet_amount_str)
-            except ValueError:
-                logger.warning(
-                    f"Invalid bet amount received: {bet_amount_str} from user {update.effective_user.id}"
-                )
-                await query.edit_message_text(
-                    "Invalid bet amount selected. Please try again."
-                )
-                return
-            bettor = TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id)
-            if bettor is None:
-                await query.edit_message_text(
-                    "You are not registered as a player in this league and cannot place bets."
-                )
-                return
-            odds_dict = await self.get_current_odds()
-            if odds_dict is None or selected_player not in odds_dict:
-                await query.edit_message_text(
-                    "Sorry, betting odds are not available at the moment. Please try again later."
-                )
-                return
-            selected_odds = odds_dict[selected_player]
-            potential_profit = bet_amount * (selected_odds - 1)
-            logger.info(
-                f"Player {bettor} placed a bet of €{bet_amount:.2f} on {selected_player} with odds {selected_odds:.2f}, potential profit: €{potential_profit:.2f}"
-            )
-            await query.edit_message_text(
-                f"Bet placed!\n"
-                f"You bet €{bet_amount:.2f} on {selected_player} with odds {selected_odds:.2f}.\n"
-            )
-
-        elif selected_answer.startswith("player_"):
-            selected_player = selected_answer[len("player_") :]
-            odds_dict = await self.get_current_odds()
-
-            if odds_dict is None or selected_player not in odds_dict:
-                await query.edit_message_text(
-                    "Sorry, betting odds are not available at the moment. Please try again later."
-                )
-                return
-
-            bettor = TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id)
-            if bettor is None:
-                await query.edit_message_text(
-                    "You are not registered as a player in this league and cannot place bets."
-                )
-                return
-
-            bet_on_self = bettor == selected_player
-            selected_odds = odds_dict[selected_player]
-            bettor_odds = odds_dict.get(bettor)
-            logger.info(
-                f"Player {bettor} selected {selected_player} with odds {selected_odds:.2f}. Bettor's own odds: {bettor_odds:.2f} if available."
-            )
-            if bettor_odds is None:
-                await query.edit_message_text(
-                    "Your betting odds are not available at the moment. Please try again later."
-                )
-                return
-            elif (
-                bettor_odds < self.model_settings.min_odds_for_other_bet
-                and not bet_on_self
-            ):
-                await query.edit_message_text(
-                    f"You cannot place a bet on another player if your odds are below {self.model_settings.min_odds_for_other_bet:.2f}."
-                )
-                return
-
-            max_profit = (
-                self.model_settings.max_profit_self_bet
-                if bet_on_self
-                else self.model_settings.max_profit_non_self_bet
-            )
-            max_stake = max_profit / (selected_odds - 1)
-            min_stake = self.model_settings.min_profit_bet / (selected_odds - 1)
-            logger.info(
-                f"Calculated max stake: {max_stake:.2f} and min stake: {min_stake:.2f} for selected player {selected_player} with odds {selected_odds:.2f}. Bet on self: {bet_on_self}"
-            )
-
-            bet_amounts = [
-                0.1,
-                0.2,
-                0.3,
-                0.5,
-                1,
-                2,
-                3,
-                5,
-                7,
-                10,
-                15,
-                20,
-                25,
-                30,
-                35,
-                40,
-                45,
-                50,
-                60,
-                70,
-                80,
-                90,
-                100,
-                120,
-                140,
-                160,
-                180,
-                200,
-            ]
-            bet_amounts = [
-                amount for amount in bet_amounts if min_stake <= amount <= max_stake
-            ]
-            if bet_amounts[-1] != max_stake:
-                bet_amounts.append(round(max_stake, 2))
-
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        f"€{amount}",
-                        callback_data=f"bet_amount_{amount}_{selected_player}",
-                    )
-                ]
-                for amount in bet_amounts
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await query.edit_message_text(
-                f"You selected *{selected_player}*\nHow much would you like to bet?",
-                reply_markup=reply_markup,
-                parse_mode="Markdown",
-            )
-
-        else:
-            logger.warning(
-                f"Received unknown callback data: {selected_answer} from user {update.effective_user.id}"
-            )
-            return
-
-    async def bet_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def start_bet(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
 
@@ -1166,9 +988,8 @@ class BotManager:
             )
             return
 
-        user_id = update.effective_user.id
-
-        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(user_id)
+        player_id = update.effective_user.id
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
 
         if player_name is None:
             await update.message.reply_text(
@@ -1183,38 +1004,94 @@ class BotManager:
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        round_status = await self.player_round_status(round_result)
-        player_score = round_status.get(player_name)
-
-        if player_score is not None:
+        players_played = await self.player_round_status(round_result)
+        if players_played.get(player_name) is not None:
             await update.message.reply_text(
-                "You have already played this round. Betting is only available before you have played."
+                "You have already played this round, so you cannot place bets. Please wait for the next round to start."
             )
             return
 
-        odds = await self.get_current_odds()
-
+        odds = self.bet_manager.get_latest_odds(self.league_state.current_round_num)
         if not odds:
             await update.message.reply_text(
-                "Betting odds are not available at the moment. Please try again later."
+                "Betting is not currently available for this round. Please try again later."
             )
             return
 
-        logger.info(
-            f"Presenting betting options to player {player_name} with odds: {odds}"
+        keyboard = [
+            [InlineKeyboardButton(f"{player} ({odd:.2f})", callback_data=player)]
+            for player, odd in odds.items()
+        ]
+        await update.message.reply_text(
+            "Who would you like to bet on?", reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return BET_SELECT_PLAYER
+
+    async def handle_player_selection(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+        query = update.callback_query
+        await query.answer()
+
+        context.user_data["bet_player"] = query.data
+        odds = self.bet_manager.get_latest_odds(self.league_state.current_round_num)
+        runner_odds = odds.get(query.data)
+        if runner_odds is None:
+            await query.edit_message_text(
+                f"Sorry, odds for {query.data} are not available. Please try again later."
+            )
+            return ConversationHandler.END
+
+        context.user_data["bet_odds"] = runner_odds
+        valid_bet_amounts = self.bet_manager.calculate_bet_amounts(
+            bettor=TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id),
+            runner=query.data,
+            odds=runner_odds,
         )
 
-        # Add reply keyboard with player options
+        if not valid_bet_amounts:
+            await query.edit_message_text(
+                f"Sorry, you cannot place a bet on {query.data} at the moment. Please try again later."
+            )
+            return ConversationHandler.END
+
         keyboard = [
-            [
-                InlineKeyboardButton(
-                    f"{player} ({podds:.2f})", callback_data=f"player_{player}"
-                )
-            ]
-            for player, podds in odds.items()
+            [InlineKeyboardButton(f"€{amount}", callback_data=str(amount))]
+            for amount in valid_bet_amounts
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            "Who would you like to bet on?",
-            reply_markup=reply_markup,
+        await query.edit_message_text(
+            f"Selected: *{query.data}*\nHow much would you like to bet?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
         )
+        return BET_SELECT_AMOUNT  # ← move to next state
+
+    async def handle_amount_selection(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+        query = update.callback_query
+        await query.answer()
+
+        player = context.user_data["bet_player"]
+        bet_odds = context.user_data["bet_odds"]
+        amount = float(query.data)
+
+        self.bet_manager.place_bet(
+            bettor=TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id),
+            runner=player,
+            amount=amount,
+            odds=bet_odds,
+        )
+
+        await query.edit_message_text(
+            f"✅ Bet placed on *{player}* for €{amount} at {bet_odds:.2f} odds!\n"
+            f"Potential profit: €{amount * (bet_odds - 1):.2f}\n",
+            parse_mode="Markdown",
+        )
+        return ConversationHandler.END  # ← end the conversation
+
+    async def cancel_bet(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+        await update.message.reply_text("Bet cancelled.")
+        return ConversationHandler.END

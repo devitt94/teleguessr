@@ -14,11 +14,12 @@ from teleguessr.league import get_last_finished_league_date
 from teleguessr.ranks import get_ranks_from_scores
 from teleguessr.replay import replay_league
 from teleguessr.settings import AppSettings, get_settings
-from teleguessr.bot_manager import BotManager
+from teleguessr.bot_manager import BET_SELECT_AMOUNT, BET_SELECT_PLAYER, BotManager
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
     CommandHandler,
+    ConversationHandler,
 )
 import typer
 
@@ -78,6 +79,19 @@ def main(test_mode: bool = False):
     bot_manager = asyncio.run(initlise_bot_manager(settings, test_mode))
     logger.info("BotManager initialised.")
 
+    bet_handler = ConversationHandler(
+        entry_points=[CommandHandler("bet", bot_manager.start_bet)],
+        states={
+            BET_SELECT_PLAYER: [
+                CallbackQueryHandler(bot_manager.handle_player_selection)
+            ],
+            BET_SELECT_AMOUNT: [
+                CallbackQueryHandler(bot_manager.handle_amount_selection)
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", bot_manager.cancel_bet)],
+    )
+
     app = ApplicationBuilder().token(settings.telegram_bot_token).build()
     app.add_handler(CommandHandler("help", bot_manager.help_handler))
     app.add_handler(CommandHandler("startleague", bot_manager.start_league_handler))
@@ -86,8 +100,7 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("handicaps", bot_manager.handicaps_handler))
     app.add_handler(CommandHandler("status", bot_manager.status_handler))
     app.add_handler(CommandHandler("lounge", bot_manager.lounge_handler))
-    app.add_handler(CommandHandler("bet", bot_manager.bet_handler))
-    app.add_handler(CallbackQueryHandler(bot_manager.bet_selection_callback_handler))
+    app.add_handler(bet_handler)
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")
 
