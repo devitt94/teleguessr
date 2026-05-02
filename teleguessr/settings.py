@@ -37,6 +37,10 @@ class LeagueSettings(BaseModel):
 class ModelSettings(BaseModel):
     n_sims: int = 40_000
     overround: float = 0.25
+    max_profit_self_bet: float = 200.0
+    max_profit_non_self_bet: float = 50.0
+    min_odds_for_other_bet: float = 4.0
+    min_profit_bet: float = 5.0
 
 
 class AppSettings(BaseSettings):
