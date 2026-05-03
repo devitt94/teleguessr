@@ -1,6 +1,8 @@
+from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
+from teleguessr.models import Bet
 from teleguessr.settings import ModelSettings
 
 from loguru import logger
@@ -69,20 +71,27 @@ class BetManager:
 
         return odds_data
 
+    def get_all_bets(self) -> list[Bet]:
+        bets_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
+        if not bets_file.exists():
+            return []
+        with open(bets_file, "r") as f:
+            bets_data = json.load(f)
+        return [Bet(**bet) for bet in bets_data]
+
     def get_current_position(self, bettor: str, runner: str) -> float:
         bets_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
         if not bets_file.exists():
             return 0.0
-        with open(bets_file, "r") as f:
-            bets_data = json.load(f)
+        bets = self.get_all_bets()
         position = 0.0
-        for bet in bets_data:
-            if bet["bettor"] != bettor:
+        for bet in bets:
+            if bet.bettor != bettor:
                 continue
-            if bet["runner"] == runner:
-                position += bet["amount"] * (bet["odds"] - 1)
+            if bet.runner == runner:
+                position += bet.stake * (bet.odds - 1)
             else:
-                position -= bet["amount"]
+                position -= bet.stake
 
         return position
 
@@ -134,13 +143,12 @@ class BetManager:
             json.dump(odds, f, indent=2)
 
     def place_bet(self, bettor: str, runner: str, amount: float, odds: float) -> None:
-        bet_data = {
-            "bettor": bettor,
-            "runner": runner,
-            "amount": amount,
-            "odds": odds,
-            "return": amount * odds,
-        }
+        bet = Bet(
+            bettor=bettor,
+            runner=runner,
+            stake=amount,
+            odds=odds,
+        )
         bet_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
         if bet_file.exists():
             with bet_file.open("r") as f:
@@ -148,6 +156,25 @@ class BetManager:
         else:
             existing_bets = []
 
-        existing_bets.append(bet_data)
+        existing_bets.append(bet.model_dump())
         with bet_file.open("w") as f:
             json.dump(existing_bets, f, indent=2)
+
+    def compute_bet_pnls(self, winner: str) -> dict[str, float]:
+        bet_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
+        if not bet_file.exists():
+            logger.info(f"No bets placed for league {self.league_date}.")
+            return {}
+
+        with bet_file.open("r") as f:
+            bets: list[Bet] = [Bet(**bet) for bet in json.load(f)]
+
+        pnls = defaultdict(float)
+        for bet in bets:
+            bettor = bet.bettor
+            if bet.runner == winner:
+                pnls[bettor] += bet.potential_profit
+            else:
+                pnls[bettor] -= bet.stake
+
+        return dict(pnls)

@@ -116,11 +116,12 @@ class BotManager:
 
         self.handicaps = get_latest_handicaps(self.league_settings)
 
-        self.bet_manager = BetManager(
-            model_settings=self.model_settings,
-            data_dir=self.data_dir,
-            league_date=datetime.now().date(),
-        )
+        if self.league_state is not None:
+            self.bet_manager = BetManager(
+                model_settings=self.model_settings,
+                data_dir=self.data_dir,
+                league_date=self.league_state.start_date,
+            )
 
         self.__initialised = True
 
@@ -150,10 +151,10 @@ class BotManager:
             "🤖 <b>Teleguessr Bot Commands</b> 🤖\n\n"
             "/startleague - Start a new league (admin only)\n"
             "/endround - End the current round (admin only)\n"
-            "/undo - Undo the last round (admin only)\n"
             "/status - Get the current status of the league and your round\n"
             "/handicaps - Show current handicaps\n"
             "/lounge - Get an invite to the Players' Lounge group chat (after playing your round)\n"
+            "/bet - Place a bet on the league winner\n"
             "/help - Show this help message\n\n"
         )
 
@@ -188,6 +189,12 @@ class BotManager:
         self.league_state = LeagueState(
             filepath=league_filepath,
             num_rounds=self.league_settings.number_of_rounds,
+        )
+
+        self.bet_manager = BetManager(
+            model_settings=self.model_settings,
+            data_dir=self.data_dir,
+            league_date=self.league_state.start_date,
         )
 
         logger.info(f"Starting new league at {league_filepath.absolute()}")
@@ -368,6 +375,7 @@ class BotManager:
         for player, odds in odds_dict.items():
             odds_message += f"- {player}: {odds}\n"
 
+        odds_message += "\n Use /bet to place your bets!"
         decimal_odds_dict = {
             player: odds
             for player, odds in zip(odds_df["player"], odds_df["back_win_odds_decimal"])
@@ -632,35 +640,6 @@ class BotManager:
 
         await self.end_round(context, update.effective_chat.id)
 
-    async def undo_last_round_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
-        if update.effective_user.id != self.admin_id:
-            await update.message.reply_text(
-                "You are not authorized to use this command."
-            )
-            return
-
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text("No active league.")
-            return
-
-        try:
-            self.league_state.undo_last_round()
-        except ValueError as e:
-            await update.message.reply_text(str(e))
-            return
-
-        logger.info(
-            f"Undid last round. Current round is now {self.league_state.current_round_num}."
-        )
-        await update.message.reply_text(
-            f"Last round undone. Current round is now {self.league_state.current_round_num}."
-        )
-
     async def end_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         if chat_id is None:
             raise ValueError("chat_id must be provided to end_round")
@@ -733,6 +712,24 @@ class BotManager:
             )
 
             gross_replay_league_state.filepath.unlink(missing_ok=True)
+
+            # Comupute bet P&L and send final bet results
+            bet_pnls = self.bet_manager.compute_bet_pnls(
+                winner=winner,
+            )
+
+            if bet_pnls:
+                bet_results_message = "💰 Bet Results:\n\n"
+                for player, pnl in bet_pnls.items():
+                    pnl_str = f"+€{pnl:.2f}" if pnl > 0 else f"-€{pnl:.2f}"
+                    bet_results_message += f"- {player}: {pnl_str}\n"
+
+                await context.bot.send_message(
+                    chat_id,
+                    bet_results_message,
+                )
+            else:
+                logger.info("No bets placed, skipping bet results message.")
 
             logger.info(
                 "Leageue finished, ending league and moving file to finished directory."
@@ -1077,7 +1074,7 @@ class BotManager:
         amount = float(query.data)
 
         self.bet_manager.place_bet(
-            bettor=TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id),
+            bettor=TELEGRAM_ID_TO_PLAYER_NAME[update.effective_user.id],
             runner=player,
             amount=amount,
             odds=bet_odds,

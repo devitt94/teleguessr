@@ -118,3 +118,18 @@ class ChallengeResult(BaseModel):
 class AbbreviatedRoundScore(BaseModel):
     rank: int
     net_score: int
+
+
+class Bet(BaseModel):
+    bettor: str
+    runner: str
+    stake: float
+    odds: float
+
+    @property
+    def potential_profit(self) -> float:
+        return self.stake * (self.odds - 1)
+
+    @property
+    def potential_return(self) -> float:
+        return self.stake * self.odds
