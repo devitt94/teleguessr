@@ -266,4 +266,9 @@ async def handicap_analysis(
 def gross_score_needed(
     handicap: float, net_score_to_beat: float, max_score: float = 50_000
 ):
-    return (net_score_to_beat - (max_score * handicap)) / (1 - handicap)
+    max_adjustment = max_score * handicap // 2
+    print(f"Max adjustment: {max_adjustment}")
+    if (max_score // 2) + max_adjustment > net_score_to_beat:
+        return net_score_to_beat - max_adjustment
+    else:
+        return (net_score_to_beat - (max_score * handicap)) / (1 - handicap)
