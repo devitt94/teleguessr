@@ -1,5 +1,6 @@
 import asyncio
 from copy import deepcopy
+import json
 from pathlib import Path
 
 import numpy as np
@@ -312,7 +313,15 @@ async def generate_outright_odds_predictions(
 
     hcaps = get_latest_handicaps(league_settings)
 
-    lognormal_fits = fit_all_players(score_data)
+    adjustments_file = settings.data_dir / "adjustments" / "adjustments.json"
+    if adjustments_file.exists():
+        with open(adjustments_file, "r") as f:
+            adjustments = json.load(f)
+    else:
+        adjustments = {}
+
+    logger.info(f"Using adjustments: {adjustments}")
+    lognormal_fits = fit_all_players(score_data, adjustments=adjustments)
 
     sim_results = simulate_league(
         lognormal_fits,

@@ -49,10 +49,18 @@ class FitResult:
 
 
 def fit_player(
-    player: str, distances: np.ndarray, weights: np.ndarray, min_rounds: int = 100
+    player: str,
+    distances: np.ndarray,
+    weights: np.ndarray,
+    min_rounds: int = 100,
+    adjustment: float = 0.0,
 ) -> FitResult | None:
     """Fit truncated lognormal for a single player. Returns None if insufficient data."""
     distances = distances[(distances > 0) & (distances < M)]
+
+    if adjustment != 0.0:
+        logger.info(f"Applying adjustment of {adjustment} to player {player}")
+        distances = distances * (1 + adjustment)  # Apply any player-specific adjustment
 
     if len(distances) < min_rounds:
         logger.info(
@@ -95,7 +103,9 @@ def fit_player(
     )
 
 
-def fit_all_players(df: pl.DataFrame, min_rounds: int = 100) -> dict[str, FitResult]:
+def fit_all_players(
+    df: pl.DataFrame, adjustments: dict[str, float] = None, min_rounds: int = 100
+) -> dict[str, FitResult]:
     results = {}
 
     default_challenge_date = df["challenge_date"].min() - timedelta(days=7)
@@ -118,7 +128,14 @@ def fit_all_players(df: pl.DataFrame, min_rounds: int = 100) -> dict[str, FitRes
     for player, group in df.group_by("player"):
         distances = group["distance_km"].to_numpy()
         weights = group["decay_weight"].to_numpy()
-        fit = fit_player(player[0], distances, weights, min_rounds=min_rounds)
+        player_adjustment = adjustments.get(player[0], 0.0)
+        fit = fit_player(
+            player[0],
+            distances,
+            weights,
+            min_rounds=min_rounds,
+            adjustment=player_adjustment,
+        )
         if fit is not None:
             results[player[0]] = fit
 
