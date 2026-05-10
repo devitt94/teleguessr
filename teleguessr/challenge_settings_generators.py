@@ -6,6 +6,7 @@ from teleguessr.models import ChallengeSettings
 CLASSIC_WORLD_MAP_ID = "WORLD"
 COMMUNITY_WORLD_MAP_ID = "62a44b22040f04bd36e8a914"
 MOVING_WORLD_MAP_ID = "696fe47c5b07bed052077a95"
+URBAN_WORLD_MAP_ID = "640d01bf1b14982128374759"
 
 
 class ChallengeSettingsGenerator(Protocol):
@@ -42,7 +43,7 @@ def mixed_challenge_settings_generator(round_number: int) -> ChallengeSettings:
     if round_number == 1:
         return ChallengeSettings(
             time_limit_seconds=90,
-            map_id=MOVING_WORLD_MAP_ID,
+            map_id=URBAN_WORLD_MAP_ID,
             pan_allowed=True,
             zoom_allowed=True,
             move_allowed=True,
