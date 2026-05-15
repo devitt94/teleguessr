@@ -99,6 +99,7 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("handicaps", bot_manager.handicaps_handler))
     app.add_handler(CommandHandler("status", bot_manager.status_handler))
     app.add_handler(CommandHandler("lounge", bot_manager.lounge_handler))
+    app.add_handler(CommandHandler("odds", bot_manager.odds_handler))
     app.add_handler(bet_handler)
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")

@@ -163,6 +163,18 @@ class BotManager:
             parse_mode="HTML",
         )
 
+    async def odds_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            await update.message.reply_text(
+                "No active league. Start a new league with /startleague."
+            )
+            return
+
+        await self.display_odds(context, chat_id=update.effective_chat.id)
+
     async def start_league_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -350,7 +362,13 @@ class BotManager:
 
         await self.display_odds(context, chat_id)
 
-    async def display_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    async def update_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            raise RuntimeError("No active league.")
+
         logger.info(
             f"Writing empty odds file for round {self.league_state.current_round_num}"
         )
@@ -365,20 +383,38 @@ class BotManager:
         logger.info(f"Odds predictions generated\n\n{odds_df}")
         odds_dict = dict(zip(odds_df["player"], odds_df["back_win_odds"]))
 
+        decimal_odds_dict = {
+            player: odds for player, odds in odds_dict.items() if odds > 1.0
+        }
+        self.bet_manager.update_odds(
+            round_num=self.league_state.current_round_num, odds=decimal_odds_dict
+        )
+        odds_message = await self.create_odds_message(odds_dict=odds_dict)
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=odds_message,
+        )
+
+    async def create_odds_message(self, odds_dict: dict[str, float]) -> str:
         odds_message = "📊 Current Odds:\n\n"
         for player, odds in odds_dict.items():
             odds_message += f"- {player}: {odds}\n"
 
         odds_message += "\n Use /bet to place your bets!"
-        decimal_odds_dict = {
-            player: odds
-            for player, odds in zip(odds_df["player"], odds_df["back_win_odds_decimal"])
-            if odds > 1.0
-        }
-        self.bet_manager.update_odds(
-            round_num=self.league_state.current_round_num, odds=decimal_odds_dict
-        )
+        return odds_message
 
+    async def display_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+        latest_odds = self.bet_manager.get_latest_odds(
+            league_round=self.league_state.current_round_num
+        )
+        if not latest_odds:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="Odds have not been generated yet for this round. Please check back soon!",
+            )
+            return
+        odds_message = await self.create_odds_message(odds_dict=latest_odds)
         await context.bot.send_message(
             chat_id=chat_id,
             text=odds_message,
