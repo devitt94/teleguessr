@@ -136,7 +136,7 @@ class BotManager:
         if not self.league_state.round_in_progress:
             logger.info("No round in progress to resume tasks for. Starting new round.")
             chat_id = self.league_state.chat_id
-            await self.start_round(app.context_types.DEFAULT_TYPE, chat_id=chat_id)
+            await self.start_round(app, chat_id=chat_id)
             return
 
         logger.info("Resuming round update polling for active round.")
@@ -327,12 +327,6 @@ class BotManager:
         logger.info(
             f"Started round {self.league_state.current_round_num} with challenge URL: {challenge_url}. "
             f"Round ends in {round_ends_in_seconds} seconds."
-        )
-
-        context.job_queue.run_repeating(
-            self.poll_for_round_updates,
-            interval=self.polling_interval_seconds,
-            first=0,
         )
 
         self.league_state.save()
