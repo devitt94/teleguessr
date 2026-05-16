@@ -83,10 +83,12 @@ def main(test_mode: bool = False):
         entry_points=[CommandHandler("bet", bot_manager.start_bet)],
         states={
             BET_SELECT_PLAYER: [
-                CallbackQueryHandler(bot_manager.handle_player_selection)
+                CallbackQueryHandler(bot_manager.handle_player_selection),
+                CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
             ],
             BET_SELECT_AMOUNT: [
-                CallbackQueryHandler(bot_manager.handle_amount_selection)
+                CallbackQueryHandler(bot_manager.handle_amount_selection),
+                CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
             ],
         },
         fallbacks=[CommandHandler("cancel", bot_manager.cancel_bet)],

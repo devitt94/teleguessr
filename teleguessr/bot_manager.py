@@ -1074,6 +1074,7 @@ class BotManager:
             [InlineKeyboardButton(f"{player} ({odd.formatted})", callback_data=player)]
             for player, odd in odds.items()
         ]
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel")])
         await update.message.reply_text(
             "Who would you like to bet on?", reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -1087,6 +1088,10 @@ class BotManager:
 
         context.user_data["bet_player"] = query.data
         odds = self.bet_manager.get_latest_odds(self.league_state.current_round_num)
+        if query.data == "cancel":
+            await query.edit_message_text("Bet cancelled.")
+            return ConversationHandler.END
+
         runner_odds = odds.get(query.data)
         if runner_odds is None:
             await query.edit_message_text(
@@ -1111,6 +1116,7 @@ class BotManager:
             [InlineKeyboardButton(f"€{amount}", callback_data=str(amount))]
             for amount in valid_bet_amounts
         ]
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel")])
         await query.edit_message_text(
             f"Selected: *{query.data}*\nHow much would you like to bet?",
             reply_markup=InlineKeyboardMarkup(keyboard),
@@ -1123,6 +1129,10 @@ class BotManager:
     ) -> int:
         query = update.callback_query
         await query.answer()
+
+        if query.data == "cancel":
+            await query.edit_message_text("Bet cancelled.")
+            return ConversationHandler.END
 
         player = context.user_data["bet_player"]
         bet_odds: FractionalOdds = context.user_data["bet_odds"]
