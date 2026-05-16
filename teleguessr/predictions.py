@@ -7,6 +7,11 @@ import numpy as np
 from loguru import logger
 
 from teleguessr.stats import FitResult, fit_all_players
+from teleguessr.odds import (
+    format_fractional,
+    fractional_to_decimal,
+    probs_to_odds,
+)
 from teleguessr.analysis import get_score_data
 from teleguessr.awards import get_ranked_guesses
 from teleguessr.handicaps import get_latest_handicaps
@@ -126,124 +131,6 @@ def simulate_league(
     return df
 
 
-def percentage_to_fractional_odds(
-    percentage: float,
-    bounds_direction: int = 0,
-) -> str:
-    """
-    Convert a probability percentage to the nearest commonly used fractional betting odds.
-
-    Args:
-        percentage: A probability value between 0 and 100 (exclusive).
-        bounds_direction: If value is 1, round up instead of to nearest, to ensure
-            odds are at least as long as implied by percentage. If -1, round down.
-
-    Returns:
-        A string representing the fractional odds (e.g. "5/2").
-
-    Raises:
-        ValueError: If percentage is not in the valid range (0, 100).
-    """
-    if not (0 < percentage < 100):
-        return "-"
-
-    # All standard fractional odds from the AceOdds conversion table,
-    # stored as (numerator, denominator) tuples, ordered from shortest to longest odds.
-    COMMON_FRACTIONS = [
-        (1, 100),
-        (1, 5),
-        (2, 9),
-        (1, 4),
-        (2, 7),
-        (3, 10),
-        (1, 3),
-        (4, 11),
-        (2, 5),
-        (4, 9),
-        (1, 2),
-        (8, 15),
-        (4, 7),
-        (8, 13),
-        (4, 6),
-        (8, 11),
-        (4, 5),
-        (5, 6),
-        (10, 11),
-        (1, 1),
-        (21, 20),
-        (11, 10),
-        (23, 20),
-        (6, 5),
-        (5, 4),
-        (11, 8),
-        (7, 5),
-        (6, 4),
-        (8, 5),
-        (13, 8),
-        (7, 4),
-        (9, 5),
-        (15, 8),
-        (2, 1),
-        (11, 5),
-        (9, 4),
-        (12, 5),
-        (5, 2),
-        (13, 5),
-        (11, 4),
-        (3, 1),
-        (16, 5),
-        (10, 3),
-        (7, 2),
-        (4, 1),
-        (9, 2),
-        (5, 1),
-        (11, 2),
-        (6, 1),
-        (13, 2),
-        (7, 1),
-        (15, 2),
-        (8, 1),
-        (9, 1),
-        (10, 1),
-        (11, 1),
-        (12, 1),
-        (13, 1),
-        (14, 1),
-        (15, 1),
-        (16, 1),
-        (18, 1),
-        (20, 1),
-        (25, 1),
-        (33, 1),
-        (50, 1),
-        (66, 1),
-        (100, 1),
-        (1000, 1),
-    ]
-
-    # Convert percentage to an implied probability (0–1)
-    prob = percentage / 100.0
-
-    # Find the fraction whose implied probability is closest to the input.
-    # Implied probability of fractional odds n/d = d / (n + d)
-    def implied_prob(n, d):
-        return d / (n + d)
-
-    if bounds_direction == 1:
-        # Filter to fractions that are at least as long as implied by percentage
-        COMMON_FRACTIONS = [
-            (n, d) for n, d in COMMON_FRACTIONS if implied_prob(n, d) <= prob
-        ]
-    elif bounds_direction == -1:
-        # Filter to fractions that are at most as long as implied by percentage
-        COMMON_FRACTIONS = [
-            (n, d) for n, d in COMMON_FRACTIONS if implied_prob(n, d) >= prob
-        ]
-    else:
-        best = min(COMMON_FRACTIONS, key=lambda nd: abs(implied_prob(*nd) - prob))
-    return f"{best[0]}/{best[1]}"
-
-
 def outright_win_probabilities(sim_df: pl.DataFrame):
     """
     Input dataframe contains a column for each player, and row i represents the player scores for simulation i.
@@ -359,25 +246,18 @@ async def generate_outright_odds_predictions(
         ),
     )
 
-    additive_overround_per_runner = overround / all_df.height
-
-    all_df = all_df.with_columns(
-        (pl.col("win_probability") * (1 + overround)).alias(
-            "adjusted_win_probability_multiplicative"
-        ),
-        (pl.col("win_probability") + additive_overround_per_runner).alias(
-            "adjusted_win_probability_additive"
-        ),
+    odds = probs_to_odds(
+        all_df["win_probability"].to_list(),
+        n_simulations=n_sims,
     )
 
     all_df = all_df.with_columns(
-        (
-            (
-                pl.col("adjusted_win_probability_multiplicative")
-                + pl.col("adjusted_win_probability_additive")
-            )
-            / 2
-        ).alias("back_win_probability"),
+        [
+            pl.Series("back_win_odds", [format_fractional(f) for f in odds]),
+            pl.Series(
+                "back_win_odds_decimal", [fractional_to_decimal(f) for f in odds]
+            ),
+        ]
     )
 
     all_df = all_df.with_columns(
@@ -388,26 +268,11 @@ async def generate_outright_odds_predictions(
         (pl.col("win_probability") * 100).round(2).cast(pl.String).alias("win_pct"),
         pl.col("mean_guess_distance_km").round(2).alias("mean_guess_distance_km"),
         pl.col("median_guess_distance_km").round(2).alias("median_guess_distance_km"),
-        (pl.col("back_win_probability") * 100)
-        .round(2)
-        .cast(pl.String)
-        .alias("back_win_pct"),
-        (pl.col("back_win_probability") * 100)
-        .map_elements(percentage_to_fractional_odds)
-        .alias("back_win_odds"),
     ).select(
         "player",
-        "back_win_odds",
         "win_pct",
-        "back_win_pct",
-        "adjusted_win_probability_multiplicative",
-        "adjusted_win_probability_additive",
-    )
-
-    all_df = all_df.with_columns(
-        pl.col("back_win_odds")
-        .map_elements(fractional_odds_to_decimal)
-        .alias("back_win_odds_decimal")
+        "back_win_odds",
+        "back_win_odds_decimal",
     )
 
     return all_df
@@ -415,6 +280,6 @@ async def generate_outright_odds_predictions(
 
 if __name__ == "__main__":
     preds = asyncio.run(
-        generate_outright_odds_predictions(n_sims=40_000, overround=0.25)
+        generate_outright_odds_predictions(n_sims=5_000, overround=0.25)
     )
     print(preds)
