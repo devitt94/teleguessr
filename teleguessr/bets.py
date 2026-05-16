@@ -151,7 +151,7 @@ class BetManager:
 
     def place_bet(
         self, bettor: str, runner: str, amount: float, odds: FractionalOdds
-    ) -> None:
+    ) -> Bet:
         bet = Bet(
             bettor=bettor,
             runner=runner,
@@ -168,6 +168,8 @@ class BetManager:
         existing_bets.append(bet.model_dump())
         with bet_file.open("w") as f:
             json.dump(existing_bets, f, indent=2)
+
+        return bet
 
     def compute_bet_pnls(self, winner: str) -> dict[str, float]:
         bet_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"

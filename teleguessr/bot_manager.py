@@ -1033,6 +1033,14 @@ class BotManager:
             return
 
         player_id = update.effective_user.id
+
+        chat_id = update.effective_chat.id
+        if chat_id != player_id:
+            await update.message.reply_text(
+                "Please place bets in a private chat with the bot to avoid interference."
+            )
+            return
+
         player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
 
         if player_name is None:
@@ -1120,18 +1128,26 @@ class BotManager:
         bet_odds: FractionalOdds = context.user_data["bet_odds"]
         amount = float(query.data)
 
-        self.bet_manager.place_bet(
+        bet = self.bet_manager.place_bet(
             bettor=TELEGRAM_ID_TO_PLAYER_NAME[update.effective_user.id],
             runner=player,
             amount=amount,
             odds=bet_odds,
         )
 
+        message = f"✅ Bet placed\n\n{bet}"
+
         await query.edit_message_text(
-            f"✅ Bet placed on *{player}* for €{amount} at {bet_odds.formatted} odds!\n"
-            f"Potential profit: €{amount * (bet_odds.decimal - 1):.2f}\n",
+            message,
             parse_mode="Markdown",
         )
+
+        await context.bot.send_message(
+            chat_id=self.league_state.chat_id,
+            text=message,
+            parse_mode="Markdown",
+        )
+
         return ConversationHandler.END  # ← end the conversation
 
     async def cancel_bet(

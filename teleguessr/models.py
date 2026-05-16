@@ -133,3 +133,13 @@ class Bet(BaseModel):
     @property
     def potential_return(self) -> float:
         return self.stake * self.odds
+
+    def __str__(self):
+        return (
+            f"Bettor: {self.bettor}\n"
+            f"Runner: {self.runner}\n"
+            f"Stake: €{self.stake:.2f}\n"
+            f"Odds: {self.odds:.2f}\n"
+            f"Return: €{self.potential_return:.2f}\n"
+            f"Potential Profit: €{self.potential_profit:.2f}\n"
+        )
