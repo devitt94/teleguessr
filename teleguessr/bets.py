@@ -3,6 +3,7 @@ from datetime import date
 from pathlib import Path
 
 from teleguessr.models import Bet
+from teleguessr.odds import FractionalOdds
 from teleguessr.settings import ModelSettings
 
 from loguru import logger
@@ -43,6 +44,7 @@ BET_AMOUNTS = [
     400,
     450,
     500,
+    1000,
 ]
 
 
@@ -57,7 +59,7 @@ class BetManager:
         self.odds_dir.mkdir(parents=True, exist_ok=True)
         self.bets_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_latest_odds(self, league_round: int) -> dict[str, float]:
+    def get_latest_odds(self, league_round: int) -> dict[str, FractionalOdds]:
         odds_file = (
             self.odds_dir
             / f"league_{self.league_date.strftime('%Y%m%d')}_round_{league_round}.json"
@@ -69,7 +71,9 @@ class BetManager:
         with open(odds_file, "r") as f:
             odds_data = json.load(f)
 
-        return odds_data
+        return {
+            runner: FractionalOdds.from_str(odds) for runner, odds in odds_data.items()
+        }
 
     def get_all_bets(self) -> list[Bet]:
         bets_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
@@ -99,11 +103,11 @@ class BetManager:
         self,
         bettor: str,
         runner: str,
-        odds: float,
+        odds: FractionalOdds,
     ) -> list[float]:
         """Calculate bet amounts based on odds and settings."""
         bet_on_self = bettor == runner
-        min_stake = self.model_settings.min_profit_bet / (odds - 1)
+        min_stake = self.model_settings.min_profit_bet / (odds.decimal - 1)
         max_profit = (
             self.model_settings.max_profit_self_bet
             if bet_on_self
@@ -115,12 +119,12 @@ class BetManager:
             f"Current position for bettor {bettor} on runner {runner}: {current_position:.2f}"
         )
         adjusted_max_profit = max_profit - current_position
-        max_stake = round(adjusted_max_profit / (odds - 1), 2)
+        max_stake = round(adjusted_max_profit / (odds.decimal - 1), 2)
         logger.info(
             f"Adjusted max profit for bettor {bettor} on runner {runner}: {adjusted_max_profit:.2f}"
         )
         logger.info(
-            f"Max stake for bettor {bettor} on runner {runner}: {max_stake:.2f}"
+            f"Min/max stake for bettor {bettor} on runner {runner}: {min_stake:.2f}/{max_stake:.2f}"
         )
 
         # Filter bet amounts to be within min and max stake
@@ -134,20 +138,25 @@ class BetManager:
 
         return valid_bets
 
-    def update_odds(self, round_num: int, odds: dict[str, float]) -> None:
+    def update_odds(self, round_num: int, odds: dict[str, FractionalOdds]) -> None:
         odds_file = (
             self.odds_dir
             / f"league_{self.league_date.strftime('%Y%m%d')}_round_{round_num}.json"
         )
+        available_odds = {
+            runner: odds.formatted for runner, odds in odds.items() if odds is not None
+        }
         with odds_file.open("w") as f:
-            json.dump(odds, f, indent=2)
+            json.dump(available_odds, f, indent=2)
 
-    def place_bet(self, bettor: str, runner: str, amount: float, odds: float) -> None:
+    def place_bet(
+        self, bettor: str, runner: str, amount: float, odds: FractionalOdds
+    ) -> None:
         bet = Bet(
             bettor=bettor,
             runner=runner,
             stake=amount,
-            odds=odds,
+            odds=odds.decimal,
         )
         bet_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
         if bet_file.exists():

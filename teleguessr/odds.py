@@ -1,30 +1,42 @@
 import math
+from typing import NamedTuple
+
+from loguru import logger
 
 
-# ---------------------------------------------------------------------------
-# Type alias: fractional odds are (numerator, denominator) tuples, e.g. (5, 2)
-# ---------------------------------------------------------------------------
-FractionalOdds = tuple[int, int]
+class FractionalOdds(NamedTuple):
+    numerator: int
+    denominator: int
 
+    @property
+    def decimal(self) -> float:
+        return 1.0 + self.numerator / self.denominator
 
-def fractional_to_decimal(frac: FractionalOdds) -> float:
-    """Convert fractional odds to decimal. e.g. (5, 2) -> 3.5, (1, 1) -> 2.0"""
-    num, den = frac
-    return 1.0 + num / den
+    @property
+    def formatted(self) -> str:
+        return f"{self.numerator}/{self.denominator}"
 
+    @property
+    def implied_probability(self) -> float:
+        return 1.0 / self.decimal
 
-def format_fractional(frac: FractionalOdds) -> str:
-    """Format fractional odds as a string, e.g. (5, 2) -> '5/2'"""
-    return f"{frac[0]}/{frac[1]}"
+    @classmethod
+    def from_str(cls, odds_str: str) -> "FractionalOdds":
+        try:
+            numerator, denominator = map(int, odds_str.split("/"))
+            return cls(numerator, denominator)
+        except Exception as e:
+            raise ValueError(f"Invalid fractional odds format: {odds_str}") from e
 
 
 def probs_to_odds(
     probabilities: list[float],
     n_simulations: int,
     k: float = 2.0,
-    flat_margin: float = 0.025,
+    flat_margin: float = 0.05,
+    margin_buffer: float = 0.01,
     ladder: list[FractionalOdds] | None = None,
-) -> list[FractionalOdds]:
+) -> list[FractionalOdds | None]:
     """
     Convert a list of model probability estimates to fractional bookmaker odds,
     accounting for two independent sources of uncertainty:
@@ -46,8 +58,6 @@ def probs_to_odds(
         flat_margin:     Fractional uplift applied to all runners to cover model error
                          (default 0.05 = 5%). Use higher values if model inputs are
                          uncertain; lower if the model is well-validated.
-        min_odds:        Floor on offered odds as fractional tuple (default 1/100).
-        max_odds:        Ceiling on offered odds as fractional tuple (default 66/1).
         ladder:          Optional list of fractional odds tuples to round down to.
                          If None, rounds down to the nearest rung on BOOKMAKER_LADDER.
 
@@ -57,12 +67,13 @@ def probs_to_odds(
     """
     if not probabilities:
         raise ValueError("probabilities list is empty")
-    if any(p <= 0 or p >= 1 for p in probabilities):
-        raise ValueError("all probabilities must be strictly between 0 and 1")
+    if any(p < 0 or p > 1 for p in probabilities):
+        raise ValueError("all probabilities must be between 0 and 1")
     if abs(sum(probabilities) - 1.0) > 0.01:
         raise ValueError(
             f"probabilities should sum to 1.0, got {sum(probabilities):.4f}"
         )
+
     if n_simulations < 1:
         raise ValueError("n_simulations must be >= 1")
     if flat_margin < 0:
@@ -70,21 +81,29 @@ def probs_to_odds(
 
     _ladder = ladder or BOOKMAKER_LADDER
     min_odds, max_odds = _ladder[0], _ladder[-1]
-    min_dec = fractional_to_decimal(min_odds)
-    max_dec = fractional_to_decimal(max_odds)
+    min_dec = min_odds.decimal
+    max_dec = max_odds.decimal
 
     # Pre-compute decimal values for the ladder once, sorted ascending
-    ladder_dec = [(fractional_to_decimal(f), f) for f in _ladder]
+    ladder_dec = [(f.decimal, f) for f in _ladder]
     ladder_dec.sort()
 
     result = []
     for p in probabilities:
+        if not (0 < p < 1):
+            # Don't offer odds for impossible or certain outcomes; return None to indicate no bet offered
+            logger.warning(
+                f"Probability {p:.4f} is out of bounds (0,1). No odds will be offered for this runner."
+            )
+            result.append(None)
+            continue
+
         # Standard error of a proportion from MC simulation
         se = math.sqrt(p * (1 - p) / n_simulations)
 
         # SE margin: covers sampling noise (proportional to uncertainty in estimate)
         # Flat margin: covers model error (applied equally to all runners)
-        adjusted_p = (p + k * se) + flat_margin
+        adjusted_p = (p + k * se) * (1 + flat_margin) + margin_buffer
 
         # Convert to decimal odds and clamp to [min_odds, max_odds]
         raw_dec = 1.0 / adjusted_p
@@ -106,72 +125,81 @@ def probs_to_odds(
 # Standard fractional bookmaker odds ladder
 # ---------------------------------------------------------------------------
 BOOKMAKER_LADDER: list[FractionalOdds] = [
-    (1, 100),
-    (1, 5),
-    (2, 9),
-    (1, 4),
-    (2, 7),
-    (3, 10),
-    (1, 3),
-    (4, 11),
-    (2, 5),
-    (4, 9),
-    (1, 2),
-    (8, 15),
-    (4, 7),
-    (8, 13),
-    (4, 6),
-    (8, 11),
-    (4, 5),
-    (5, 6),
-    (10, 11),
-    (1, 1),
-    (21, 20),
-    (11, 10),
-    (23, 20),
-    (6, 5),
-    (5, 4),
-    (11, 8),
-    (7, 5),
-    (6, 4),
-    (8, 5),
-    (13, 8),
-    (7, 4),
-    (9, 5),
-    (15, 8),
-    (2, 1),
-    (11, 5),
-    (9, 4),
-    (12, 5),
-    (5, 2),
-    (13, 5),
-    (11, 4),
-    (3, 1),
-    (16, 5),
-    (10, 3),
-    (7, 2),
-    (4, 1),
-    (9, 2),
-    (5, 1),
-    (11, 2),
-    (6, 1),
-    (13, 2),
-    (7, 1),
-    (15, 2),
-    (8, 1),
-    (9, 1),
-    (10, 1),
-    (11, 1),
-    (12, 1),
-    (13, 1),
-    (14, 1),
-    (15, 1),
-    (16, 1),
-    (18, 1),
-    (20, 1),
-    (25, 1),
-    (33, 1),
-    (50, 1),
-    (66, 1),
-    (100, 1),
+    FractionalOdds(1, 500),
+    FractionalOdds(1, 200),
+    FractionalOdds(1, 100),
+    FractionalOdds(1, 50),
+    FractionalOdds(1, 20),
+    FractionalOdds(1, 14),
+    FractionalOdds(1, 10),
+    FractionalOdds(1, 8),
+    FractionalOdds(1, 7),
+    FractionalOdds(1, 6),
+    FractionalOdds(1, 5),
+    FractionalOdds(2, 9),
+    FractionalOdds(1, 4),
+    FractionalOdds(2, 7),
+    FractionalOdds(3, 10),
+    FractionalOdds(1, 3),
+    FractionalOdds(4, 11),
+    FractionalOdds(2, 5),
+    FractionalOdds(4, 9),
+    FractionalOdds(1, 2),
+    FractionalOdds(8, 15),
+    FractionalOdds(4, 7),
+    FractionalOdds(8, 13),
+    FractionalOdds(4, 6),
+    FractionalOdds(8, 11),
+    FractionalOdds(4, 5),
+    FractionalOdds(5, 6),
+    FractionalOdds(10, 11),
+    FractionalOdds(1, 1),
+    FractionalOdds(21, 20),
+    FractionalOdds(11, 10),
+    FractionalOdds(23, 20),
+    FractionalOdds(6, 5),
+    FractionalOdds(5, 4),
+    FractionalOdds(11, 8),
+    FractionalOdds(7, 5),
+    FractionalOdds(6, 4),
+    FractionalOdds(8, 5),
+    FractionalOdds(13, 8),
+    FractionalOdds(7, 4),
+    FractionalOdds(9, 5),
+    FractionalOdds(15, 8),
+    FractionalOdds(2, 1),
+    FractionalOdds(11, 5),
+    FractionalOdds(9, 4),
+    FractionalOdds(12, 5),
+    FractionalOdds(5, 2),
+    FractionalOdds(13, 5),
+    FractionalOdds(11, 4),
+    FractionalOdds(3, 1),
+    FractionalOdds(16, 5),
+    FractionalOdds(10, 3),
+    FractionalOdds(7, 2),
+    FractionalOdds(4, 1),
+    FractionalOdds(9, 2),
+    FractionalOdds(5, 1),
+    FractionalOdds(11, 2),
+    FractionalOdds(6, 1),
+    FractionalOdds(13, 2),
+    FractionalOdds(7, 1),
+    FractionalOdds(15, 2),
+    FractionalOdds(8, 1),
+    FractionalOdds(9, 1),
+    FractionalOdds(10, 1),
+    FractionalOdds(11, 1),
+    FractionalOdds(12, 1),
+    FractionalOdds(13, 1),
+    FractionalOdds(14, 1),
+    FractionalOdds(15, 1),
+    FractionalOdds(16, 1),
+    FractionalOdds(18, 1),
+    FractionalOdds(20, 1),
+    FractionalOdds(25, 1),
+    FractionalOdds(33, 1),
+    FractionalOdds(50, 1),
+    FractionalOdds(66, 1),
+    FractionalOdds(100, 1),
 ]

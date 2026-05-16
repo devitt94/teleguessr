@@ -18,6 +18,7 @@ from teleguessr.formatters import (
     format_round_result_html,
     format_time,
 )
+from teleguessr.odds import FractionalOdds
 from teleguessr.predictions import generate_outright_odds_predictions
 from teleguessr.replay import replay_league
 from teleguessr.geoguessr_scraper import GeoguessrClient
@@ -360,7 +361,12 @@ class BotManager:
             disable_notification=True,
         )
 
-        await self.display_odds(context, chat_id)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="⏳ Calculating latest odds...",
+        )
+
+        await self.update_odds(context, chat_id)
 
     async def update_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         if not self.__initialised:
@@ -380,14 +386,23 @@ class BotManager:
         odds_df = await generate_outright_odds_predictions(
             n_sims=self.model_settings.n_sims, overround=self.model_settings.overround
         )
-        logger.info(f"Odds predictions generated\n\n{odds_df}")
-        odds_dict = dict(zip(odds_df["player"], odds_df["back_win_odds"]))
+        odds_dict = dict(
+            zip(
+                odds_df["player"],
+                [
+                    FractionalOdds.from_str(odds)
+                    for odds in odds_df["back_win_odds"]
+                    if odds is not None
+                ],
+            )
+        )
+        overround = sum(odds.implied_probability for odds in odds_dict.values()) - 1
+        logger.info(
+            f"Odds predictions generated\n\n{odds_df}\\n\nOverround: {overround:.2%}"
+        )
 
-        decimal_odds_dict = {
-            player: odds for player, odds in odds_dict.items() if odds > 1.0
-        }
         self.bet_manager.update_odds(
-            round_num=self.league_state.current_round_num, odds=decimal_odds_dict
+            round_num=self.league_state.current_round_num, odds=odds_dict
         )
         odds_message = await self.create_odds_message(odds_dict=odds_dict)
 
@@ -396,10 +411,12 @@ class BotManager:
             text=odds_message,
         )
 
-    async def create_odds_message(self, odds_dict: dict[str, float]) -> str:
+    async def create_odds_message(self, odds_dict: dict[str, FractionalOdds]) -> str:
+        if not odds_dict:
+            return "Odds are not available."
         odds_message = "📊 Current Odds:\n\n"
         for player, odds in odds_dict.items():
-            odds_message += f"- {player}: {odds}\n"
+            odds_message += f"- {player}: {odds.formatted}\n"
 
         odds_message += "\n Use /bet to place your bets!"
         return odds_message
@@ -1046,7 +1063,7 @@ class BotManager:
             return
 
         keyboard = [
-            [InlineKeyboardButton(f"{player} ({odd:.2f})", callback_data=player)]
+            [InlineKeyboardButton(f"{player} ({odd.formatted})", callback_data=player)]
             for player, odd in odds.items()
         ]
         await update.message.reply_text(
@@ -1100,7 +1117,7 @@ class BotManager:
         await query.answer()
 
         player = context.user_data["bet_player"]
-        bet_odds = context.user_data["bet_odds"]
+        bet_odds: FractionalOdds = context.user_data["bet_odds"]
         amount = float(query.data)
 
         self.bet_manager.place_bet(
@@ -1111,8 +1128,8 @@ class BotManager:
         )
 
         await query.edit_message_text(
-            f"✅ Bet placed on *{player}* for €{amount} at {bet_odds:.2f} odds!\n"
-            f"Potential profit: €{amount * (bet_odds - 1):.2f}\n",
+            f"✅ Bet placed on *{player}* for €{amount} at {bet_odds.formatted} odds!\n"
+            f"Potential profit: €{amount * (bet_odds.decimal - 1):.2f}\n",
             parse_mode="Markdown",
         )
         return ConversationHandler.END  # ← end the conversation

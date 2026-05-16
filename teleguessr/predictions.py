@@ -8,8 +8,6 @@ from loguru import logger
 
 from teleguessr.stats import FitResult, fit_all_players
 from teleguessr.odds import (
-    format_fractional,
-    fractional_to_decimal,
     probs_to_odds,
 )
 from teleguessr.analysis import get_score_data
@@ -253,9 +251,16 @@ async def generate_outright_odds_predictions(
 
     all_df = all_df.with_columns(
         [
-            pl.Series("back_win_odds", [format_fractional(f) for f in odds]),
             pl.Series(
-                "back_win_odds_decimal", [fractional_to_decimal(f) for f in odds]
+                "back_win_odds", [f.formatted if f is not None else None for f in odds]
+            ),
+            pl.Series(
+                "back_win_odds_decimal",
+                [f.decimal if f is not None else None for f in odds],
+            ),
+            pl.Series(
+                "back_win_implied_prob",
+                [f.implied_probability if f is not None else None for f in odds],
             ),
         ]
     )
@@ -273,6 +278,10 @@ async def generate_outright_odds_predictions(
         "win_pct",
         "back_win_odds",
         "back_win_odds_decimal",
+        "back_win_implied_prob",
+        "mean_guess_distance_km",
+        "median_guess_distance_km",
+        "handicap_pct",
     )
 
     return all_df
