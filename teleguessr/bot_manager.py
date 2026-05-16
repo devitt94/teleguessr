@@ -176,6 +176,39 @@ class BotManager:
 
         await self.display_odds(context, chat_id=update.effective_chat.id)
 
+    async def position_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            await update.message.reply_text(
+                "No active league. Start a new league with /startleague."
+            )
+            return
+        player_id = update.effective_user.id
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+        if player_name is None:
+            await update.message.reply_text(
+                "Your Telegram ID is not linked to a player name. Please contact the admin."
+            )
+            return
+
+        all_runners = list(self.handicaps.keys())
+        positions = self.bet_manager.compute_position(
+            bettor=player_name, runners=all_runners
+        )
+
+        position_message = "📈 Your current betting position:\n\n"
+        for runner, position in positions.items():
+            position_message += f"- {runner}: €{position:.2f}\n"
+
+        await update.message.reply_text(
+            position_message,
+            parse_mode="HTML",
+        )
+
     async def start_league_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -419,6 +452,8 @@ class BotManager:
             odds_message += f"- {player}: {odds.formatted}\n"
 
         odds_message += "\n DM me with /bet to place your bets!"
+        odds_message += "\n Use /position to check your current betting position."
+
         return odds_message
 
     async def display_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):

@@ -189,3 +189,20 @@ class BetManager:
                 pnls[bettor] -= bet.stake
 
         return dict(pnls)
+
+    def compute_position(self, bettor: str, runners: list[str]) -> dict[str, float]:
+        bets_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
+        if not bets_file.exists():
+            return {runner: 0.0 for runner in runners}
+        bets = self.get_all_bets()
+        position = {runner: 0.0 for runner in runners}
+        for bet in bets:
+            if bet.bettor != bettor:
+                continue
+            for runner in runners:
+                if bet.runner == runner:
+                    position[runner] += bet.stake * (bet.odds - 1)
+                else:
+                    position[runner] -= bet.stake
+
+        return position
