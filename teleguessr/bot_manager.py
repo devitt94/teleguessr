@@ -418,7 +418,7 @@ class BotManager:
         for player, odds in odds_dict.items():
             odds_message += f"- {player}: {odds.formatted}\n"
 
-        odds_message += "\n Use /bet to place your bets!"
+        odds_message += "\n DM me with /bet to place your bets!"
         return odds_message
 
     async def display_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
