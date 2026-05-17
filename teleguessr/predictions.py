@@ -2,6 +2,7 @@ import asyncio
 from copy import deepcopy
 import json
 from pathlib import Path
+import random
 
 import numpy as np
 from loguru import logger
@@ -70,10 +71,23 @@ def _simulate_league(
 ) -> LeagueState:
     while not league_state.is_finished:
         challenge_settings = challenge_settings_generator(i)
+
+        ## Leader going into final round gets a decrease in ability to simulate a comeback, simulating the psychological pressure of leading
+        streamer = None
+        if league_state.current_round_num == n_rounds - 1:
+            mu_adjustment = 0.25
+            streamer = random.choice(league_state.current_leaders)
+            lognormal_fits[streamer].mu += mu_adjustment
+
         round_result = _simulate_round(lognormal_fits, hcaps, challenge_settings)
         ranked_guesses = get_ranked_guesses(round_result)
         league_state.add_round_result(round_result)
         league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
+
+        if streamer is not None:
+            lognormal_fits[streamer].mu -= mu_adjustment
+            streamer = None
+
     return league_state
 
 
@@ -184,7 +198,7 @@ def fractional_odds_to_decimal(odds: str) -> float:
 
 
 async def generate_outright_odds_predictions(
-    n_sims: int, overround: float
+    n_sims: int,
 ) -> pl.DataFrame:
     score_data: pl.DataFrame = await get_score_data(include_legacy_rounds=False)
     settings = get_settings()
@@ -288,7 +302,5 @@ async def generate_outright_odds_predictions(
 
 
 if __name__ == "__main__":
-    preds = asyncio.run(
-        generate_outright_odds_predictions(n_sims=5_000, overround=0.25)
-    )
+    preds = asyncio.run(generate_outright_odds_predictions(n_sims=40_000))
     print(preds)

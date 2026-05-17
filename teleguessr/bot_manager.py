@@ -417,7 +417,7 @@ class BotManager:
 
         logger.info(f"Generating and sending odds update to chat {chat_id}.")
         odds_df = await generate_outright_odds_predictions(
-            n_sims=self.model_settings.n_sims, overround=self.model_settings.overround
+            n_sims=self.model_settings.n_sims,
         )
         odds_dict = dict(
             zip(

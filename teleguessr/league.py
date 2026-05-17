@@ -2,7 +2,6 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 import re
 from typing import Callable
-from teleguessr.awards import get_ranked_guesses
 from teleguessr.models import (
     ActiveRound,
     ChallengeResult,
@@ -127,6 +126,13 @@ class LeagueState(BaseModel):
         return len(self.results) + 1 if self.round_in_progress else len(self.results)
 
     @property
+    def current_leaders(self) -> list[str]:
+        if not self.__scores:
+            return []
+        max_score = max(self.__scores.values())
+        return [player for player, score in self.__scores.items() if score == max_score]
+
+    @property
     def start_date(self) -> date:
         return datetime.strptime(self.filepath.stem.split("_")[-1], "%Y%m%d").date()
 
@@ -212,7 +218,7 @@ class LeagueState(BaseModel):
             raise ValueError("A round is already in progress.")
         if self.is_finished:
             raise ValueError("The league has already finished.")
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         if end_time_hours < 0:
             # Use immediate end time for testing
@@ -226,37 +232,6 @@ class LeagueState(BaseModel):
             end_time=end_time,
             challenge_settings=challenge_settings,
             players_finished=set(),
-        )
-
-    def undo_last_round(self):
-        if not self.results:
-            raise ValueError("No rounds to undo.")
-
-        last_result = self.results.pop()
-        removed_scores = skewed_ranking_score_manager(last_result)
-        for player, score in removed_scores.items():
-            self.__scores[player] = self.__scores.get(player, 0) - score
-            if str(self.current_round_num) in self.__round_results_by_player[player]:
-                del self.__round_results_by_player[player][str(self.current_round_num)]
-
-        ranked_guesses = get_ranked_guesses(last_result)
-        if ranked_guesses:
-            best_guess = ranked_guesses[0]
-            worst_guess = ranked_guesses[-1]
-            best_guess_player = best_guess.player.name
-            worst_guess_player = worst_guess.player.name
-            self.__scores[best_guess_player] -= 1
-            self.__scores[worst_guess_player] += 1
-
-            self.__best_guesses_by_player[best_guess_player] -= 1
-            self.__worst_guesses_by_player[worst_guess_player] -= 1
-
-        players_finished = last_result.players_finished
-        self.current_round = ActiveRound(
-            challenge_url=last_result.challenge_url,
-            end_time=datetime.now()
-            + timedelta(hours=24),  # Placeholder; actual end time unknown
-            players_finished=players_finished,
         )
 
     def add_round_result(self, result: ChallengeResult):
