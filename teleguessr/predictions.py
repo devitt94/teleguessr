@@ -3,8 +3,9 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import random
-
+import multiprocessing
 import numpy as np
+from functools import partial
 from loguru import logger
 
 from teleguessr.stats import FitResult, fit_all_players
@@ -123,8 +124,6 @@ def simulate_league(
 
     for i in range(n_sims):
         sim_init_state: LeagueState = deepcopy(league_state)
-        if i % 1000 == 0:
-            logger.info(f"Simulated league {i}/{n_sims}")
 
         final_state: LeagueState = _simulate_league(
             i,
@@ -141,6 +140,39 @@ def simulate_league(
     df = pl.DataFrame(league_final_leaderboards)
 
     return df
+
+
+def simulate_league_parallel(
+    lognormal_fits: dict[str, FitResult],
+    n_sims: int,
+    league_settings: LeagueSettings,
+    hcaps: dict[str, float],
+    league_state_file: Path | None = None,
+) -> pl.DataFrame:
+    n_workers = multiprocessing.cpu_count()
+    sims_per_worker = n_sims // n_workers
+    logger.info(
+        f"Running {n_sims} simulations across {n_workers} workers ({sims_per_worker} sims/worker)"
+    )
+
+    simulate = partial(
+        simulate_league,
+        lognormal_fits,
+        league_settings=league_settings,
+        hcaps=hcaps,
+        league_state_file=league_state_file,
+    )
+
+    # Split total sims evenly across workers
+    sims_per_worker = n_sims // n_workers
+    sim_counts = [sims_per_worker] * n_workers
+    sim_counts[-1] += n_sims - sum(sim_counts)  # remainder to last worker
+
+    with multiprocessing.Pool(processes=n_workers) as pool:
+        results = pool.map(simulate, sim_counts)
+
+    combined_df = pl.concat(results, how="vertical")
+    return combined_df
 
 
 def outright_win_probabilities(sim_df: pl.DataFrame):
@@ -222,7 +254,7 @@ async def generate_outright_odds_predictions(
     logger.info(f"Using adjustments: {adjustments}")
     lognormal_fits = fit_all_players(score_data, adjustments=adjustments)
 
-    sim_results = simulate_league(
+    sim_results = simulate_league_parallel(
         lognormal_fits,
         n_sims=n_sims,
         league_settings=league_settings,
