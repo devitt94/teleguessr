@@ -33,7 +33,7 @@ def probs_to_odds(
     probabilities: list[float],
     n_simulations: int,
     k: float = 2.0,
-    flat_margin: float = 0.05,
+    flat_margin: float = 0.07,
     margin_buffer: float = 0.01,
     ladder: list[FractionalOdds] | None = None,
 ) -> list[FractionalOdds | None]:
