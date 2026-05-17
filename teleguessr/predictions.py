@@ -63,7 +63,6 @@ def _simulate_round(
 
 
 def _simulate_league(
-    i: int,
     lognormal_fits: dict[str, FitResult],
     league_state: LeagueState,
     challenge_settings_generator: ChallengeSettingsGenerator,
@@ -71,7 +70,9 @@ def _simulate_league(
     hcaps: dict[str, float],
 ) -> LeagueState:
     while not league_state.is_finished:
-        challenge_settings = challenge_settings_generator(i)
+        challenge_settings = challenge_settings_generator(
+            league_state.current_round_num
+        )
 
         ## Leader going into final round gets a decrease in ability to simulate a comeback, simulating the psychological pressure of leading
         streamer = None
@@ -123,10 +124,12 @@ def simulate_league(
         logger.info(f"Simulating from state {current_round=} with {scores=}")
 
     for i in range(n_sims):
+        if i % 100 == 0:
+            logger.info(f"Simulating league {i}/{n_sims}")
+
         sim_init_state: LeagueState = deepcopy(league_state)
 
         final_state: LeagueState = _simulate_league(
-            i,
             lognormal_fits,
             sim_init_state,
             challenge_settings_generator,
