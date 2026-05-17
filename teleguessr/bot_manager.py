@@ -399,15 +399,6 @@ class BotManager:
             text="⏳ Calculating latest odds...",
         )
 
-        await self.update_odds(context, chat_id)
-
-    async def update_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
-        if self.league_state is None or self.league_state.is_finished:
-            raise RuntimeError("No active league.")
-
         logger.info(
             f"Writing empty odds file for round {self.league_state.current_round_num}"
         )
@@ -415,6 +406,14 @@ class BotManager:
             round_num=self.league_state.current_round_num, odds={}
         )
 
+        context.job_queue.run_once(
+            self.generate_and_send_odds_update,
+            when=1,
+            data={"chat_id": chat_id},
+        )
+
+    async def generate_and_send_odds_update(self, context: ContextTypes.DEFAULT_TYPE):
+        chat_id = context.job.data["chat_id"]
         logger.info(f"Generating and sending odds update to chat {chat_id}.")
         odds_df = await generate_outright_odds_predictions(
             n_sims=self.model_settings.n_sims,
