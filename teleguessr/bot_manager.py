@@ -412,6 +412,12 @@ class BotManager:
             data={"chat_id": chat_id},
         )
 
+        context.job_queue.run_repeating(
+            self.poll_for_round_updates,
+            interval=self.polling_interval_seconds,
+            first=self.polling_interval_seconds,
+        )
+
     async def generate_and_send_odds_update(self, context: ContextTypes.DEFAULT_TYPE):
         chat_id = context.job.data["chat_id"]
         logger.info(f"Generating and sending odds update to chat {chat_id}.")
