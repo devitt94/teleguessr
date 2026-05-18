@@ -850,6 +850,8 @@ class BotManager:
         )
         tb_text = "".join(tb_list)
 
+        tb_text = tb_text[-4000:]
+
         message = (
             "⚠️ <b>Bot Handler Error</b>\n"
             f"<b>Exception:</b> {context.error}\n\n"
