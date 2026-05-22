@@ -21,6 +21,7 @@ from telegram.ext import (
     CommandHandler,
     ConversationHandler,
 )
+from telegram.request import HTTPXRequest
 import typer
 
 
@@ -94,11 +95,12 @@ def main(test_mode: bool = False):
         fallbacks=[CommandHandler("cancel", bot_manager.cancel_bet)],
     )
 
+    request = HTTPXRequest(
+        read_timeout=30, write_timeout=30, connect_timeout=10, pool_timeout=10
+    )
+
     app = (
-        ApplicationBuilder()
-        .token(settings.telegram_bot_token)
-        .request(read_timeout=30, write_timeout=30, connect_timeout=10, pool_timeout=10)
-        .build()
+        ApplicationBuilder().token(settings.telegram_bot_token).request(request).build()
     )
     app.add_handler(CommandHandler("help", bot_manager.help_handler))
     app.add_handler(CommandHandler("startleague", bot_manager.start_league_handler))
