@@ -190,6 +190,25 @@ class BetManager:
 
         return dict(pnls)
 
+    def compute_bookmaker_exposure(self, runners: list[str]) -> dict[str, float]:
+        bet_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
+        if not bet_file.exists():
+            logger.info(f"No bets placed for league {self.league_date}.")
+            return {}
+
+        with bet_file.open("r") as f:
+            bets: list[Bet] = [Bet(**bet) for bet in json.load(f)]
+
+        exposure = defaultdict(float)
+        for bet in bets:
+            for runner in runners:
+                if bet.runner == runner:
+                    exposure[runner] -= bet.potential_profit
+                else:
+                    exposure[runner] += bet.stake
+
+        return dict(exposure)
+
     def compute_position(self, bettor: str, runners: list[str]) -> dict[str, float]:
         bets_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
         if not bets_file.exists():

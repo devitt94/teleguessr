@@ -187,18 +187,23 @@ class BotManager:
                 "No active league. Start a new league with /startleague."
             )
             return
-        player_id = update.effective_user.id
-        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
-        if player_name is None:
-            await update.message.reply_text(
-                "Your Telegram ID is not linked to a player name. Please contact the admin."
-            )
-            return
 
+        player_id = update.effective_user.id
         all_runners = list(self.handicaps.keys())
-        positions = self.bet_manager.compute_position(
-            bettor=player_name, runners=all_runners
-        )
+
+        if player_id == self.admin_id:
+            positions = self.bet_manager.compute_bookmaker_exposure(all_runners)
+        else:
+            player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+            if player_name is None:
+                await update.message.reply_text(
+                    "Your Telegram ID is not linked to a player name. Please contact the admin."
+                )
+                return
+
+            positions = self.bet_manager.compute_position(
+                bettor=player_name, runners=all_runners
+            )
 
         position_message = "📈 Your current betting position:\n\n"
         for runner, position in positions.items():
@@ -1075,6 +1080,12 @@ class BotManager:
             return
 
         player_id = update.effective_user.id
+
+        if player_id == self.admin_id:
+            await update.message.reply_text(
+                "Admins cannot place bets. Please use a player account to place bets."
+            )
+            return
 
         chat_id = update.effective_chat.id
         if chat_id != player_id:
