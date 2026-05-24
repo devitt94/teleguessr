@@ -35,6 +35,7 @@ class ActiveRound(BaseModel):
 class ChallengeScore(BaseModel):
     player: Player
     guesses: list[Guess] = conlist(Guess, min_length=1)
+    is_finished: bool = True
 
     @property
     def gross_score(self) -> int:
@@ -92,14 +93,14 @@ class ChallengeResult(BaseModel):
 
     @property
     def players_finished(self) -> set[str]:
-        return {score.player.name for score in self.scores}
+        return {score.player.name for score in self.scores if score.is_finished}
 
     @property
     def num_rounds(self) -> int:
         return (
             self.challenge_settings.number_of_locations
             if self.challenge_settings
-            else max(len(score.guesses) for score in self.scores)
+            else max(len(score.guesses) for score in self.scores if score.is_finished)
         )
 
     def get_player_position(self, player_name: str) -> int:
@@ -118,6 +119,7 @@ class ChallengeResult(BaseModel):
 class AbbreviatedRoundScore(BaseModel):
     rank: int
     net_score: int
+    is_finished: bool = True
 
 
 class Bet(BaseModel):

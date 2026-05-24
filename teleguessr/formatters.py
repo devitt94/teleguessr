@@ -97,7 +97,7 @@ def format_round_result_html(
     num_rounds = (
         result.challenge_settings.number_of_locations
         if result.challenge_settings
-        else 5
+        else max(len(score.guesses) for score in result.scores if score.is_finished)
     )
     sorted_player_scores = sorted(
         result.scores, key=lambda rs: rs.compute_net_score(num_rounds), reverse=True

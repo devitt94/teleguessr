@@ -74,10 +74,14 @@ class GeoguessrClient:
                 logger.warning(
                     f"Player {playername} has only completed {len(guesses)} rounds, expected {challenge_settings.number_of_locations}."
                 )
-                continue
+                is_finished = False
+            else:
+                is_finished = True
 
             player = Player(name=playername, hcap_multiplier=hcap_multiplier)
-            round_score = ChallengeScore(player=player, guesses=guesses)
+            round_score = ChallengeScore(
+                player=player, guesses=guesses, is_finished=is_finished
+            )
             challenge_scores.append(round_score)
 
         return ChallengeResult(

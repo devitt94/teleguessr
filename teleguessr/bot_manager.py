@@ -292,7 +292,7 @@ class BotManager:
         current_round_played_status = await self.player_round_status(round_result)
         finished_players, still_pending_players = set(), set()
         for player, abbreviated_score in current_round_played_status.items():
-            if abbreviated_score is not None:
+            if abbreviated_score is not None and abbreviated_score.is_finished:
                 finished_players.add(player)
             else:
                 still_pending_players.add(player)
@@ -304,7 +304,7 @@ class BotManager:
             for player in new_finished_players:
                 self.league_state.add_player_finished(player)
 
-                if self.players_lounge_group_id is None:
+                if self.players_lounge_group_id is None or not still_pending_players:
                     continue
 
                 try:
@@ -517,6 +517,9 @@ class BotManager:
                 if abbreviated_score is None:
                     rank_emoji = "❓"
                     net_score_str = ""
+                elif not abbreviated_score.is_finished:
+                    rank_emoji = "⏳"
+                    net_score_str = f" ({abbreviated_score.net_score} pts so far)"
                 else:
                     rank_emoji = NUMBER_EMOJI_MAP.get(abbreviated_score.rank, "❓")
                     net_score_str = f" ({abbreviated_score.net_score} pts)"
@@ -530,7 +533,12 @@ class BotManager:
             sorted_players = sorted(players_played.items())
 
             for player, abbreviated_score in sorted_players:
-                emoji = "✅" if abbreviated_score is not None else "❌"
+                if abbreviated_score is None:
+                    emoji = "❌"
+                elif not abbreviated_score.is_finished:
+                    emoji = "⏳"
+                else:
+                    emoji = "✅"
                 leaderboard_message += f"  - {emoji} {player}\n"
 
         return leaderboard_message
@@ -556,11 +564,16 @@ class BotManager:
         points_for_round = skewed_ranking_score_manager(round_result)
         players_played = set()
         for score in round_result.scores:
-            projected_scores[score.player.name] = (
-                projected_scores.get(score.player.name, 0)
-                + points_for_round[score.player.name]
-            )
-            players_played.add(score.player.name)
+            if score.is_finished:
+                projected_scores[score.player.name] = (
+                    projected_scores.get(score.player.name, 0)
+                    + points_for_round[score.player.name]
+                )
+                players_played.add(score.player.name)
+            else:
+                projected_scores[score.player.name] = projected_scores.get(
+                    score.player.name, 0
+                )
 
         projected_scores[best_guess_player] += 1
         projected_scores[worst_guess_player] -= 1
@@ -623,7 +636,12 @@ class BotManager:
         if not self.league_state.round_in_progress:
             status_message += "- No round currently in progress.\n"
         else:
-            players_played = await self.player_round_status(round_result)
+            players_scores = await self.player_round_status(round_result)
+            players_played = set(
+                player
+                for player, score in players_scores.items()
+                if score is not None and score.is_finished
+            )
 
             time_left = self.league_state.get_time_left_seconds()
 
@@ -631,7 +649,7 @@ class BotManager:
                 player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(
                     from_perspective_of_player_id
                 )
-                player_has_played = bool(players_played.get(player_name))
+                player_has_played = player_name in players_played
             else:
                 player_has_played = True
 
@@ -640,7 +658,7 @@ class BotManager:
             )
             status_message += await self.get_round_leaderboard_message(
                 scores_hidden=not player_has_played,
-                players_played=players_played,
+                players_played=players_scores,
             )
 
             if player_has_played:
@@ -688,7 +706,7 @@ class BotManager:
         players_pending = {
             player
             for player, abbreviated_score in players_finished.items()
-            if abbreviated_score is None
+            if abbreviated_score is None or not abbreviated_score.is_finished
         }
         if not players_pending:
             logger.info("All players have finished the round; no reminder sent.")
@@ -702,7 +720,7 @@ class BotManager:
 
         message = (
             f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}.\n"
-            f"The following players have not played yet:\n{pending_list}\n\n"
+            f"The following players have not completed this round yet:\n{pending_list}\n\n"
             f"Round URL: {self.league_state.current_round.challenge_url}"
         )
 
@@ -880,16 +898,22 @@ class BotManager:
     async def player_round_status(
         self, round_result: ChallengeResult
     ) -> dict[str, AbbreviatedRoundScore | None]:
-        net_scores = {
-            score.player.name: score.compute_net_score(round_result.num_rounds)
-            for score in round_result.scores
-        }
+        net_scores = {}
+        unfinished_players = set()
+        for score in round_result.scores:
+            net_score = score.compute_net_score(round_result.num_rounds)
+            net_scores[score.player.name] = net_score
+            if not score.is_finished:
+                unfinished_players.add(score.player.name)
+
         ranks = get_ranks_from_scores(net_scores)
 
         result = {player: None for player in self.handicaps.keys()}
+
         for player, rank in ranks.items():
+            is_finished = player not in unfinished_players
             result[player] = AbbreviatedRoundScore(
-                rank=rank, net_score=net_scores[player]
+                rank=rank, net_score=net_scores[player], is_finished=is_finished
             )
 
         # Sort the result dict by rank (None values at the end)
@@ -1048,9 +1072,9 @@ class BotManager:
         round_status = await self.player_round_status(round_result)
         player_score = round_status.get(player_name)
 
-        if player_score is None:
+        if player_score is None or not player_score.is_finished:
             await update.message.reply_text(
-                "You have not played this round yet. Please complete your round to join the lounge."
+                "You have not completed this round yet. Please complete your round to join the lounge."
             )
             return
 
@@ -1116,7 +1140,7 @@ class BotManager:
         players_played = await self.player_round_status(round_result)
         if players_played.get(player_name) is not None:
             await update.message.reply_text(
-                "You have already played this round, so you cannot place bets. Please wait for the next round to start."
+                "You have already started this round, so you cannot place bets. Please wait for the next round to start."
             )
             return
 
