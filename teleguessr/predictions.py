@@ -337,5 +337,5 @@ async def generate_outright_odds_predictions(
 
 
 if __name__ == "__main__":
-    preds = asyncio.run(generate_outright_odds_predictions(n_sims=5000))
+    preds = asyncio.run(generate_outright_odds_predictions(n_sims=40_000))
     print(preds)
