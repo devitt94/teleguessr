@@ -4,6 +4,7 @@ import traceback
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application as TelegramApp, ConversationHandler
+from telegram.error import NetworkError
 
 from teleguessr.awards import get_ranked_guesses
 from teleguessr.bets import BetManager
@@ -850,11 +851,14 @@ class BotManager:
     ) -> None:
         """Error handler that sends the traceback to the admin."""
         # Build a clean traceback message
+        if isinstance(context.error, NetworkError):
+            logger.info(f"Network error occurred: {context.error}")
+            return
+
         tb_list = traceback.format_exception(
             None, context.error, context.error.__traceback__
         )
         tb_text = "".join(tb_list)
-
         tb_text = tb_text[-4000:]
 
         message = (
