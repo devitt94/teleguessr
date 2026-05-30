@@ -24,6 +24,8 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
         stddev_dist = statistics.stdev(distances) if len(distances) > 1 else 0.0
         avg_pts = statistics.mean(points)
         stddev_pts = statistics.stdev(points) if len(points) > 1 else 0.0
+        second_best_pts = sorted(points, reverse=True)[1] if len(points) > 1 else 0
+        second_worst_pts = sorted(points)[1] if len(points) > 1 else 0
         stats.append(
             GuessStats(
                 average_distance=avg_dist,
@@ -32,6 +34,8 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
                 average_pts=avg_pts,
                 median_pts=statistics.median(points),
                 stddev_pts=stddev_pts,
+                second_best_pts=second_best_pts,
+                second_worst_pts=second_worst_pts,
                 n_players=len(distances),
             )
         )
@@ -68,9 +72,13 @@ def combined_ranker(guess: Guess, stats: GuessStats) -> float:
     )
 
 
+def next_best_points_ranker(guess: Guess, stats: GuessStats) -> float:
+    return guess.score - (stats.second_best_pts + stats.second_worst_pts) / 2
+
+
 def get_ranked_guesses(
     round_result: ChallengeResult,
-    guess_ranker: GuessRanker = combined_ranker,
+    guess_ranker: GuessRanker = next_best_points_ranker,
 ) -> list[RankedGuess]:
     """
     Rank all guesses in the round based on the provided guess_ranker function.

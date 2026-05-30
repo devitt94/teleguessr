@@ -67,6 +67,8 @@ class GuessStats(BaseModel):
     average_pts: float
     median_pts: float
     stddev_pts: float
+    second_best_pts: int
+    second_worst_pts: int
     n_players: int
 
 
