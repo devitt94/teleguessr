@@ -1,4 +1,3 @@
-import asyncio
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -234,8 +233,11 @@ def fractional_odds_to_decimal(odds: str) -> float:
 
 async def generate_outright_odds_predictions(
     n_sims: int,
+    include_legacy_rounds: bool = False,
 ) -> pl.DataFrame:
-    score_data: pl.DataFrame = await get_score_data(include_legacy_rounds=False)
+    score_data: pl.DataFrame = await get_score_data(
+        include_legacy_rounds=include_legacy_rounds
+    )
     settings = get_settings()
     league_settings = settings.league
     active_dir = settings.data_dir / "leagues" / "active"
@@ -334,8 +336,3 @@ async def generate_outright_odds_predictions(
     )
 
     return all_df
-
-
-if __name__ == "__main__":
-    preds = asyncio.run(generate_outright_odds_predictions(n_sims=40_000))
-    print(preds)

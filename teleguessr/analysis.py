@@ -271,7 +271,3 @@ def gross_score_needed(
         return net_score_to_beat - max_adjustment
     else:
         return (net_score_to_beat - (max_score * handicap)) / (1 - handicap)
-
-
-if __name__ == "__main__":
-    print(gross_score_needed(0.45, 38760))

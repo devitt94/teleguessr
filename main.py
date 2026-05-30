@@ -254,5 +254,57 @@ def analysis(
         asyncio.run(handicap_analysis(include_legacy_rounds=include_legacy_rounds))
 
 
+@app.command()
+def predictions(
+    include_legacy_rounds: bool = typer.Option(
+        False,
+        "--include-legacy-rounds",
+        "-i",
+        help="Include legacy rounds in the predictions. Will increase runtime and potentially spam geoguessr with requests, so use sparingly.",
+    ),
+    n_sims: int = typer.Option(
+        40_000,
+        "--n-sims",
+        "-n",
+        help="Number of simulations to run for the predictions. Higher numbers will increase accuracy but also increase runtime. Default is 40,000.",
+    ),
+):
+    """Generate outright odds predictions for the current league."""
+    from teleguessr.predictions import generate_outright_odds_predictions
+
+    preds = asyncio.run(
+        generate_outright_odds_predictions(
+            n_sims=n_sims, include_legacy_rounds=include_legacy_rounds
+        )
+    )
+    print(preds)
+
+
+@app.command()
+def gross_score_needed(
+    net_score_to_beat: float = typer.Argument(
+        ...,
+        help="The net score that needs to be beaten (i.e. the current best net score on the leaderboard).",
+    ),
+    handicap: float = typer.Argument(
+        ...,
+        help="The player's handicap multiplier (e.g. 0.1 for a 10% handicap).",
+    ),
+    max_score: int = typer.Option(
+        50000,
+        "--max-score",
+        "-m",
+        help="The maximum possible score for the round (e.g. 50000 for a standard round).",
+    ),
+):
+    """Calculate the gross score needed to beat a given net score, taking into account the player's handicap."""
+    from teleguessr.analysis import gross_score_needed
+
+    required_gross_score = gross_score_needed(handicap, net_score_to_beat, max_score)
+    print(
+        f"Gross score needed to beat a net score of {net_score_to_beat:.2f} with a handicap of {handicap:.0%}: {required_gross_score:.0f}"
+    )
+
+
 if __name__ == "__main__":
     app()
