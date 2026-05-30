@@ -209,13 +209,9 @@ class BotManager:
         position_message = "📈 Your current betting position:\n\n"
         for runner in all_runners:
             position = positions.get(runner, 0.0)
-            position_sign = ""
-            if position > 0:
-                position_sign = "+"
-            elif position < 0:
-                position_sign = "-"
-
-            position_message += f"- {runner}: {position_sign}€{abs(position):.2f}\n"
+            position_message += (
+                f"- {runner}: {self.bet_manager.compute_signed_amount(position)}\n"
+            )
         await update.message.reply_text(
             position_message,
             parse_mode="HTML",
@@ -892,11 +888,12 @@ class BotManager:
             if bet_pnls:
                 bet_results_message = "💰 Bet Results:\n\n"
                 for player, pnl in bet_pnls.items():
-                    pnl_str = f"+€{pnl:.2f}" if pnl > 0 else f"-€{pnl:.2f}"
-                    bet_results_message += f"- {player}: {pnl_str}\n"
+                    bet_results_message += (
+                        f"- {player}: {self.bet_manager.compute_signed_amount(pnl)}\n"
+                    )
 
                 bookmaker_pnl = -sum(bet_pnls.values())
-                bet_results_message += f"\nBookmaker P&L: {'+' if bookmaker_pnl > 0 else ''}€{bookmaker_pnl:.2f}"
+                bet_results_message += f"\nBookmaker P&L: {self.bet_manager.compute_signed_amount(bookmaker_pnl)}"
 
                 await context.bot.send_message(
                     chat_id,
