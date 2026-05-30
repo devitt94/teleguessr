@@ -207,9 +207,15 @@ class BotManager:
             )
 
         position_message = "📈 Your current betting position:\n\n"
-        for runner, position in positions.items():
-            position_message += f"- {runner}: €{position:.2f}\n"
+        for runner in all_runners:
+            position = positions.get(runner, 0.0)
+            position_sign = ""
+            if position > 0:
+                position_sign = "+"
+            elif position < 0:
+                position_sign = "-"
 
+            position_message += f"- {runner}: {position_sign}€{abs(position):.2f}\n"
         await update.message.reply_text(
             position_message,
             parse_mode="HTML",
@@ -889,6 +895,9 @@ class BotManager:
                     pnl_str = f"+€{pnl:.2f}" if pnl > 0 else f"-€{pnl:.2f}"
                     bet_results_message += f"- {player}: {pnl_str}\n"
 
+                bookmaker_pnl = -sum(bet_pnls.values())
+                bet_results_message += f"\nBookmaker P&L: {'+' if bookmaker_pnl > 0 else ''}€{bookmaker_pnl:.2f}"
+
                 await context.bot.send_message(
                     chat_id,
                     bet_results_message,
@@ -1162,12 +1171,6 @@ class BotManager:
             return
 
         player_id = update.effective_user.id
-
-        if player_id == self.admin_id:
-            await update.message.reply_text(
-                "Admins cannot place bets. Please use a player account to place bets."
-            )
-            return
 
         chat_id = update.effective_chat.id
         if chat_id != player_id:
