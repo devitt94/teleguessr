@@ -751,6 +751,60 @@ class BotManager:
 
         await self.end_round(context, update.effective_chat.id)
 
+    async def guesses_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            await update.message.reply_text(
+                "No active league. Start a new league with /startleague."
+            )
+            return
+
+        if update.effective_chat.id == self.league_state.chat_id:
+            await update.message.reply_text(
+                "Guesses are only visible in private chat or Players' Lounge. Please DM me with /guesses to see the current round guesses and rankings.",
+            )
+            return
+
+        ranked_guesses = await self.get_ranked_guesses()
+
+        top_5_guesses = []
+        locations_seen_top_5 = set()
+        for ranked_guess in ranked_guesses:
+            if ranked_guess.location_index not in locations_seen_top_5:
+                top_5_guesses.append(ranked_guess)
+                locations_seen_top_5.add(ranked_guess.location_index)
+            if len(top_5_guesses) >= 5:
+                break
+
+        bottom_5_guesses = []
+        locations_seen_bottom_5 = set()
+        for ranked_guess in reversed(ranked_guesses):
+            if ranked_guess.location_index not in locations_seen_bottom_5:
+                bottom_5_guesses.append(ranked_guess)
+                locations_seen_bottom_5.add(ranked_guess.location_index)
+            if len(bottom_5_guesses) >= 5:
+                break
+
+        guesses_message = "📊 Current Round Guesses:\n\n"
+
+        guesses_message += "Top 5 guesses:\n"
+        for ranked_guess in top_5_guesses:
+            guesses_message += f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score:.4f})\n"
+
+        guesses_message += "\nBottom 5 guesses:\n"
+        for ranked_guess in bottom_5_guesses:
+            guesses_message += f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score:.4f})\n"
+
+        logger.info(
+            f"Sending guesses update to chat {update.effective_chat.id}\n\n{guesses_message}"
+        )
+        await update.message.reply_text(
+            guesses_message,
+            parse_mode="HTML",
+        )
+
     async def end_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         if chat_id is None:
             raise ValueError("chat_id must be provided to end_round")
