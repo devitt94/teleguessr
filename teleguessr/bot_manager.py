@@ -929,6 +929,44 @@ class BotManager:
                 chat_id=chat_id,
             )
 
+    async def outcomes_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            await update.message.reply_text(
+                "No active league. Start a new league with /startleague."
+            )
+            return
+
+        odds = self.bet_manager.get_latest_odds(
+            league_round=self.league_state.current_round_num
+        )
+        if not odds:
+            await update.message.reply_text(
+                "Odds have not been generated yet for this round. Please check back soon!",
+            )
+            return
+
+        bet_outcomes_message = "📊 Bet Outcomes:\n\n"
+        for player, odds in odds.items():
+            bet_outcomes_message += f"{player}: (current odds: {odds.formatted})\n"
+
+            for bettor, pnl in self.bet_manager.compute_bet_pnls(winner=player).items():
+                bet_outcomes_message += (
+                    f"    - {bettor}: {self.bet_manager.compute_signed_amount(pnl)}\n"
+                )
+
+            bet_outcomes_message += "\n"
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=bet_outcomes_message,
+            parse_mode="HTML",
+        )
+
     async def show_leaderboard(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         leaderboard = self.league_state.get_leaderboard_data()
         leaderboard_text = format_leaderboard_html(**leaderboard)

@@ -10,18 +10,14 @@ dependencies = [
     "geoguessr-async>=1.1.0",
     "html2text>=2025.4.15",
     "loguru>=0.7.3",
+    "numpy>=2.4.3",
+    "polars>=1.38.1",
+    "scipy>=1.17.1",
     "pydantic>=2.12.2",
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.1.1",
     "python-telegram-bot[job-queue]>=22.5",
     "typer>=0.21.1",
-]
-
-[project.optional-dependencies]
-analysis = [
-    "numpy>=2.4.3",
-    "polars>=1.38.1",
-    "scipy>=1.17.1",
 ]
 
 [dependency-groups]
