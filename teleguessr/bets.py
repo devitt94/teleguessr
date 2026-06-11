@@ -226,6 +226,21 @@ class BetManager:
 
         return position
 
+    def compute_equity(
+        self, runner: str, net_position: float, odds: FractionalOdds | None
+    ) -> float:
+        min_prob, max_prob = 0.00001, 0.99999
+        if odds is None:
+            adjusted_probability = min_prob
+        else:
+            adjusted_probability = (
+                odds.implied_probability - 0.02
+                if net_position > 0
+                else odds.implied_probability + 0.02
+            )
+            adjusted_probability = max(min_prob, min(max_prob, adjusted_probability))
+        return net_position * adjusted_probability
+
     @staticmethod
     def compute_signed_amount(amount: float) -> str:
         if amount > 0:

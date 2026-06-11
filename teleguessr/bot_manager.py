@@ -207,11 +207,26 @@ class BotManager:
             )
 
         position_message = "📈 Your current betting position:\n\n"
-        for runner in all_runners:
-            position = positions.get(runner, 0.0)
+
+        all_positions = {runner: positions.get(runner, 0.0) for runner in all_runners}
+
+        total_equity = 0.0
+        for runner, position in sorted(
+            all_positions.items(), key=lambda x: x[1], reverse=True
+        ):
+            runner_odds = self.bet_manager.get_latest_odds(
+                self.league_state.current_round_num
+            ).get(runner)
+
+            total_equity += self.bet_manager.compute_equity(
+                runner, position, runner_odds
+            )
+
             position_message += (
                 f"- {runner}: {self.bet_manager.compute_signed_amount(position)}\n"
             )
+
+        position_message += f"\nEstimated cash out (adjusted for odds): {self.bet_manager.compute_signed_amount(total_equity)}"
         await update.message.reply_text(
             position_message,
             parse_mode="HTML",

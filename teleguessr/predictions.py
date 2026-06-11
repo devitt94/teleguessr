@@ -80,6 +80,9 @@ def _simulate_league(
             streamer = random.choice(league_state.current_leaders)
             lognormal_fits[streamer].mu += mu_adjustment
 
+        logger.info(
+            f"Simulating round {league_state.current_round_num} with settings {league_state.get_leaderboard_data()['scores']=} and {streamer=}"
+        )
         round_result = _simulate_round(lognormal_fits, hcaps, challenge_settings)
         ranked_guesses = get_ranked_guesses(round_result)
         league_state.add_round_result(round_result)
@@ -136,6 +139,9 @@ def simulate_league(
             hcaps,
         )
         final_leaderboard = final_state.get_leaderboard_data()
+        logger.info(
+            f"Final leaderboard for simulation {i}: {final_leaderboard['scores']=}"
+        )
         player_scores = final_leaderboard["scores"]
         league_final_leaderboards.append(player_scores)
 
