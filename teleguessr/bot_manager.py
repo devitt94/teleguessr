@@ -806,13 +806,16 @@ class BotManager:
 
         guesses_message = "📊 Current Round Guesses:\n\n"
 
+        def format_guess(ranked_guess: RankedGuess) -> str:
+            return f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score})"
+
         guesses_message += "Top 5 guesses:\n"
         for ranked_guess in top_5_guesses:
-            guesses_message += f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score:.4f})\n"
+            guesses_message += f"{format_guess(ranked_guess)}\n"
 
         guesses_message += "\nBottom 5 guesses:\n"
         for ranked_guess in bottom_5_guesses:
-            guesses_message += f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score:.4f})\n"
+            guesses_message += f"{format_guess(ranked_guess)}\n"
 
         logger.info(
             f"Sending guesses update to chat {update.effective_chat.id}\n\n{guesses_message}"
