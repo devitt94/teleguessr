@@ -121,7 +121,7 @@ def fit_all_players(
 
     df = df.with_columns(
         pl.col("weeks_ago")
-        .map_elements(lambda x: 0.5 ** (x / 6))
+        .map_elements(lambda x: 0.5 ** (x / 8))
         .alias("decay_weight")  # half-life of 6 weeks
     )
 

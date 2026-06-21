@@ -1,7 +1,4 @@
-import math
 from typing import NamedTuple
-
-from loguru import logger
 
 
 class FractionalOdds(NamedTuple):
@@ -31,11 +28,6 @@ class FractionalOdds(NamedTuple):
 
 def probs_to_odds(
     probabilities: list[float],
-    n_simulations: int,
-    k: float = 2.0,
-    flat_margin: float = 0.07,
-    margin_buffer: float = 0.01,
-    ladder: list[FractionalOdds] | None = None,
 ) -> list[FractionalOdds | None]:
     """
     Convert a list of model probability estimates to fractional bookmaker odds,
@@ -65,141 +57,103 @@ def probs_to_odds(
         List of fractional odds tuples (numerator, denominator),
         in the same order as the input probabilities.
     """
-    if not probabilities:
-        raise ValueError("probabilities list is empty")
-    if any(p < 0 or p > 1 for p in probabilities):
-        raise ValueError("all probabilities must be between 0 and 1")
-    if abs(sum(probabilities) - 1.0) > 0.01:
-        raise ValueError(
-            f"probabilities should sum to 1.0, got {sum(probabilities):.4f}"
-        )
+    return [probability_to_odds(p) for p in probabilities]
 
-    if n_simulations < 1:
-        raise ValueError("n_simulations must be >= 1")
-    if flat_margin < 0:
-        raise ValueError("flat_margin must be >= 0")
 
-    _ladder = ladder or BOOKMAKER_LADDER
-    min_odds, max_odds = _ladder[0], _ladder[-1]
-    min_dec = min_odds.decimal
-    max_dec = max_odds.decimal
+def probability_to_odds(probability: float) -> FractionalOdds | None:
+    """Convert a single probability to fractional bookmaker odds."""
 
-    # Pre-compute decimal values for the ladder once, sorted ascending
-    ladder_dec = [(f.decimal, f) for f in _ladder]
-    ladder_dec.sort()
+    if probability < 0 or probability > 1:
+        raise ValueError("probability must be between 0 and 1")
 
-    result = []
-    for p in probabilities:
-        if not (0 < p < 1):
-            # Don't offer odds for impossible or certain outcomes; return None to indicate no bet offered
-            logger.warning(
-                f"Probability {p:.4f} is out of bounds (0,1). No odds will be offered for this runner."
-            )
-            result.append(None)
-            continue
-
-        # Standard error of a proportion from MC simulation
-        se = math.sqrt(p * (1 - p) / n_simulations)
-
-        # SE margin: covers sampling noise (proportional to uncertainty in estimate)
-        # Flat margin: covers model error (applied equally to all runners)
-        adjusted_p = (p + k * se) * (1 + flat_margin) + margin_buffer
-
-        # Convert to decimal odds and clamp to [min_odds, max_odds]
-        raw_dec = 1.0 / adjusted_p
-        clamped_dec = max(min_dec, min(max_dec, raw_dec))
-
-        # Round down to the nearest rung on the ladder
-        rungs_below = [(d, f) for d, f in ladder_dec if d <= clamped_dec]
-        if rungs_below:
-            _, best_frac = max(rungs_below)  # largest decimal that is still <= clamped
-        else:
-            best_frac = min_odds  # below the bottom of the ladder
-
-        result.append(best_frac)
-
-    return result
+    for prob, odds in BOOKMAKER_LADDER:
+        if probability >= prob:
+            return odds
+    return None
 
 
 # ---------------------------------------------------------------------------
 # Standard fractional bookmaker odds ladder
 # ---------------------------------------------------------------------------
-BOOKMAKER_LADDER: list[FractionalOdds] = [
-    FractionalOdds(1, 500),
-    FractionalOdds(1, 200),
-    FractionalOdds(1, 100),
-    FractionalOdds(1, 50),
-    FractionalOdds(1, 20),
-    FractionalOdds(1, 14),
-    FractionalOdds(1, 10),
-    FractionalOdds(1, 8),
-    FractionalOdds(1, 7),
-    FractionalOdds(1, 6),
-    FractionalOdds(1, 5),
-    FractionalOdds(2, 9),
-    FractionalOdds(1, 4),
-    FractionalOdds(2, 7),
-    FractionalOdds(3, 10),
-    FractionalOdds(1, 3),
-    FractionalOdds(4, 11),
-    FractionalOdds(2, 5),
-    FractionalOdds(4, 9),
-    FractionalOdds(1, 2),
-    FractionalOdds(8, 15),
-    FractionalOdds(4, 7),
-    FractionalOdds(8, 13),
-    FractionalOdds(4, 6),
-    FractionalOdds(8, 11),
-    FractionalOdds(4, 5),
-    FractionalOdds(5, 6),
-    FractionalOdds(10, 11),
-    FractionalOdds(1, 1),
-    FractionalOdds(21, 20),
-    FractionalOdds(11, 10),
-    FractionalOdds(23, 20),
-    FractionalOdds(6, 5),
-    FractionalOdds(5, 4),
-    FractionalOdds(11, 8),
-    FractionalOdds(7, 5),
-    FractionalOdds(6, 4),
-    FractionalOdds(8, 5),
-    FractionalOdds(13, 8),
-    FractionalOdds(7, 4),
-    FractionalOdds(9, 5),
-    FractionalOdds(15, 8),
-    FractionalOdds(2, 1),
-    FractionalOdds(11, 5),
-    FractionalOdds(9, 4),
-    FractionalOdds(12, 5),
-    FractionalOdds(5, 2),
-    FractionalOdds(13, 5),
-    FractionalOdds(11, 4),
-    FractionalOdds(3, 1),
-    FractionalOdds(16, 5),
-    FractionalOdds(10, 3),
-    FractionalOdds(7, 2),
-    FractionalOdds(4, 1),
-    FractionalOdds(9, 2),
-    FractionalOdds(5, 1),
-    FractionalOdds(11, 2),
-    FractionalOdds(6, 1),
-    FractionalOdds(13, 2),
-    FractionalOdds(7, 1),
-    FractionalOdds(15, 2),
-    FractionalOdds(8, 1),
-    FractionalOdds(9, 1),
-    FractionalOdds(10, 1),
-    FractionalOdds(11, 1),
-    FractionalOdds(12, 1),
-    FractionalOdds(13, 1),
-    FractionalOdds(14, 1),
-    FractionalOdds(15, 1),
-    FractionalOdds(16, 1),
-    FractionalOdds(18, 1),
-    FractionalOdds(20, 1),
-    FractionalOdds(25, 1),
-    FractionalOdds(33, 1),
-    FractionalOdds(50, 1),
-    FractionalOdds(66, 1),
-    FractionalOdds(100, 1),
-]
+BOOKMAKER_LADDER: tuple[tuple[float, FractionalOdds | None]] = (
+    (0.995, None),  # no bet offered for almost certain outcomes
+    (0.99, FractionalOdds(1, 1000)),
+    (0.98, FractionalOdds(1, 500)),
+    (0.97, FractionalOdds(1, 200)),
+    (0.96, FractionalOdds(1, 100)),
+    (0.95, FractionalOdds(1, 66)),
+    (0.94, FractionalOdds(1, 50)),
+    (0.93, FractionalOdds(1, 33)),
+    (0.92, FractionalOdds(1, 25)),
+    (0.91, FractionalOdds(1, 20)),
+    (0.90, FractionalOdds(1, 18)),
+    (0.89, FractionalOdds(1, 1)),
+    (0.88, FractionalOdds(1, 14)),
+    (0.87, FractionalOdds(1, 12)),
+    (0.86, FractionalOdds(1, 10)),
+    (0.85, FractionalOdds(1, 9)),
+    (0.84, FractionalOdds(1, 8)),
+    (0.83, FractionalOdds(2, 15)),
+    (0.82, FractionalOdds(1, 7)),
+    (0.81, FractionalOdds(2, 13)),
+    (0.80, FractionalOdds(1, 6)),
+    (0.79, FractionalOdds(2, 11)),
+    (0.78, FractionalOdds(1, 5)),
+    (0.76, FractionalOdds(2, 9)),
+    (0.74, FractionalOdds(1, 4)),
+    (0.72, FractionalOdds(2, 7)),
+    (0.70, FractionalOdds(3, 10)),
+    (0.68, FractionalOdds(1, 3)),
+    (0.66, FractionalOdds(4, 11)),
+    (0.64, FractionalOdds(2, 5)),
+    (0.62, FractionalOdds(4, 9)),
+    (0.60, FractionalOdds(1, 2)),
+    (0.59, FractionalOdds(8, 15)),
+    (0.57, FractionalOdds(4, 7)),
+    (0.55, FractionalOdds(8, 13)),
+    (0.53, FractionalOdds(4, 6)),
+    (0.51, FractionalOdds(8, 11)),
+    (0.50, FractionalOdds(4, 5)),
+    (0.48, FractionalOdds(5, 6)),
+    (0.47, FractionalOdds(10, 11)),
+    (0.45, FractionalOdds(20, 21)),
+    (0.44, FractionalOdds(1, 1)),
+    (0.43, FractionalOdds(21, 20)),
+    (0.42, FractionalOdds(11, 10)),
+    (0.41, FractionalOdds(23, 20)),
+    (0.40, FractionalOdds(6, 5)),
+    (0.39, FractionalOdds(5, 4)),
+    (0.38, FractionalOdds(13, 10)),
+    (0.37, FractionalOdds(11, 8)),
+    (0.36, FractionalOdds(7, 5)),
+    (0.34, FractionalOdds(6, 4)),
+    (0.325, FractionalOdds(13, 8)),
+    (0.31, FractionalOdds(7, 4)),
+    (0.295, FractionalOdds(15, 8)),
+    (0.28, FractionalOdds(2, 1)),
+    (0.265, FractionalOdds(21, 10)),
+    (0.25, FractionalOdds(9, 4)),
+    (0.235, FractionalOdds(12, 5)),
+    (0.21, FractionalOdds(5, 2)),
+    (0.20, FractionalOdds(11, 4)),
+    (0.19, FractionalOdds(3, 1)),
+    (0.18, FractionalOdds(13, 4)),
+    (0.17, FractionalOdds(7, 2)),
+    (0.16, FractionalOdds(15, 4)),
+    (0.145, FractionalOdds(4, 1)),
+    (0.13, FractionalOdds(9, 2)),
+    (0.115, FractionalOdds(5, 1)),
+    (0.10, FractionalOdds(11, 2)),
+    (0.09, FractionalOdds(6, 1)),
+    (0.08, FractionalOdds(13, 2)),
+    (0.07, FractionalOdds(7, 1)),
+    (0.06, FractionalOdds(15, 2)),
+    (0.05, FractionalOdds(9, 1)),
+    (0.04, FractionalOdds(10, 1)),
+    (0.03, FractionalOdds(12, 1)),
+    (0.02, FractionalOdds(14, 1)),
+    (0.01, FractionalOdds(20, 1)),
+    (0.005, FractionalOdds(33, 1)),
+    (0.002, FractionalOdds(50, 1)),
+    (0.001, FractionalOdds(66, 1)),
+)
