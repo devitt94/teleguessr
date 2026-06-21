@@ -87,7 +87,7 @@ BOOKMAKER_LADDER: tuple[tuple[float, FractionalOdds | None]] = (
     (0.92, FractionalOdds(1, 25)),
     (0.91, FractionalOdds(1, 20)),
     (0.90, FractionalOdds(1, 18)),
-    (0.89, FractionalOdds(1, 1)),
+    (0.89, FractionalOdds(1, 16)),
     (0.88, FractionalOdds(1, 14)),
     (0.87, FractionalOdds(1, 12)),
     (0.86, FractionalOdds(1, 10)),
