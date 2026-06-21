@@ -16,6 +16,7 @@ PLAYER_NAME_TO_TELEGRAM_ID = {
     "Kingdom of Gregoria I": 6724087132,
     "Horanje": 1752908144,
     "Boothlandia": 7495773616,
+    "Commissioner Perez": 1672238836,
 }
 
 TELEGRAM_ID_TO_PLAYER_NAME = {v: k for k, v in PLAYER_NAME_TO_TELEGRAM_ID.items()}

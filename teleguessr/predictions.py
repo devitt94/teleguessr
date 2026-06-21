@@ -136,9 +136,6 @@ def simulate_league(
             hcaps,
         )
         final_leaderboard = final_state.get_leaderboard_data()
-        logger.info(
-            f"Final leaderboard for simulation {i}: {json.dumps(final_leaderboard, indent=2)}"
-        )
         player_scores = final_leaderboard["scores"]
         league_final_leaderboards.append(player_scores)
 
