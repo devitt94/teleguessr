@@ -18,6 +18,7 @@ class GeoguessrClient:
     async def create_challenge(
         self,
         challenge_settings: ChallengeSettings,
+        retries: int = 3,
     ) -> str:
         """
         Create a new GeoGuessr challenge and return its URL.
@@ -27,15 +28,25 @@ class GeoguessrClient:
         )
 
         map_url = f"https://www.geoguessr.com/maps/{challenge_settings.map_id}"
-        challenge_url = await Geoguessr(self.ncfa_cookie).generate_challenge(
-            mapUrl=map_url,
-            move=challenge_settings.move_allowed,
-            pan=challenge_settings.pan_allowed,
-            zoom=challenge_settings.zoom_allowed,
-            timeLimit=challenge_settings.time_limit_seconds,
-            playMap=False,
-            numRounds=challenge_settings.number_of_locations,
-        )
+        try:
+            challenge_url = await Geoguessr(self.ncfa_cookie).generate_challenge(
+                mapUrl=map_url,
+                move=challenge_settings.move_allowed,
+                pan=challenge_settings.pan_allowed,
+                zoom=challenge_settings.zoom_allowed,
+                timeLimit=challenge_settings.time_limit_seconds,
+                playMap=False,
+                numRounds=challenge_settings.number_of_locations,
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to create challenge: {e}. Retrying {retries} more times..."
+            )
+            if retries > 0:
+                return await self.create_challenge(challenge_settings, retries - 1)
+            else:
+                raise
+
         return challenge_url
 
     async def get_challenge_scores(
