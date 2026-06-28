@@ -6,11 +6,11 @@ from hypothesis import given, strategies as st
 
 
 @given(probability=st.floats(min_value=0.075, max_value=0.925))
-def test_probability_to_odds__margin_always_between_3_and_5_percent(probability):
+def test_probability_to_odds__margin_always_within_expected_range(probability):
     odds = probability_to_odds(probability)
     assert odds is not None
     margin = odds.implied_probability - probability
-    assert 0.0325 <= margin <= 0.0575
+    assert 0.025 <= margin <= 0.05
 
 
 def test_probability_to_odds__invalid_probability_raises_value_error():

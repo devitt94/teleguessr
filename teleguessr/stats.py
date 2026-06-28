@@ -68,10 +68,6 @@ def fit_player(
         )
         return None
 
-    if player == "Horanje":
-        logger.info(f"Skipping {player} due to known data issues")
-        return None
-
     log_data = np.log(distances)
     mu0, sigma0 = log_data.mean(), log_data.std()
 
