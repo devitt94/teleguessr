@@ -101,7 +101,7 @@ def fit_player(
         mean_km=mean_km,
         median_km=median_km,
     )
-    print(
+    logger.info(
         f"Fitted {player}: mu={mu_hat:.4f}, sigma={sigma_hat:.4f}, mean_km={mean_km:.2f}, median_km={median_km:.2f}"
     )
     return res
@@ -145,8 +145,8 @@ def fit_all_players(
 
     results["Commissioner Perez"] = FitResult(
         player="Commissioner Perez",
-        mu=7.35,
-        sigma=2.2,
+        mu=7.5,
+        sigma=2.22,
         n_rounds=100,
         converged=True,
         mean_km=3250.0,
