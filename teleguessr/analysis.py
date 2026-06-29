@@ -76,6 +76,7 @@ MAX_DISTANCE_KM = 20015  # Max possible distance on Earth, used for lognormal tr
 NAME_CHANGES = {
     "Boothd": "Boothlandia",
     "Danminican Republic": "Danquador Junta State",
+    "Commissioner Perez": "Ashghanistani Dem Rep Mikistan",
 }
 
 
