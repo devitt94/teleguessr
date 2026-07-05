@@ -52,7 +52,7 @@ def fit_player(
     player: str,
     distances: np.ndarray,
     weights: np.ndarray,
-    min_rounds: int = 100,
+    min_rounds: int = 50,
     adjustment: float = 0.0,
 ) -> FitResult | None:
     """Fit truncated lognormal for a single player. Returns None if insufficient data."""
@@ -108,7 +108,7 @@ def fit_player(
 
 
 def fit_all_players(
-    df: pl.DataFrame, adjustments: dict[str, float] = None, min_rounds: int = 100
+    df: pl.DataFrame, adjustments: dict[str, float], min_rounds: int = 50
 ) -> dict[str, FitResult]:
     results = {}
 
@@ -132,7 +132,13 @@ def fit_all_players(
     for player, group in df.group_by("player"):
         distances = group["distance_km"].to_numpy()
         weights = group["decay_weight"].to_numpy()
-        player_adjustment = adjustments.get(player[0], 0.0)
+
+        try:
+            player_adjustment = adjustments[player[0]]
+        except KeyError:
+            logger.warning(f"No adjustment found for player {player[0]}, skipping fit.")
+            continue
+
         fit = fit_player(
             player[0],
             distances,
@@ -142,15 +148,5 @@ def fit_all_players(
         )
         if fit is not None:
             results[player[0]] = fit
-
-    results["Commissioner Perez"] = FitResult(
-        player="Commissioner Perez",
-        mu=7.5,
-        sigma=2.22,
-        n_rounds=100,
-        converged=True,
-        mean_km=3250.0,
-        median_km=2250.0,
-    )
 
     return results
