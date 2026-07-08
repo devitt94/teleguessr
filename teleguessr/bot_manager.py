@@ -448,15 +448,14 @@ class BotManager:
             n_sims=self.model_settings.n_sims,
         )
         odds_dict = dict(
-            zip(
-                odds_df["player"],
-                [
-                    FractionalOdds.from_str(odds)
-                    for odds in odds_df["back_win_odds"]
-                    if odds is not None
-                ],
-            )
+            odds_df.select("player", "back_win_odds")
+            .drop_nulls("back_win_odds")
+            .iter_rows()
         )
+        odds_dict = {
+            player: FractionalOdds.from_str(odds) for player, odds in odds_dict.items()
+        }
+
         overround = sum(odds.implied_probability for odds in odds_dict.values()) - 1
         logger.info(
             f"Odds predictions generated\n\n{odds_df}\\n\nOverround: {overround:.2%}"
