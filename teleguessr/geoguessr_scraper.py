@@ -84,20 +84,14 @@ class GeoguessrClient:
                 for score, distance in zip(guess_points, guess_distances)
             ]
 
-            if (
-                challenge_settings
-                and len(guesses) != challenge_settings.number_of_locations
-            ):
-                logger.warning(
-                    f"Player {playername} has only completed {len(guesses)} rounds, expected {challenge_settings.number_of_locations}."
-                )
-                is_finished = False
+            if challenge_settings:
+                n_rounds = challenge_settings.number_of_locations
             else:
-                is_finished = True
+                n_rounds = len(guesses)
 
             player = Player(name=playername, hcap_multiplier=hcap_multiplier)
             round_score = ChallengeScore(
-                player=player, guesses=guesses, is_finished=is_finished
+                player=player, guesses=guesses, num_rounds=n_rounds
             )
             challenge_scores.append(round_score)
 

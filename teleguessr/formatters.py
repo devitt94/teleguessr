@@ -94,13 +94,8 @@ def format_round_result_html(
 
     rank_scores = skewed_ranking_score_manager(result)
 
-    num_rounds = (
-        result.challenge_settings.number_of_locations
-        if result.challenge_settings
-        else max(len(score.guesses) for score in result.scores if score.is_finished)
-    )
     sorted_player_scores = sorted(
-        result.scores, key=lambda rs: rs.compute_net_score(num_rounds), reverse=True
+        result.scores, key=lambda rs: rs.compute_net_score(), reverse=True
     )
 
     bonus_points = {rs.player.name: 0 for rs in sorted_player_scores}
@@ -133,8 +128,8 @@ def format_round_result_html(
             f"{rank_emoji} <b>{pos_str} — {rs.player.name}</b>\n"
             f"    • Gross: <b>{rs.gross_score}</b>\n"
             f"    • Hcap: <b>{rs.player.hcap_multiplier:.1%}</b>\n"
-            f"    • Hcap Adjustment: <b>{rs.compute_hcap_adjustment(num_rounds)}</b>\n"
-            f"    • Net: <b>{rs.compute_net_score(num_rounds)}</b>\n"
+            f"    • Hcap Adjustment: <b>{rs.compute_hcap_adjustment()}</b>\n"
+            f"    • Net: <b>{rs.compute_net_score()}</b>\n"
             f"    • Points: <b>{points_str}</b>\n"
         )
 

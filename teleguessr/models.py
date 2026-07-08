@@ -35,7 +35,11 @@ class ActiveRound(BaseModel):
 class ChallengeScore(BaseModel):
     player: Player
     guesses: list[Guess] = conlist(Guess, min_length=1)
-    is_finished: bool = True
+    num_rounds: int = Field(default=10, ge=1)
+
+    @property
+    def is_finished(self) -> bool:
+        return len(self.guesses) == self.num_rounds
 
     @property
     def gross_score(self) -> int:
@@ -47,17 +51,18 @@ class ChallengeScore(BaseModel):
             self.player.hcap_multiplier * (max_challenge_score - self.gross_score)
         )
 
-    def compute_hcap_adjustment(self, num_rounds: int) -> int:
+    def compute_hcap_adjustment(self) -> int:
         uncapped_adjustment = self.compute_uncapped_hcap_adjustment(
-            num_rounds=num_rounds
+            num_rounds=self.num_rounds
         )
         max_adjustment = int(
-            ((MAX_ROUND_SCORE * num_rounds) // 2) * self.player.hcap_multiplier
+            ((MAX_ROUND_SCORE * self.num_rounds) // 2) * self.player.hcap_multiplier
         )
-        return min(uncapped_adjustment, max_adjustment)
+        capped_adjustment = min(uncapped_adjustment, max_adjustment)
+        return capped_adjustment * (len(self.guesses) / self.num_rounds)
 
-    def compute_net_score(self, num_rounds: int) -> int:
-        return self.gross_score + self.compute_hcap_adjustment(num_rounds=num_rounds)
+    def compute_net_score(self) -> int:
+        return self.gross_score + self.compute_hcap_adjustment()
 
 
 class GuessStats(BaseModel):
@@ -108,7 +113,7 @@ class ChallengeResult(BaseModel):
     def get_player_position(self, player_name: str) -> int:
         sorted_scores = sorted(
             self.scores,
-            key=lambda rs: rs.compute_net_score(self.num_rounds),
+            key=lambda rs: rs.compute_net_score(),
             reverse=True,
         )
         for index, rs in enumerate(sorted_scores):
@@ -121,7 +126,12 @@ class ChallengeResult(BaseModel):
 class AbbreviatedRoundScore(BaseModel):
     rank: int
     net_score: int
-    is_finished: bool = True
+    rounds_played: int
+    total_rounds: int
+
+    @property
+    def is_finished(self) -> bool:
+        return self.rounds_played == self.total_rounds
 
 
 class Bet(BaseModel):

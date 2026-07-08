@@ -535,7 +535,7 @@ class BotManager:
                     net_score_str = ""
                 elif not abbreviated_score.is_finished:
                     rank_emoji = "⏳"
-                    net_score_str = f" ({abbreviated_score.net_score} pts so far)"
+                    net_score_str = f" ({abbreviated_score.net_score} pts, {abbreviated_score.rounds_played}/{abbreviated_score.total_rounds} played)"
                 else:
                     rank_emoji = NUMBER_EMOJI_MAP.get(abbreviated_score.rank, "❓")
                     net_score_str = f" ({abbreviated_score.net_score} pts)"
@@ -1014,21 +1014,22 @@ class BotManager:
         self, round_result: ChallengeResult
     ) -> dict[str, AbbreviatedRoundScore | None]:
         net_scores = {}
-        unfinished_players = set()
+        rounds_played_by_player = {}
         for score in round_result.scores:
-            net_score = score.compute_net_score(round_result.num_rounds)
+            net_score = score.compute_net_score()
             net_scores[score.player.name] = net_score
-            if not score.is_finished:
-                unfinished_players.add(score.player.name)
+            rounds_played_by_player[score.player.name] = len(score.guesses)
 
         ranks = get_ranks_from_scores(net_scores)
 
         result = {player: None for player in self.handicaps.keys()}
 
         for player, rank in ranks.items():
-            is_finished = player not in unfinished_players
             result[player] = AbbreviatedRoundScore(
-                rank=rank, net_score=net_scores[player], is_finished=is_finished
+                rank=rank,
+                net_score=net_scores[player],
+                rounds_played=rounds_played_by_player[player],
+                total_rounds=round_result.num_rounds,
             )
 
         # Sort the result dict by rank (None values at the end)

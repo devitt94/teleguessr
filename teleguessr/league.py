@@ -19,16 +19,14 @@ ScoreManager = Callable[[ChallengeResult], dict[str, int]]
 def default_score_manager(result: ChallengeResult) -> dict[str, int]:
     scores: dict[str, int] = {}
     for round_score in result.scores:
-        scores[round_score.player.name] = round_score.compute_net_score(
-            result.num_rounds
-        )
+        scores[round_score.player.name] = round_score.compute_net_score()
     return scores
 
 
 def ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
     sorted_scores = sorted(
         result.scores,
-        key=lambda rs: rs.compute_net_score(result.num_rounds),
+        key=lambda rs: rs.compute_net_score(),
         reverse=True,
     )
     scores: dict[str, int] = {}
@@ -42,7 +40,7 @@ def skewed_ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
     rank_points = [12, 10, 8, 7, 6, 5, 4, 3, 2, 1]
     sorted_scores = sorted(
         result.scores,
-        key=lambda rs: rs.compute_net_score(result.num_rounds),
+        key=lambda rs: rs.compute_net_score(),
         reverse=True,
     )
     scores: dict[str, int] = {}
@@ -203,8 +201,7 @@ class LeagueState(BaseModel):
 
         last_round = self.results[-1]
         last_round_scores = {
-            rs.player.name: rs.compute_net_score(last_round.num_rounds)
-            for rs in last_round.scores
+            rs.player.name: rs.compute_net_score() for rs in last_round.scores
         }
         top_players_sorted = sorted(
             top_players, key=lambda p: last_round_scores.get(p, 0), reverse=True
