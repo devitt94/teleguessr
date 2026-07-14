@@ -280,6 +280,9 @@ def predictions(
         )
     )
     print(preds)
+    print("\n\n")
+    print("Predicted outright odds:")
+    print(json.dumps(dict(zip(preds["player"], preds["back_win_odds"])), indent=4))
 
 
 @app.command()
