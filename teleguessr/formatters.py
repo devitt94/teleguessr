@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from teleguessr.league import skewed_ranking_score_manager
 from teleguessr.models import ChallengeResult, ChallengeSettings, RankedGuess
 
@@ -168,3 +170,28 @@ def format_challenge_settings(challenge_settings: ChallengeSettings) -> str:
         f"Pan: <b>{pan_str}</b>\n"
         f"Zoom: <b>{zoom_str}</b>"
     )
+
+
+def format_datetime_to_time_ago(dt: datetime | date | None) -> str:
+    if dt is None:
+        return "N/A"
+    now = datetime.now()
+    if isinstance(dt, date) and not isinstance(dt, datetime):
+        dt = datetime.combine(dt, datetime.min.time())
+
+    delta = now - dt
+
+    days = delta.days
+
+    years = days // 365
+    if years > 0:
+        return f"{years} year{'s' if years > 1 else ''} ago"
+
+    months = days // 30
+    if months > 0:
+        return f"{months} month{'s' if months > 1 else ''} ago"
+
+    if days > 0:
+        return f"{days} day{'s' if days > 1 else ''} ago"
+
+    return "today"

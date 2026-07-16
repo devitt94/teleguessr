@@ -15,6 +15,7 @@ from teleguessr.challenge_settings_generators import (
 from teleguessr.formatters import (
     format_awards_html,
     format_challenge_settings,
+    format_datetime_to_time_ago,
     format_leaderboard_html,
     format_round_result_html,
     format_time,
@@ -118,6 +119,7 @@ class BotManager:
             logger.info("No active league found.")
 
         self.handicaps = get_latest_handicaps(self.league_settings)
+        self.record_manager = RecordManager(data_dir=self.data_dir)
 
         if self.league_state is not None:
             self.bet_manager = BetManager(
@@ -125,7 +127,6 @@ class BotManager:
                 data_dir=self.data_dir,
                 league_date=self.league_state.start_date,
             )
-            self.record_manager = RecordManager(data_dir=self.data_dir)
 
         self.__initialised = True
 
@@ -237,27 +238,30 @@ class BotManager:
             parse_mode="HTML",
         )
 
-    def records_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def records_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
 
         records = self.record_manager.get_records()
 
-        records_message = "🏆 All-Time Records:\n\n"
+        records_message = "🏆 All-Time Records:\n"
+        records_message += "Net = 🏅; Gross = 👑\n\n"
+
         for player, record in records.items():
             records_message += f"- {player}:\n"
-            records_message += f"  - Net Wins: {record.net_wins}\n"
-            records_message += f"  - Gross Wins: {record.gross_wins}\n"
-            if record.most_recent_net_win:
-                records_message += f"  - Most Recent Net Win: {record.most_recent_net_win.strftime('%Y-%m-%d')}\n"
+            if record.net_wins > 0:
+                net_win_str = f"{record.net_wins} (most recent: {format_datetime_to_time_ago(record.most_recent_net_win)}) \n"
             else:
-                records_message += "  - Most Recent Net Win: N/A\n"
-            if record.most_recent_gross_win:
-                records_message += f"  - Most Recent Gross Win: {record.most_recent_gross_win.strftime('%Y-%m-%d')}\n"
-            else:
-                records_message += "  - Most Recent Gross Win: N/A\n"
+                net_win_str = "0\n"
+            records_message += f"    - 🏅x{net_win_str}"
 
-        update.message.reply_text(
+            if record.gross_wins > 0:
+                gross_win_str = f"{record.gross_wins} (most recent: {format_datetime_to_time_ago(record.most_recent_gross_win)}) \n"
+            else:
+                gross_win_str = "0\n"
+            records_message += f"    - 👑x{gross_win_str}"
+
+        await update.message.reply_text(
             records_message,
             parse_mode="HTML",
         )

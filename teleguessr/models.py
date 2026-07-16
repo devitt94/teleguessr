@@ -59,9 +59,6 @@ class ChallengeScore(BaseModel):
             ((MAX_ROUND_SCORE * self.num_rounds) // 2) * self.player.hcap_multiplier
         )
         capped_adjustment = min(uncapped_adjustment, max_adjustment)
-        print(
-            f"{len(self.guesses)=} rounds, gross score: {self.gross_score}, uncapped adjustment: {uncapped_adjustment}, max adjustment: {max_adjustment}, capped adjustment: {capped_adjustment}"
-        )
         return capped_adjustment
 
     def compute_net_score(self) -> int:
