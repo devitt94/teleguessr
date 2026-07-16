@@ -920,6 +920,12 @@ class BotManager:
                 league_settings=self.league_settings,
             )
 
+            gross_winner = gross_replay_league_state.get_winner()
+            self.record_manager.update_records(
+                gross_winner=gross_winner,
+                net_winner=winner,
+            )
+
             replayed_leaderboard_text = format_leaderboard_html(
                 **gross_replay_league_state.get_leaderboard_data()
             )
