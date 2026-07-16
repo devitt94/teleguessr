@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from pydantic import BaseModel, Field, confloat, conlist
+from pydantic import BaseModel, Field, confloat, conlist, field_serializer
 
 
 MAX_ROUND_SCORE = 5000
@@ -164,3 +164,7 @@ class Records(BaseModel):
     gross_wins: int
     most_recent_net_win: date | None = None
     most_recent_gross_win: date | None = None
+
+    @field_serializer("most_recent_net_win", "most_recent_gross_win")
+    def serialize_date(self, value: date | None) -> str | None:
+        return value.strftime("%Y-%m-%d") if value else None
