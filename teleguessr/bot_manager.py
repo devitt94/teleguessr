@@ -22,6 +22,7 @@ from teleguessr.formatters import (
 from teleguessr.odds import FractionalOdds
 from teleguessr.predictions import generate_outright_odds_predictions
 from teleguessr.replay import replay_league
+from teleguessr.record_manager import RecordManager
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import (
     LeagueState,
@@ -124,6 +125,7 @@ class BotManager:
                 data_dir=self.data_dir,
                 league_date=self.league_state.start_date,
             )
+            self.record_manager = RecordManager(data_dir=self.data_dir)
 
         self.__initialised = True
 
@@ -157,6 +159,9 @@ class BotManager:
             "/handicaps - Show current handicaps\n"
             "/lounge - Get an invite to the Players' Lounge group chat (after playing your round)\n"
             "/bet - Place a bet on the league winner\n"
+            "/position - Show your current betting position\n"
+            "/guesses - Show current round guesses and rankings\n"
+            "/records - Show all-time records\n"
             "/help - Show this help message\n\n"
         )
 
@@ -229,6 +234,31 @@ class BotManager:
         position_message += f"\nEstimated cash out (adjusted for odds): {self.bet_manager.compute_signed_amount(total_equity)}"
         await update.message.reply_text(
             position_message,
+            parse_mode="HTML",
+        )
+
+    def records_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        records = self.record_manager.get_records()
+
+        records_message = "🏆 All-Time Records:\n\n"
+        for player, record in records.items():
+            records_message += f"- {player}:\n"
+            records_message += f"  - Net Wins: {record.net_wins}\n"
+            records_message += f"  - Gross Wins: {record.gross_wins}\n"
+            if record.most_recent_net_win:
+                records_message += f"  - Most Recent Net Win: {record.most_recent_net_win.strftime('%Y-%m-%d')}\n"
+            else:
+                records_message += "  - Most Recent Net Win: N/A\n"
+            if record.most_recent_gross_win:
+                records_message += f"  - Most Recent Gross Win: {record.most_recent_gross_win.strftime('%Y-%m-%d')}\n"
+            else:
+                records_message += "  - Most Recent Gross Win: N/A\n"
+
+        update.message.reply_text(
+            records_message,
             parse_mode="HTML",
         )
 

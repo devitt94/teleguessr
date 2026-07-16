@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, Field, confloat, conlist
 
 
@@ -160,3 +160,10 @@ class Bet(BaseModel):
             f"Return: €{self.potential_return:.2f}\n"
             f"Potential Profit: €{self.potential_profit:.2f}\n"
         )
+
+
+class Records(BaseModel):
+    net_wins: int
+    gross_wins: int
+    most_recent_net_win: date | None = None
+    most_recent_gross_win: date | None = None
