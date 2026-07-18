@@ -29,7 +29,13 @@ from teleguessr.league import (
     LeagueState,
     skewed_ranking_score_manager,
 )
-from teleguessr.models import AbbreviatedRoundScore, ChallengeResult, RankedGuess
+from teleguessr.models import (
+    AbbreviatedRoundScore,
+    BetType,
+    ChallengeResult,
+    MarketType,
+    RankedGuess,
+)
 from teleguessr.settings import (
     LeagueSettings,
     TELEGRAM_ID_TO_PLAYER_NAME,
@@ -48,7 +54,7 @@ from teleguessr.ranks import get_ranks_from_scores
 from telegram.ext import ContextTypes
 
 
-BET_SELECT_PLAYER, BET_SELECT_AMOUNT = range(2)
+BET_SELECT_PLAYER, BET_SELECT_BET_TYPE, BET_SELECT_AMOUNT = range(3)
 
 NUMBER_EMOJI_MAP = {
     1: "1️⃣",
@@ -126,6 +132,7 @@ class BotManager:
                 model_settings=self.model_settings,
                 data_dir=self.data_dir,
                 league_date=self.league_state.start_date,
+                all_runners=list(self.handicaps.keys()),
             )
 
         self.__initialised = True
@@ -183,6 +190,27 @@ class BotManager:
 
         await self.display_odds(context, chat_id=update.effective_chat.id)
 
+    async def exposure_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            update.message.reply_text(
+                "No active league. Start a new league with /startleague."
+            )
+            return
+
+        exposure_message = self.construct_position_message(
+            player_name=None, is_bookmaker=True
+        )
+
+        await update.message.reply_text(
+            exposure_message,
+            parse_mode="HTML",
+        )
+
     async def position_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -196,29 +224,33 @@ class BotManager:
             return
 
         player_id = update.effective_user.id
-        all_runners = list(self.handicaps.keys())
-
-        if player_id == self.admin_id:
-            positions = self.bet_manager.compute_bookmaker_exposure(all_runners)
-        else:
-            player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
-            if player_name is None:
-                await update.message.reply_text(
-                    "Your Telegram ID is not linked to a player name. Please contact the admin."
-                )
-                return
-
-            positions = self.bet_manager.compute_position(
-                bettor=player_name, runners=all_runners
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+        if player_name is None:
+            await update.message.reply_text(
+                "Your Telegram ID is not linked to a player name. Please contact the admin."
             )
+            return
 
-        position_message = "📈 Your current betting position:\n\n"
+        position_message = self.construct_position_message(player_name=player_name)
+        await update.message.reply_text(
+            position_message,
+            parse_mode="HTML",
+        )
 
-        all_positions = {runner: positions.get(runner, 0.0) for runner in all_runners}
+    def construct_position_message(
+        self, player_name: str, is_bookmaker: bool = False
+    ) -> str:
+        if is_bookmaker:
+            position = self.bet_manager.compute_bookmaker_exposure()
+            position_message = "📈 Bookmaker's exposure:\n\n"
+        else:
+            position_message = "📈 Your current betting position:\n\n"
+            position = self.bet_manager.compute_position(bettor=player_name)
 
         total_equity = 0.0
+
         for runner, position in sorted(
-            all_positions.items(), key=lambda x: x[1], reverse=True
+            position.items(), key=lambda x: x[1], reverse=True
         ):
             runner_odds = self.bet_manager.get_latest_odds(
                 self.league_state.current_round_num
@@ -233,10 +265,7 @@ class BotManager:
             )
 
         position_message += f"\nEstimated cash out (adjusted for odds): {self.bet_manager.compute_signed_amount(total_equity)}"
-        await update.message.reply_text(
-            position_message,
-            parse_mode="HTML",
-        )
+        return position_message
 
     async def records_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
@@ -298,6 +327,7 @@ class BotManager:
             model_settings=self.model_settings,
             data_dir=self.data_dir,
             league_date=self.league_state.start_date,
+            all_runners=list(self.handicaps.keys()),
         )
 
         logger.info(f"Starting new league at {league_filepath.absolute()}")
@@ -460,7 +490,7 @@ class BotManager:
             f"Writing empty odds file for round {self.league_state.current_round_num}"
         )
         self.bet_manager.update_odds(
-            round_num=self.league_state.current_round_num, odds={}
+            round_num=self.league_state.current_round_num, back_odds={}, lay_odds={}
         )
 
         context.job_queue.run_once(
@@ -481,24 +511,37 @@ class BotManager:
         odds_df = await generate_outright_odds_predictions(
             n_sims=self.model_settings.n_sims,
         )
-        odds_dict = dict(
-            odds_df.select("player", "back_win_odds")
+
+        back_win_odds_dict = {
+            player: FractionalOdds.from_str(odds)
+            for player, odds in odds_df.select("player", "back_win_odds")
             .drop_nulls("back_win_odds")
             .iter_rows()
-        )
-        odds_dict = {
-            player: FractionalOdds.from_str(odds) for player, odds in odds_dict.items()
         }
 
-        overround = sum(odds.implied_probability for odds in odds_dict.values()) - 1
+        lay_win_odds_dict = {
+            player: FractionalOdds.from_str(odds)
+            for player, odds in odds_df.select("player", "lay_win_odds")
+            .drop_nulls("lay_win_odds")
+            .iter_rows()
+        }
+
+        back_overround = (
+            sum(odds.implied_probability for odds in back_win_odds_dict.values()) - 1
+        )
+        lay_overround = (
+            sum(odds.implied_probability for odds in lay_win_odds_dict.values()) - 1
+        )
         logger.info(
-            f"Odds predictions generated\n\n{odds_df}\\n\nOverround: {overround:.2%}"
+            f"Odds predictions generated\n\n{odds_df}\\n\nOverrounds: Back - {back_overround:.2%}, Lay - {lay_overround:.2%}"
         )
 
         self.bet_manager.update_odds(
-            round_num=self.league_state.current_round_num, odds=odds_dict
+            round_num=self.league_state.current_round_num,
+            back_odds=back_win_odds_dict,
+            lay_odds=lay_win_odds_dict,
         )
-        odds_message = await self.create_odds_message(odds_dict=odds_dict)
+        odds_message = await self.create_odds_message(odds_dict=back_win_odds_dict)
 
         await context.bot.send_message(
             chat_id=chat_id,
@@ -1317,29 +1360,81 @@ class BotManager:
         query = update.callback_query
         await query.answer()
 
-        context.user_data["bet_player"] = query.data
-        odds = self.bet_manager.get_latest_odds(self.league_state.current_round_num)
         if query.data == "cancel":
             await query.edit_message_text("Bet cancelled.")
             return ConversationHandler.END
 
-        runner_odds = odds.get(query.data)
-        if runner_odds is None:
+        context.user_data["bet_player"] = query.data
+
+        runner_back_odds = self.bet_manager.get_latest_odds(
+            self.league_state.current_round_num, bet_type=BetType.BACK
+        ).get(query.data)
+        runner_lay_odds = self.bet_manager.get_latest_odds(
+            self.league_state.current_round_num, bet_type=BetType.LAY
+        ).get(query.data)
+
+        if not (runner_back_odds or runner_lay_odds):
             await query.edit_message_text(
                 f"Sorry, odds for {query.data} are not available. Please try again later."
             )
             return ConversationHandler.END
 
-        context.user_data["bet_odds"] = runner_odds
+        context.user_data["back_odds"] = runner_back_odds
+        context.user_data["lay_odds"] = runner_lay_odds
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    f"Back ({runner_back_odds.formatted})",
+                    callback_data=BetType.BACK.value,
+                )
+            ]
+            if runner_back_odds
+            else [],
+            [
+                InlineKeyboardButton(
+                    f"Lay ({runner_lay_odds.formatted})",
+                    callback_data=BetType.LAY.value,
+                )
+            ]
+            if runner_lay_odds
+            else [],
+            [InlineKeyboardButton("Cancel", callback_data="cancel")],
+        ]
+
+        await query.edit_message_text(
+            f"Runner: *{query.data}*\nWould you like to place a Back or Lay bet?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
+        )
+
+        return BET_SELECT_BET_TYPE
+
+    async def handle_bet_type_selection(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+        query = update.callback_query
+        await query.answer()
+
+        if query.data == "cancel":
+            await query.edit_message_text("Bet cancelled.")
+            return ConversationHandler.END
+
+        context.user_data["bet_type"] = BetType(query.data)
+
         valid_bet_amounts = self.bet_manager.calculate_bet_amounts(
             bettor=TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id),
-            runner=query.data,
-            odds=runner_odds,
+            runner=context.user_data["bet_player"],
+            odds=context.user_data["back_odds"]
+            if context.user_data["bet_type"] == BetType.BACK
+            else context.user_data["lay_odds"],
+            market_type=MarketType.WINNER,
+            bet_type=context.user_data["bet_type"],
         )
 
         if not valid_bet_amounts:
             await query.edit_message_text(
-                f"Sorry, you cannot place a bet on {query.data} at the moment. Please try again later."
+                "Sorry, this bet is not available at the moment."
             )
             return ConversationHandler.END
 
@@ -1349,7 +1444,7 @@ class BotManager:
         ]
         keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel")])
         await query.edit_message_text(
-            f"Selected: *{query.data}*\nHow much would you like to bet?",
+            f"Runner: *{context.user_data['bet_player']}*\nBet Type: *{query.data}*\nHow much would you like to bet?",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
@@ -1366,7 +1461,11 @@ class BotManager:
             return ConversationHandler.END
 
         player = context.user_data["bet_player"]
-        bet_odds: FractionalOdds = context.user_data["bet_odds"]
+        bet_odds: FractionalOdds = (
+            context.user_data["back_odds"]
+            if context.user_data["bet_type"] == BetType.BACK
+            else context.user_data["lay_odds"]
+        )
         amount = float(query.data)
 
         bet = self.bet_manager.place_bet(
@@ -1374,6 +1473,8 @@ class BotManager:
             runner=player,
             amount=amount,
             odds=bet_odds,
+            market_type=MarketType.WINNER,
+            bet_type=context.user_data["bet_type"],
         )
 
         message = f"✅ Bet placed\n\n{bet}"

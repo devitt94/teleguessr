@@ -25,6 +25,10 @@ class FractionalOdds(NamedTuple):
         except Exception as e:
             raise ValueError(f"Invalid fractional odds format: {odds_str}") from e
 
+    def invert(self) -> "FractionalOdds":
+        """Return the inverse of the odds (e.g., 2/1 becomes 1/2)."""
+        return FractionalOdds(self.denominator, self.numerator)
+
 
 def probs_to_odds(
     probabilities: list[float],

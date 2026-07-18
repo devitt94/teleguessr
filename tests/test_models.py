@@ -1,6 +1,9 @@
 import pytest
 
 
+from teleguessr.models import Bet, BetType, MarketType, ChallengeScore, Player, Guess
+
+
 @pytest.mark.parametrize(
     (
         "num_rounds",
@@ -21,8 +24,6 @@ import pytest
 def test_ChallengeScore_compute_hcap_adjustment(
     num_rounds, num_guesses, gross_score, handicap_multiplier, expected_adjustment
 ):
-    from teleguessr.models import ChallengeScore, Player, Guess
-
     player = Player(name="Test Player", hcap_multiplier=handicap_multiplier)
     guesses = [
         Guess(score=gross_score // num_guesses, distance_km=0.0)
@@ -33,3 +34,51 @@ def test_ChallengeScore_compute_hcap_adjustment(
     )
 
     assert challenge_score.compute_hcap_adjustment() == expected_adjustment
+
+
+@pytest.mark.parametrize(
+    ("stake", "odds", "bet_type", "expected_profit"),
+    [
+        (100.0, 2.0, BetType.BACK, 100.0),
+        (100.0, 2.0, BetType.LAY, 100.0),
+        (50.0, 3.0, BetType.BACK, 100.0),
+        (50.0, 3.0, BetType.LAY, 25.0),
+        (10.0, 1.5, BetType.BACK, 5.0),
+        (10.0, 1.5, BetType.LAY, 20.0),
+    ],
+)
+def test_Bet_potential_profit(stake, odds, bet_type, expected_profit):
+    bet = Bet(
+        bettor="Test Bettor",
+        runner="Test Runner",
+        stake=stake,
+        odds=odds,
+        market_type=MarketType.WINNER,
+        bet_type=bet_type,
+    )
+
+    assert bet.potential_profit == expected_profit
+
+
+@pytest.mark.parametrize(
+    ("stake", "odds", "bet_type", "expected_return"),
+    [
+        (100.0, 2.0, BetType.BACK, 200.0),
+        (100.0, 2.0, BetType.LAY, 200.0),
+        (50.0, 3.0, BetType.BACK, 150.0),
+        (50.0, 3.0, BetType.LAY, 75.0),
+        (10.0, 1.5, BetType.BACK, 15.0),
+        (10.0, 1.5, BetType.LAY, 30.0),
+    ],
+)
+def test_Bet_potential_return(stake, odds, bet_type, expected_return):
+    bet = Bet(
+        bettor="Test Bettor",
+        runner="Test Runner",
+        stake=stake,
+        odds=odds,
+        market_type=MarketType.WINNER,
+        bet_type=bet_type,
+    )
+
+    assert bet.potential_return == expected_return

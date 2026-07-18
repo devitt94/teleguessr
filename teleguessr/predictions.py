@@ -322,9 +322,18 @@ async def generate_outright_odds_predictions(
 
     all_df = all_df.sort("win_probability", descending=True)
 
+    all_df = all_df.with_columns()
+
+    all_df = all_df.with_columns(
+        (1.0 - pl.col("win_probability")).alias("not_win_probability")
+    )
+
     win_odds = probs_to_odds(
         all_df["win_probability"].to_list(),
     )
+
+    lay_win_odds = probs_to_odds(all_df["not_win_probability"].to_list())
+    lay_win_odds = [f.invert() if f is not None else None for f in lay_win_odds]
 
     ws_odds = probs_to_odds(
         all_df["wooden_spoon_probability"].to_list(),
@@ -339,6 +348,17 @@ async def generate_outright_odds_predictions(
             pl.Series(
                 "back_win_implied_prob",
                 [f.implied_probability if f is not None else None for f in win_odds],
+            ),
+            pl.Series(
+                "lay_win_odds",
+                [f.formatted if f is not None else None for f in lay_win_odds],
+            ),
+            pl.Series(
+                "lay_win_implied_prob",
+                [
+                    f.implied_probability if f is not None else None
+                    for f in lay_win_odds
+                ],
             ),
             pl.Series(
                 "back_ws_odds",
@@ -369,8 +389,10 @@ async def generate_outright_odds_predictions(
         "wooden_spoon_pct",
         "back_win_odds",
         "back_win_implied_prob",
-        "back_ws_odds",
-        "back_ws_implied_prob",
+        "lay_win_odds",
+        "lay_win_implied_prob",
+        # "back_ws_odds",
+        # "back_ws_implied_prob",
     )
 
     return all_df

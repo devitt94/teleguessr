@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from enum import StrEnum
 from pydantic import BaseModel, Field, confloat, conlist, field_serializer
 
 
@@ -134,25 +135,45 @@ class AbbreviatedRoundScore(BaseModel):
         return self.rounds_played == self.total_rounds
 
 
+class MarketType(StrEnum):
+    WINNER = "WINNER"
+    WOODEN_SPOON = "WOODEN_SPOON"
+    PODIUM = "PODIUM"
+
+
+class BetType(StrEnum):
+    BACK = "BACK"
+    LAY = "LAY"
+
+
 class Bet(BaseModel):
     bettor: str
     runner: str
     stake: float
     odds: float
+    market_type: MarketType = MarketType.WINNER
+    bet_type: BetType = BetType.BACK
 
     @property
     def potential_profit(self) -> float:
-        return self.stake * (self.odds - 1)
+        if self.bet_type == BetType.BACK:
+            return self.stake * (self.odds - 1)
+        elif self.bet_type == BetType.LAY:
+            return self.stake * 1 / (self.odds - 1)
+        else:
+            raise ValueError(f"Invalid bet type: {self.bet_type}")
 
     @property
     def potential_return(self) -> float:
-        return self.stake * self.odds
+        return self.stake + self.potential_profit
 
     def __str__(self):
         return (
             f"Bettor: {self.bettor}\n"
             f"Runner: {self.runner}\n"
             f"Stake: €{self.stake:.2f}\n"
+            f"Market: {self.market_type.value}\n"
+            f"Bet Type: {self.bet_type.value}\n"
             f"Odds: {self.odds:.2f}\n"
             f"Return: €{self.potential_return:.2f}\n"
             f"Potential Profit: €{self.potential_profit:.2f}\n"

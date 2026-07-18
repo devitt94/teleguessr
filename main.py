@@ -14,7 +14,12 @@ from teleguessr.league import get_last_finished_league_date
 from teleguessr.ranks import get_ranks_from_scores
 from teleguessr.replay import replay_league
 from teleguessr.settings import AppSettings, get_settings
-from teleguessr.bot_manager import BET_SELECT_AMOUNT, BET_SELECT_PLAYER, BotManager
+from teleguessr.bot_manager import (
+    BET_SELECT_AMOUNT,
+    BET_SELECT_BET_TYPE,
+    BET_SELECT_PLAYER,
+    BotManager,
+)
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
@@ -87,6 +92,10 @@ def main(test_mode: bool = False):
                 CallbackQueryHandler(bot_manager.handle_player_selection),
                 CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
             ],
+            BET_SELECT_BET_TYPE: [
+                CallbackQueryHandler(bot_manager.handle_bet_type_selection),
+                CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
+            ],
             BET_SELECT_AMOUNT: [
                 CallbackQueryHandler(bot_manager.handle_amount_selection),
                 CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
@@ -110,6 +119,7 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("lounge", bot_manager.lounge_handler))
     app.add_handler(CommandHandler("odds", bot_manager.odds_handler))
     app.add_handler(CommandHandler("position", bot_manager.position_handler))
+    app.add_handler(CommandHandler("exposure", bot_manager.exposure_handler))
     app.add_handler(CommandHandler("guesses", bot_manager.guesses_handler))
     app.add_handler(CommandHandler("outcomes", bot_manager.outcomes_handler))
     app.add_handler(CommandHandler("records", bot_manager.records_handler))
