@@ -805,7 +805,15 @@ class BotManager:
             logger.info("All players have finished the round; no reminder sent.")
             return
 
-        pending_list = "\n".join(f"- {player}" for player in players_pending)
+        players_with_telegram_ids = [
+            (player, PLAYER_NAME_TO_TELEGRAM_ID.get(player))
+            for player in players_pending
+        ]
+
+        pending_list = "\n".join(
+            f"- [{player}](tg://user?id={telegram_id})"
+            for player, telegram_id in players_with_telegram_ids
+        )
 
         logger.info(
             f"Sending reminder to chat {chat_id} for players: {players_pending}"

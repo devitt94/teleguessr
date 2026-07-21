@@ -313,6 +313,11 @@ class BetManager:
                     -self.model_settings.max_loss_self,
                     self.model_settings.max_profit_self,
                 )
+            if bet_type == BetType.LAY:
+                return (
+                    -self.model_settings.max_loss_non_self,
+                    self.model_settings.max_profit_self,
+                )
             return (
                 -self.model_settings.max_loss_non_self,
                 self.model_settings.max_profit_non_self,
