@@ -1468,8 +1468,15 @@ class BotManager:
         )
         amount = float(query.data)
 
+        bettor = TELEGRAM_ID_TO_PLAYER_NAME[update.effective_user.id]
+        if bettor in self.league_state.get_players_finished_round():
+            await query.edit_message_text(
+                "You have already started this round, so you cannot place bets. Please wait for the next round to start."
+            )
+            return ConversationHandler.END
+
         bet = self.bet_manager.place_bet(
-            bettor=TELEGRAM_ID_TO_PLAYER_NAME[update.effective_user.id],
+            bettor=bettor,
             runner=player,
             amount=amount,
             odds=bet_odds,
