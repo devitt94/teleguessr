@@ -1193,8 +1193,8 @@ class BotManager:
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        players_played = self.__player_round_status(round_result)
-        if players_played.get(player_name) is not None:
+        players_played = await self.player_round_status(round_result)
+        if player_id != self.admin_id and players_played.get(player_name) is not None:
             await update.message.reply_text(
                 "You have already started this round, so you cannot place bets. Please wait for the next round to start."
             )
