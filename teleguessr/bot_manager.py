@@ -349,6 +349,20 @@ class BotManager:
 
         await self.start_round(context, chat_id=update.effective_chat.id)
 
+    async def leaderboard_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        if not self.__initialised:
+            raise RuntimeError("BotManager not initialised!")
+
+        if self.league_state is None or self.league_state.is_finished:
+            await update.message.reply_text(
+                "No active league. Start a new league with /startleague."
+            )
+            return
+
+        await self.show_leaderboard(context, chat_id=update.effective_chat.id)
+
     async def poll_for_round_updates(self, context: ContextTypes.DEFAULT_TYPE):
         if not self.__initialised:
             raise RuntimeError("BotManager not initialised!")
