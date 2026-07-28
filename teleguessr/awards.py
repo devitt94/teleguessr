@@ -9,7 +9,7 @@ def compute_stats(round_result: ChallengeResult) -> list[GuessStats]:
     Returns a list of GuessStats objects, one for each guess index.
     """
 
-    num_guesses = len(round_result.scores[0].guesses)
+    num_guesses = round_result.num_rounds
     all_distances: list[list[float]] = [[] for _ in range(num_guesses)]
     all_points: list[list[int]] = [[] for _ in range(num_guesses)]
 
