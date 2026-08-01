@@ -1,6 +1,9 @@
+from collections.abc import Callable
 from datetime import datetime, timedelta
+from functools import wraps
 from pathlib import Path
 import traceback
+from typing import Awaitable
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application as TelegramApp, ConversationHandler
@@ -70,13 +73,59 @@ NUMBER_EMOJI_MAP = {
 }
 
 
-def ensure_initialised(func):
-    async def wrapper(self: "BotManager", *args, **kwargs):
-        if not self._initialised:
-            raise RuntimeError("BotManager not initialised!")
-        return await func(self, *args, **kwargs)
+HandlerFunc = Callable[
+    ["BotManager", Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]
+]
 
-    return wrapper
+
+def command_handler(
+    initialised: bool = True,
+    admin: bool = False,
+    league_in_progress: bool | None = None,
+    round_in_progress: bool = False,
+) -> Callable[[HandlerFunc], HandlerFunc]:
+    """A decorator for command handlers to validate the application state before executing the command."""
+
+    def decorator(func: HandlerFunc) -> HandlerFunc:
+        @wraps(func)
+        async def wrapper(
+            self: "BotManager", update: Update, context: ContextTypes.DEFAULT_TYPE
+        ) -> None:
+            if initialised and not self._initialised:
+                raise RuntimeError("BotManager not initialised!")
+
+            if admin and update.effective_user.id != self.admin_id:
+                await update.message.reply_text(
+                    "You are not authorized to use this command."
+                )
+                return
+
+            league_currently_in_progress = (
+                self.league_state is not None and not self.league_state.is_finished
+            )
+            if league_in_progress is not None:
+                if league_in_progress and not league_currently_in_progress:
+                    await update.message.reply_text(
+                        "No active league. Start a new league with /startleague."
+                    )
+                    return
+                elif not league_in_progress and league_currently_in_progress:
+                    await update.message.reply_text(
+                        "A league is currently in progress. This command cannot be used during an active league."
+                    )
+                    return
+
+            if round_in_progress and not (
+                league_currently_in_progress and self.league_state.round_in_progress
+            ):
+                await update.message.reply_text("No round currently in progress.")
+                return
+
+            return await func(self, update, context)
+
+        return wrapper
+
+    return decorator
 
 
 class BotManager:
@@ -146,7 +195,6 @@ class BotManager:
 
         self._initialised = True
 
-    @ensure_initialised
     async def resume_league_tasks(self, app: TelegramApp):
         if self.league_state is None or self.league_state.is_finished:
             logger.info("No active league to resume tasks for.")
@@ -155,104 +203,17 @@ class BotManager:
         if not self.league_state.round_in_progress:
             logger.info("No round in progress to resume tasks for. Starting new round.")
             chat_id = self.league_state.chat_id
-            await self.start_round(app, chat_id=chat_id)
+            await self.__start_round(app, chat_id=chat_id)
             return
 
         logger.info("Resuming round update polling for active round.")
         app.job_queue.run_repeating(
-            self.poll_for_round_updates,
+            self.__poll_for_round_updates,
             interval=self.polling_interval_seconds,
             first=0,
         )
 
-    async def help_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        help_message = (
-            "🤖 <b>Teleguessr Bot Commands</b> 🤖\n\n"
-            "/startleague - Start a new league (admin only)\n"
-            "/endround - End the current round (admin only)\n"
-            "/status - Get the current status of the league and your round\n"
-            "/handicaps - Show current handicaps\n"
-            "/lounge - Get an invite to the Players' Lounge group chat (after playing your round)\n"
-            "/bet - Place a bet on the league winner\n"
-            "/position - Show your current betting position\n"
-            "/guesses - Show current round guesses and rankings\n"
-            "/records - Show all-time records\n"
-            "/help - Show this help message\n\n"
-        )
-
-        await update.message.reply_text(
-            help_message,
-            parse_mode="HTML",
-        )
-
-    @ensure_initialised
-    async def odds_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
-            )
-            return
-
-        latest_odds = self.bet_manager.get_latest_odds(
-            league_round=self.league_state.current_round_num
-        )
-        if not latest_odds:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Odds have not been generated yet for this round. Please check back soon!",
-            )
-            return
-
-        odds_message = self.create_odds_message(odds_dict=latest_odds)
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=odds_message,
-        )
-
-    @ensure_initialised
-    async def exposure_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
-            )
-            return
-
-        exposure_message = self._construct_position_message(
-            player_name=None, is_bookmaker=True
-        )
-
-        await update.message.reply_text(
-            exposure_message,
-            parse_mode="HTML",
-        )
-
-    @ensure_initialised
-    async def position_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
-            )
-            return
-
-        player_id = update.effective_user.id
-        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
-        if player_name is None:
-            await update.message.reply_text(
-                "Your Telegram ID is not linked to a player name. Please contact the admin."
-            )
-            return
-
-        position_message = self._construct_position_message(player_name=player_name)
-        await update.message.reply_text(
-            position_message,
-            parse_mode="HTML",
-        )
-
-    def _construct_position_message(
+    def __construct_position_message(
         self, player_name: str, is_bookmaker: bool = False
     ) -> str:
         if is_bookmaker:
@@ -282,98 +243,7 @@ class BotManager:
         position_message += f"\nEstimated cash out (adjusted for odds): {self.bet_manager.compute_signed_amount(total_equity)}"
         return position_message
 
-    @ensure_initialised
-    async def records_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        records = self.record_manager.get_records()
-
-        records_message = "🏆 All-Time Records:\n"
-        records_message += "Net = 🏅; Gross = 👑\n\n"
-
-        for player, record in records.items():
-            records_message += f"- {player}:\n"
-            if record.net_wins > 0:
-                net_win_str = f"{record.net_wins} (most recent: {format_datetime_to_time_ago(record.most_recent_net_win)}) \n"
-            else:
-                net_win_str = "0\n"
-            records_message += f"    - 🏅x{net_win_str}"
-
-            if record.gross_wins > 0:
-                gross_win_str = f"{record.gross_wins} (most recent: {format_datetime_to_time_ago(record.most_recent_gross_win)}) \n"
-            else:
-                gross_win_str = "0\n"
-            records_message += f"    - 👑x{gross_win_str}"
-
-        await update.message.reply_text(
-            records_message,
-            parse_mode="HTML",
-        )
-
-    @ensure_initialised
-    async def start_league_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if update.effective_user.id != self.admin_id:
-            await update.message.reply_text(
-                "You are not authorized to use this command."
-            )
-            return
-
-        if self.league_state is not None and not self.league_state.is_finished:
-            err_msg = "League already active, cannot start a new one."
-            logger.warning(err_msg)
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=err_msg,
-            )
-            return
-
-        league_start_date = datetime.now().strftime("%Y%m%d")
-        league_filepath = self.active_league_dir / f"league_{league_start_date}.json"
-        self.league_state = LeagueState(
-            filepath=league_filepath,
-            num_rounds=self.league_settings.number_of_rounds,
-        )
-
-        self.bet_manager = BetManager(
-            model_settings=self.model_settings,
-            data_dir=self.data_dir,
-            league_date=self.league_state.start_date,
-            all_runners=list(self.handicaps.keys()),
-        )
-
-        logger.info(f"Starting new league at {league_filepath.absolute()}")
-
-        await update.message.reply_text("New league starting...")
-
-        sorted_handicaps = sorted(self.handicaps.items(), key=lambda item: item[1])
-
-        handicap_message = "📉 Handicaps:\n\n"
-        for player, handicap in sorted_handicaps:
-            handicap_message += f"- {player}: {handicap:.0%}\n"
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=handicap_message,
-        )
-
-        self.league_state.chat_id = update.effective_chat.id
-        self.league_state.save()
-
-        await self.start_round(context, chat_id=update.effective_chat.id)
-
-    @ensure_initialised
-    async def leaderboard_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
-            )
-            return
-
-        await self.__show_leaderboard(context, chat_id=update.effective_chat.id)
-
-    @ensure_initialised
-    async def poll_for_round_updates(self, context: ContextTypes.DEFAULT_TYPE):
+    async def __poll_for_round_updates(self, context: ContextTypes.DEFAULT_TYPE):
         if (
             self.league_state is None
             or self.league_state.is_finished
@@ -446,7 +316,7 @@ class BotManager:
 
         if should_end_round:
             logger.info("Ending round.")
-            await self.end_round(context, chat_id=self.league_state.chat_id)
+            await self.__end_round(context, chat_id=self.league_state.chat_id)
             return
 
         round_reminder_time = self.league_state.current_round.end_time - timedelta(
@@ -460,12 +330,11 @@ class BotManager:
 
         if should_send_reminder:
             logger.info("Sending round reminder.")
-            await self.reminder(context, chat_id=self.league_state.chat_id)
+            await self.__reminder(context, chat_id=self.league_state.chat_id)
             self.league_state.current_round.reminder_sent = True
             self.league_state.save()
 
-    @ensure_initialised
-    async def start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    async def __start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         challenge_settings = self.challenge_settings_generator(
             self.league_state.current_round_num
         )
@@ -522,7 +391,7 @@ class BotManager:
         )
 
         context.job_queue.run_repeating(
-            self.poll_for_round_updates,
+            self.__poll_for_round_updates,
             interval=self.polling_interval_seconds,
             first=self.polling_interval_seconds,
         )
@@ -563,14 +432,14 @@ class BotManager:
             back_odds=back_win_odds_dict,
             lay_odds=lay_win_odds_dict,
         )
-        odds_message = self.create_odds_message(odds_dict=back_win_odds_dict)
+        odds_message = self.__create_odds_message(odds_dict=back_win_odds_dict)
 
         await context.bot.send_message(
             chat_id=chat_id,
             text=odds_message,
         )
 
-    def create_odds_message(self, odds_dict: dict[str, FractionalOdds]) -> str:
+    def __create_odds_message(self, odds_dict: dict[str, FractionalOdds]) -> str:
         if not odds_dict:
             return "Odds are not available."
         odds_message = "📊 Current Odds:\n\n"
@@ -639,7 +508,7 @@ class BotManager:
 
         return leaderboard_message
 
-    def get_league_projections_for_round(
+    def __get_league_projections_for_round(
         self,
         round_result: ChallengeResult,
         best_guess_player: str,
@@ -690,32 +559,6 @@ class BotManager:
         )
         return "\n".join(projection_message_lines)
 
-    @ensure_initialised
-    async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
-            )
-            return
-
-        player_id = update.effective_user.id
-        chat_id = update.effective_chat.id
-
-        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
-
-        logger.info(
-            f"Sending status update to chat {chat_id} for player {player_name} (ID: {player_id})"
-        )
-
-        round_result = await self.geoguessr_client.get_challenge_scores(
-            self.league_state.current_round.challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
-            challenge_settings=self.league_state.current_round.challenge_settings,
-        )
-
-        await self.__status_update(context, chat_id, round_result, player_id)
-
     async def __status_update(
         self,
         context: ContextTypes.DEFAULT_TYPE,
@@ -763,7 +606,7 @@ class BotManager:
 
                 best_guess_player = ranked_guesses[0].player.name
                 worst_guess_player = ranked_guesses[-1].player.name
-                projected_leaderboard_message = self.get_league_projections_for_round(
+                projected_leaderboard_message = self.__get_league_projections_for_round(
                     round_result=round_result,
                     best_guess_player=best_guess_player,
                     worst_guess_player=worst_guess_player,
@@ -776,7 +619,7 @@ class BotManager:
             parse_mode="HTML",
         )
 
-    async def reminder(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    async def __reminder(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
             handicaps=self.handicaps,
@@ -784,7 +627,7 @@ class BotManager:
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        players_finished = await self.player_round_status(round_result)
+        players_finished = await self.__player_round_status(round_result)
 
         time_left = self.league_state.get_time_left_seconds()
         time_left_str = format_time(time_left)
@@ -820,306 +663,7 @@ class BotManager:
 
         await context.bot.send_message(chat_id, message, parse_mode="MarkdownV2")
 
-    @ensure_initialised
-    async def end_round_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if update.effective_user.id != self.admin_id:
-            await update.message.reply_text(
-                "You are not authorized to use this command."
-            )
-            return
-
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text("No active league.")
-            return
-
-        if not self.league_state.round_in_progress:
-            await update.message.reply_text("No round in progress.")
-            return
-
-        await self.end_round(context, update.effective_chat.id)
-
-    @ensure_initialised
-    async def guesses_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
-            )
-            return
-
-        if update.effective_chat.id == self.league_state.chat_id:
-            await update.message.reply_text(
-                "Guesses are only visible in private chat or Players' Lounge. Please DM me with /guesses to see the current round guesses and rankings.",
-            )
-            return
-
-        ranked_guesses = await self.__get_ranked_guesses()
-
-        top_5_guesses = []
-        locations_seen_top_5 = set()
-        for ranked_guess in ranked_guesses:
-            if ranked_guess.location_index not in locations_seen_top_5:
-                top_5_guesses.append(ranked_guess)
-                locations_seen_top_5.add(ranked_guess.location_index)
-            if len(top_5_guesses) >= 5:
-                break
-
-        bottom_5_guesses = []
-        locations_seen_bottom_5 = set()
-        for ranked_guess in reversed(ranked_guesses):
-            if ranked_guess.location_index not in locations_seen_bottom_5:
-                bottom_5_guesses.append(ranked_guess)
-                locations_seen_bottom_5.add(ranked_guess.location_index)
-            if len(bottom_5_guesses) >= 5:
-                break
-
-        guesses_message = "📊 Current Round Guesses:\n\n"
-
-        def format_guess(ranked_guess: RankedGuess) -> str:
-            return f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score})"
-
-        guesses_message += "Top 5 guesses:\n"
-        for ranked_guess in top_5_guesses:
-            guesses_message += f"{format_guess(ranked_guess)}\n"
-
-        guesses_message += "\nBottom 5 guesses:\n"
-        for ranked_guess in bottom_5_guesses:
-            guesses_message += f"{format_guess(ranked_guess)}\n"
-
-        logger.info(
-            f"Sending guesses update to chat {update.effective_chat.id}\n\n{guesses_message}"
-        )
-        await update.message.reply_text(
-            guesses_message,
-            parse_mode="HTML",
-        )
-
-    async def end_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-        if chat_id is None:
-            raise ValueError("chat_id must be provided to end_round")
-
-        challenge_url = self.league_state.current_round.challenge_url
-        challenge_settings = self.league_state.current_round.challenge_settings
-        round_result = await self.geoguessr_client.get_challenge_scores(
-            challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
-            challenge_settings=challenge_settings,
-        )
-
-        ranked_guesses = get_ranked_guesses(round_result)
-
-        self.league_state.add_round_result(round_result)
-        self.league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
-        self.league_state.save()
-
-        round_text = format_round_result_html(round_result, ranked_guesses)
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"🏁 Round {self.league_state.last_round_finished_num} has ended!\n\n{round_text}",
-            parse_mode="HTML",
-        )
-
-        await self.__clear_players_from_lounge_chat(context)
-
-        await self.__show_leaderboard(context, chat_id)
-
-        if self.league_state.is_finished:
-            winner = self.league_state.get_winner()
-            await context.bot.send_message(
-                chat_id, f"🏆 League finished. Winner: {winner}"
-            )
-            # Calculate and update handicaps
-            player_ranks = get_ranks_from_scores(
-                self.league_state.get_leaderboard_data()["scores"]
-            )
-            new_handicaps = calculate_new_handicaps(player_ranks, self.league_settings)
-
-            update_handicaps(
-                new_handicaps, self.league_state.league_start_date, self.league_settings
-            )
-
-            logger.info(f"Updated handicaps: {new_handicaps}")
-            await self.show_handicap_updates(
-                context,
-                chat_id,
-                prev_handicaps=self.handicaps,
-                new_handicaps=new_handicaps,
-            )
-            self.handicaps = new_handicaps
-            logger.info("Starting replay without handicaps.")
-
-            gross_replay_league_state = await replay_league(
-                league_path=self.league_state.filepath,
-                handicaps={},
-                league_settings=self.league_settings,
-            )
-
-            gross_winner = gross_replay_league_state.get_winner()
-            self.record_manager.update_records(
-                gross_winner=gross_winner,
-                net_winner=winner,
-            )
-
-            replayed_leaderboard_text = format_leaderboard_html(
-                **gross_replay_league_state.get_leaderboard_data()
-            )
-            await context.bot.send_message(
-                chat_id,
-                f"📊 Gross Results:\n\n{replayed_leaderboard_text}",
-                parse_mode="HTML",
-            )
-
-            gross_replay_league_state.filepath.unlink(missing_ok=True)
-
-            # Comupute bet P&L and send final bet results
-            bet_pnls = self.bet_manager.compute_bet_pnls(
-                winner=winner,
-            )
-
-            if bet_pnls:
-                bet_results_message = "💰 Bet Results:\n\n"
-                for player, pnl in bet_pnls.items():
-                    bet_results_message += (
-                        f"- {player}: {self.bet_manager.compute_signed_amount(pnl)}\n"
-                    )
-
-                bookmaker_pnl = -sum(bet_pnls.values())
-                bet_results_message += f"\nBookmaker P&L: {self.bet_manager.compute_signed_amount(bookmaker_pnl)}"
-
-                await context.bot.send_message(
-                    chat_id,
-                    bet_results_message,
-                )
-            else:
-                logger.info("No bets placed, skipping bet results message.")
-
-            logger.info(
-                "Leageue finished, ending league and moving file to finished directory."
-            )
-
-            await self.end_league()
-
-        else:
-            await self.start_round(
-                context,
-                chat_id=chat_id,
-            )
-
-    @ensure_initialised
-    async def outcomes_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
-            )
-            return
-
-        odds = self.bet_manager.get_latest_odds(
-            league_round=self.league_state.current_round_num
-        )
-        if not odds:
-            await update.message.reply_text(
-                "Odds have not been generated yet for this round. Please check back soon!",
-            )
-            return
-
-        bet_outcomes_message = "📊 Bet Outcomes:\n\n"
-        for player, odds in odds.items():
-            bet_outcomes_message += f"{player}: (current odds: {odds.formatted})\n"
-
-            for bettor, pnl in self.bet_manager.compute_bet_pnls(winner=player).items():
-                bet_outcomes_message += (
-                    f"    - {bettor}: {self.bet_manager.compute_signed_amount(pnl)}\n"
-                )
-
-            bet_outcomes_message += "\n"
-
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=bet_outcomes_message,
-            parse_mode="HTML",
-        )
-
-    async def __show_leaderboard(
-        self, context: ContextTypes.DEFAULT_TYPE, chat_id: int
-    ):
-        leaderboard = self.league_state.get_leaderboard_data()
-        leaderboard_text = format_leaderboard_html(**leaderboard)
-
-        await context.bot.send_message(
-            chat_id,
-            f"📊 Standings after round {self.league_state.last_round_finished_num}:\n\n{leaderboard_text}",
-            parse_mode="HTML",
-        )
-
-    async def error_handler(
-        self, update: object, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
-        """Error handler that sends the traceback to the admin."""
-        # Build a clean traceback message
-        if isinstance(context.error, NetworkError):
-            logger.info(f"Network error occurred: {context.error}")
-            return
-
-        tb_list = traceback.format_exception(
-            None, context.error, context.error.__traceback__
-        )
-        tb_text = "".join(tb_list)
-        tb_text = tb_text[-4000:]
-
-        message = (
-            "⚠️ <b>Bot Handler Error</b>\n"
-            f"<b>Exception:</b> {context.error}\n\n"
-            f"<b>Traceback:</b>\n<pre>{tb_text}</pre>"
-        )
-
-        try:
-            await context.bot.send_message(
-                chat_id=self.admin_id, text=message, parse_mode="HTML"
-            )
-        except Exception as e:
-            logger.exception(f"Failed to send admin alert: {e}")
-
-        # Still print to logs
-        logger.info(f"Exception while handling update {update}: {context.error}")
-
-    def __player_round_status(
-        self, round_result: ChallengeResult
-    ) -> dict[str, AbbreviatedRoundScore | None]:
-        net_scores = {}
-        rounds_played_by_player = {}
-        for score in round_result.scores:
-            net_score = score.compute_net_score()
-            net_scores[score.player.name] = net_score
-            rounds_played_by_player[score.player.name] = len(score.guesses)
-
-        ranks = get_ranks_from_scores(net_scores)
-
-        result = {player: None for player in self.handicaps.keys()}
-
-        for player, rank in ranks.items():
-            result[player] = AbbreviatedRoundScore(
-                rank=rank,
-                net_score=net_scores[player],
-                rounds_played=rounds_played_by_player[player],
-                total_rounds=round_result.num_rounds,
-            )
-
-        # Sort the result dict by rank (None values at the end)
-        return dict(
-            sorted(
-                result.items(),
-                key=lambda item: (
-                    item[1].rank if item[1] is not None else float("inf")
-                ),
-            )
-        )
-
-    async def end_league(self):
+    async def __end_league(self):
         if self.league_state is None:
             raise RuntimeError("No active league to end.")
 
@@ -1132,7 +676,7 @@ class BotManager:
         )
         self.league_state = None
 
-    async def show_handicap_updates(
+    async def __show_handicap_updates(
         self,
         context: ContextTypes.DEFAULT_TYPE,
         chat_id: int,
@@ -1231,14 +775,440 @@ class BotManager:
                     text=f"⚠️ Failed to remove player {player_name} from lounge chat: {e}",
                 )
 
-    @ensure_initialised
-    async def lounge_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if self.league_state is None or self.league_state.is_finished:
+    async def __show_leaderboard(
+        self, context: ContextTypes.DEFAULT_TYPE, chat_id: int
+    ):
+        leaderboard = self.league_state.get_leaderboard_data()
+        leaderboard_text = format_leaderboard_html(**leaderboard)
+
+        await context.bot.send_message(
+            chat_id,
+            f"📊 Standings after round {self.league_state.last_round_finished_num}:\n\n{leaderboard_text}",
+            parse_mode="HTML",
+        )
+
+    async def error_handler(
+        self, update: object, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Error handler that sends the traceback to the admin."""
+        # Build a clean traceback message
+        if isinstance(context.error, NetworkError):
+            logger.info(f"Network error occurred: {context.error}")
+            return
+
+        tb_list = traceback.format_exception(
+            None, context.error, context.error.__traceback__
+        )
+        tb_text = "".join(tb_list)
+        tb_text = tb_text[-4000:]
+
+        message = (
+            "⚠️ <b>Bot Handler Error</b>\n"
+            f"<b>Exception:</b> {context.error}\n\n"
+            f"<b>Traceback:</b>\n<pre>{tb_text}</pre>"
+        )
+
+        try:
+            await context.bot.send_message(
+                chat_id=self.admin_id, text=message, parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.exception(f"Failed to send admin alert: {e}")
+
+        # Still print to logs
+        logger.info(f"Exception while handling update {update}: {context.error}")
+
+    def __player_round_status(
+        self, round_result: ChallengeResult
+    ) -> dict[str, AbbreviatedRoundScore | None]:
+        net_scores = {}
+        rounds_played_by_player = {}
+        for score in round_result.scores:
+            net_score = score.compute_net_score()
+            net_scores[score.player.name] = net_score
+            rounds_played_by_player[score.player.name] = len(score.guesses)
+
+        ranks = get_ranks_from_scores(net_scores)
+
+        result = {player: None for player in self.handicaps.keys()}
+
+        for player, rank in ranks.items():
+            result[player] = AbbreviatedRoundScore(
+                rank=rank,
+                net_score=net_scores[player],
+                rounds_played=rounds_played_by_player[player],
+                total_rounds=round_result.num_rounds,
+            )
+
+        # Sort the result dict by rank (None values at the end)
+        return dict(
+            sorted(
+                result.items(),
+                key=lambda item: (
+                    item[1].rank if item[1] is not None else float("inf")
+                ),
+            )
+        )
+
+    async def __end_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+        if chat_id is None:
+            raise ValueError("chat_id must be provided to end_round")
+
+        challenge_url = self.league_state.current_round.challenge_url
+        challenge_settings = self.league_state.current_round.challenge_settings
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            challenge_url,
+            handicaps=self.handicaps,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+            challenge_settings=challenge_settings,
+        )
+
+        ranked_guesses = get_ranked_guesses(round_result)
+
+        self.league_state.add_round_result(round_result)
+        self.league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
+        self.league_state.save()
+
+        round_text = format_round_result_html(round_result, ranked_guesses)
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"🏁 Round {self.league_state.last_round_finished_num} has ended!\n\n{round_text}",
+            parse_mode="HTML",
+        )
+
+        await self.__clear_players_from_lounge_chat(context)
+
+        await self.__show_leaderboard(context, chat_id)
+
+        if self.league_state.is_finished:
+            winner = self.league_state.get_winner()
+            await context.bot.send_message(
+                chat_id, f"🏆 League finished. Winner: {winner}"
+            )
+            # Calculate and update handicaps
+            player_ranks = get_ranks_from_scores(
+                self.league_state.get_leaderboard_data()["scores"]
+            )
+            new_handicaps = calculate_new_handicaps(player_ranks, self.league_settings)
+
+            update_handicaps(
+                new_handicaps, self.league_state.league_start_date, self.league_settings
+            )
+
+            logger.info(f"Updated handicaps: {new_handicaps}")
+            await self.__show_handicap_updates(
+                context,
+                chat_id,
+                prev_handicaps=self.handicaps,
+                new_handicaps=new_handicaps,
+            )
+            self.handicaps = new_handicaps
+            logger.info("Starting replay without handicaps.")
+
+            gross_replay_league_state = await replay_league(
+                league_path=self.league_state.filepath,
+                handicaps={},
+                league_settings=self.league_settings,
+            )
+
+            gross_winner = gross_replay_league_state.get_winner()
+            self.record_manager.update_records(
+                gross_winner=gross_winner,
+                net_winner=winner,
+            )
+
+            replayed_leaderboard_text = format_leaderboard_html(
+                **gross_replay_league_state.get_leaderboard_data()
+            )
+            await context.bot.send_message(
+                chat_id,
+                f"📊 Gross Results:\n\n{replayed_leaderboard_text}",
+                parse_mode="HTML",
+            )
+
+            gross_replay_league_state.filepath.unlink(missing_ok=True)
+
+            # Comupute bet P&L and send final bet results
+            bet_pnls = self.bet_manager.compute_bet_pnls(
+                winner=winner,
+            )
+
+            if bet_pnls:
+                bet_results_message = "💰 Bet Results:\n\n"
+                for player, pnl in bet_pnls.items():
+                    bet_results_message += (
+                        f"- {player}: {self.bet_manager.compute_signed_amount(pnl)}\n"
+                    )
+
+                bookmaker_pnl = -sum(bet_pnls.values())
+                bet_results_message += f"\nBookmaker P&L: {self.bet_manager.compute_signed_amount(bookmaker_pnl)}"
+
+                await context.bot.send_message(
+                    chat_id,
+                    bet_results_message,
+                )
+            else:
+                logger.info("No bets placed, skipping bet results message.")
+
+            logger.info(
+                "Leageue finished, ending league and moving file to finished directory."
+            )
+
+            await self.__end_league()
+
+        else:
+            await self.__start_round(
+                context,
+                chat_id=chat_id,
+            )
+
+    @command_handler()
+    async def help_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        help_message = (
+            "🤖 <b>Teleguessr Bot Commands</b> 🤖\n\n"
+            "/startleague - Start a new league (admin only)\n"
+            "/endround - End the current round (admin only)\n"
+            "/status - Get the current status of the league and your round\n"
+            "/handicaps - Show current handicaps\n"
+            "/lounge - Get an invite to the Players' Lounge group chat (after playing your round)\n"
+            "/bet - Place a bet on the league winner\n"
+            "/position - Show your current betting position\n"
+            "/guesses - Show current round guesses and rankings\n"
+            "/records - Show all-time records\n"
+            "/help - Show this help message\n\n"
+        )
+
+        await update.message.reply_text(
+            help_message,
+            parse_mode="HTML",
+        )
+
+    @command_handler()
+    async def records_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        records = self.record_manager.get_records()
+
+        records_message = "🏆 All-Time Records:\n"
+        records_message += "Net = 🏅; Gross = 👑\n\n"
+
+        for player, record in records.items():
+            records_message += f"- {player}:\n"
+            if record.net_wins > 0:
+                net_win_str = f"{record.net_wins} (most recent: {format_datetime_to_time_ago(record.most_recent_net_win)}) \n"
+            else:
+                net_win_str = "0\n"
+            records_message += f"    - 🏅x{net_win_str}"
+
+            if record.gross_wins > 0:
+                gross_win_str = f"{record.gross_wins} (most recent: {format_datetime_to_time_ago(record.most_recent_gross_win)}) \n"
+            else:
+                gross_win_str = "0\n"
+            records_message += f"    - 👑x{gross_win_str}"
+
+        await update.message.reply_text(
+            records_message,
+            parse_mode="HTML",
+        )
+
+    @command_handler(league_in_progress=True)
+    async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        player_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+
+        logger.info(
+            f"Sending status update to chat {chat_id} for player {player_name} (ID: {player_id})"
+        )
+
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            self.league_state.current_round.challenge_url,
+            handicaps=self.handicaps,
+            default_handicap=self.league_settings.default_handicap_multiplier,
+            challenge_settings=self.league_state.current_round.challenge_settings,
+        )
+
+        await self.__status_update(context, chat_id, round_result, player_id)
+
+    @command_handler(admin=True, league_in_progress=False)
+    async def start_league_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        league_start_date = datetime.now().strftime("%Y%m%d")
+        league_filepath = self.active_league_dir / f"league_{league_start_date}.json"
+        self.league_state = LeagueState(
+            filepath=league_filepath,
+            num_rounds=self.league_settings.number_of_rounds,
+        )
+
+        self.bet_manager = BetManager(
+            model_settings=self.model_settings,
+            data_dir=self.data_dir,
+            league_date=self.league_state.start_date,
+            all_runners=list(self.handicaps.keys()),
+        )
+
+        logger.info(f"Starting new league at {league_filepath.absolute()}")
+
+        await update.message.reply_text("New league starting...")
+
+        sorted_handicaps = sorted(self.handicaps.items(), key=lambda item: item[1])
+
+        handicap_message = "📉 Handicaps:\n\n"
+        for player, handicap in sorted_handicaps:
+            handicap_message += f"- {player}: {handicap:.0%}\n"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=handicap_message,
+        )
+
+        self.league_state.chat_id = update.effective_chat.id
+        self.league_state.save()
+
+        await self.__start_round(context, chat_id=update.effective_chat.id)
+
+    @command_handler(league_in_progress=True)
+    async def leaderboard_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        await self.__show_leaderboard(context, chat_id=update.effective_chat.id)
+
+    @command_handler(admin=True, league_in_progress=True, round_in_progress=True)
+    async def end_round_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        await self.__end_round(context, update.effective_chat.id)
+
+    @command_handler(league_in_progress=True, round_in_progress=True)
+    async def guesses_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_chat.id == self.league_state.chat_id:
             await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
+                "Guesses are only visible in private chat or Players' Lounge. Please DM me with /guesses to see the current round guesses and rankings.",
             )
             return
 
+        ranked_guesses = await self.__get_ranked_guesses()
+
+        top_5_guesses = []
+        locations_seen_top_5 = set()
+        for ranked_guess in ranked_guesses:
+            if ranked_guess.location_index not in locations_seen_top_5:
+                top_5_guesses.append(ranked_guess)
+                locations_seen_top_5.add(ranked_guess.location_index)
+            if len(top_5_guesses) >= 5:
+                break
+
+        bottom_5_guesses = []
+        locations_seen_bottom_5 = set()
+        for ranked_guess in reversed(ranked_guesses):
+            if ranked_guess.location_index not in locations_seen_bottom_5:
+                bottom_5_guesses.append(ranked_guess)
+                locations_seen_bottom_5.add(ranked_guess.location_index)
+            if len(bottom_5_guesses) >= 5:
+                break
+
+        guesses_message = "📊 Current Round Guesses:\n\n"
+
+        def format_guess(ranked_guess: RankedGuess) -> str:
+            return f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score})"
+
+        guesses_message += "Top 5 guesses:\n"
+        for ranked_guess in top_5_guesses:
+            guesses_message += f"{format_guess(ranked_guess)}\n"
+
+        guesses_message += "\nBottom 5 guesses:\n"
+        for ranked_guess in bottom_5_guesses:
+            guesses_message += f"{format_guess(ranked_guess)}\n"
+
+        logger.info(
+            f"Sending guesses update to chat {update.effective_chat.id}\n\n{guesses_message}"
+        )
+        await update.message.reply_text(
+            guesses_message,
+            parse_mode="HTML",
+        )
+
+    @command_handler(league_in_progress=True)
+    async def outcomes_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        odds = self.bet_manager.get_latest_odds(
+            league_round=self.league_state.current_round_num
+        )
+        if not odds:
+            await update.message.reply_text(
+                "Odds have not been generated yet for this round. Please check back soon!",
+            )
+            return
+
+        bet_outcomes_message = "📊 Bet Outcomes:\n\n"
+        for player, odds in odds.items():
+            bet_outcomes_message += f"{player}: (current odds: {odds.formatted})\n"
+
+            for bettor, pnl in self.bet_manager.compute_bet_pnls(winner=player).items():
+                bet_outcomes_message += (
+                    f"    - {bettor}: {self.bet_manager.compute_signed_amount(pnl)}\n"
+                )
+
+            bet_outcomes_message += "\n"
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=bet_outcomes_message,
+            parse_mode="HTML",
+        )
+
+    @command_handler(league_in_progress=True)
+    async def odds_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        latest_odds = self.bet_manager.get_latest_odds(
+            league_round=self.league_state.current_round_num
+        )
+        if not latest_odds:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Odds have not been generated yet for this round. Please check back soon!",
+            )
+            return
+
+        odds_message = self.__create_odds_message(odds_dict=latest_odds)
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=odds_message,
+        )
+
+    @command_handler(league_in_progress=True)
+    async def exposure_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        exposure_message = self.__construct_position_message(
+            player_name=None, is_bookmaker=True
+        )
+
+        await update.message.reply_text(
+            exposure_message,
+            parse_mode="HTML",
+        )
+
+    @command_handler(league_in_progress=True)
+    async def position_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        player_id = update.effective_user.id
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+        if player_name is None:
+            await update.message.reply_text(
+                "Your Telegram ID is not linked to a player name. Please contact the admin."
+            )
+            return
+
+        position_message = self.__construct_position_message(player_name=player_name)
+        await update.message.reply_text(
+            position_message,
+            parse_mode="HTML",
+        )
+
+    @command_handler(league_in_progress=True, round_in_progress=True)
+    async def lounge_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
 
         player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(user_id)
@@ -1270,7 +1240,7 @@ class BotManager:
             player_name=player_name,
         )
 
-    @ensure_initialised
+    @command_handler
     async def handicaps_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -1282,14 +1252,8 @@ class BotManager:
 
         await update.message.reply_text(message)
 
-    @ensure_initialised
+    @command_handler(league_in_progress=True, round_in_progress=True)
     async def start_bet(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if self.league_state is None or self.league_state.is_finished:
-            await update.message.reply_text(
-                "No active league. Start a new league with /startleague."
-            )
-            return
-
         player_id = update.effective_user.id
 
         chat_id = update.effective_chat.id
