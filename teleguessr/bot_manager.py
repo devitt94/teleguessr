@@ -834,15 +834,12 @@ class BotManager:
         )
 
         message = (
-            f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}.\n"
+            f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}\.\n"
             f"The following players have not completed this round yet:\n{pending_list}\n\n"
             f"Round URL: {self.league_state.current_round.challenge_url}"
         )
 
-        await context.bot.send_message(
-            chat_id,
-            message,
-        )
+        await context.bot.send_message(chat_id, message, parse_mode="MarkdownV2")
 
     async def end_round_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
