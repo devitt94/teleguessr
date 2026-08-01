@@ -70,6 +70,15 @@ NUMBER_EMOJI_MAP = {
 }
 
 
+def ensure_initialised(func):
+    async def wrapper(self: "BotManager", *args, **kwargs):
+        if not self._initialised:
+            raise RuntimeError("BotManager not initialised!")
+        return await func(self, *args, **kwargs)
+
+    return wrapper
+
+
 class BotManager:
     def __init__(
         self,
@@ -89,7 +98,7 @@ class BotManager:
         self.model_settings = model_settings
         self.league_state = None
         self.bet_manager = None
-        self.__initialised = False
+        self._initialised = False
         self.geoguessr_client = geoguessr_client
 
         self.challenge_settings_generator: ChallengeSettingsGenerator = (
@@ -135,12 +144,10 @@ class BotManager:
                 all_runners=list(self.handicaps.keys()),
             )
 
-        self.__initialised = True
+        self._initialised = True
 
+    @ensure_initialised
     async def resume_league_tasks(self, app: TelegramApp):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             logger.info("No active league to resume tasks for.")
             return
@@ -178,31 +185,41 @@ class BotManager:
             parse_mode="HTML",
         )
 
+    @ensure_initialised
     async def odds_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
             )
             return
 
-        await self.display_odds(context, chat_id=update.effective_chat.id)
+        latest_odds = self.bet_manager.get_latest_odds(
+            league_round=self.league_state.current_round_num
+        )
+        if not latest_odds:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Odds have not been generated yet for this round. Please check back soon!",
+            )
+            return
 
+        odds_message = self.create_odds_message(odds_dict=latest_odds)
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=odds_message,
+        )
+
+    @ensure_initialised
     async def exposure_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
-            update.message.reply_text(
+            await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
             )
             return
 
-        exposure_message = self.construct_position_message(
+        exposure_message = self._construct_position_message(
             player_name=None, is_bookmaker=True
         )
 
@@ -211,12 +228,10 @@ class BotManager:
             parse_mode="HTML",
         )
 
+    @ensure_initialised
     async def position_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
@@ -231,13 +246,13 @@ class BotManager:
             )
             return
 
-        position_message = self.construct_position_message(player_name=player_name)
+        position_message = self._construct_position_message(player_name=player_name)
         await update.message.reply_text(
             position_message,
             parse_mode="HTML",
         )
 
-    def construct_position_message(
+    def _construct_position_message(
         self, player_name: str, is_bookmaker: bool = False
     ) -> str:
         if is_bookmaker:
@@ -267,10 +282,8 @@ class BotManager:
         position_message += f"\nEstimated cash out (adjusted for odds): {self.bet_manager.compute_signed_amount(total_equity)}"
         return position_message
 
+    @ensure_initialised
     async def records_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         records = self.record_manager.get_records()
 
         records_message = "🏆 All-Time Records:\n"
@@ -295,12 +308,10 @@ class BotManager:
             parse_mode="HTML",
         )
 
+    @ensure_initialised
     async def start_league_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if update.effective_user.id != self.admin_id:
             await update.message.reply_text(
                 "You are not authorized to use this command."
@@ -349,24 +360,20 @@ class BotManager:
 
         await self.start_round(context, chat_id=update.effective_chat.id)
 
+    @ensure_initialised
     async def leaderboard_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
             )
             return
 
-        await self.show_leaderboard(context, chat_id=update.effective_chat.id)
+        await self.__show_leaderboard(context, chat_id=update.effective_chat.id)
 
+    @ensure_initialised
     async def poll_for_round_updates(self, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if (
             self.league_state is None
             or self.league_state.is_finished
@@ -384,7 +391,7 @@ class BotManager:
         )
 
         players_finished_before = self.league_state.get_players_finished_round()
-        current_round_played_status = await self.player_round_status(round_result)
+        current_round_played_status = self.__player_round_status(round_result)
         finished_players, still_pending_players = set(), set()
         for player, abbreviated_score in current_round_played_status.items():
             if abbreviated_score is not None and abbreviated_score.is_finished:
@@ -403,7 +410,7 @@ class BotManager:
                     continue
 
                 try:
-                    await self.invite_player_to_lounge(
+                    await self.__invite_player_to_lounge(
                         context,
                         player_name=player,
                     )
@@ -425,7 +432,7 @@ class BotManager:
             self.league_state.save()
 
             if self.players_lounge_group_id is not None:
-                await self.status_update(
+                await self.__status_update(
                     context,
                     chat_id=self.players_lounge_group_id,
                     round_result=round_result,
@@ -457,6 +464,7 @@ class BotManager:
             self.league_state.current_round.reminder_sent = True
             self.league_state.save()
 
+    @ensure_initialised
     async def start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         challenge_settings = self.challenge_settings_generator(
             self.league_state.current_round_num
@@ -508,7 +516,7 @@ class BotManager:
         )
 
         context.job_queue.run_once(
-            self.generate_and_send_odds_update,
+            self.__generate_and_send_odds_update,
             when=1,
             data={"chat_id": chat_id},
         )
@@ -519,7 +527,7 @@ class BotManager:
             first=self.polling_interval_seconds,
         )
 
-    async def generate_and_send_odds_update(self, context: ContextTypes.DEFAULT_TYPE):
+    async def __generate_and_send_odds_update(self, context: ContextTypes.DEFAULT_TYPE):
         chat_id = context.job.data["chat_id"]
         logger.info(f"Generating and sending odds update to chat {chat_id}.")
         odds_df = await generate_outright_odds_predictions(
@@ -555,14 +563,14 @@ class BotManager:
             back_odds=back_win_odds_dict,
             lay_odds=lay_win_odds_dict,
         )
-        odds_message = await self.create_odds_message(odds_dict=back_win_odds_dict)
+        odds_message = self.create_odds_message(odds_dict=back_win_odds_dict)
 
         await context.bot.send_message(
             chat_id=chat_id,
             text=odds_message,
         )
 
-    async def create_odds_message(self, odds_dict: dict[str, FractionalOdds]) -> str:
+    def create_odds_message(self, odds_dict: dict[str, FractionalOdds]) -> str:
         if not odds_dict:
             return "Odds are not available."
         odds_message = "📊 Current Odds:\n\n"
@@ -574,26 +582,7 @@ class BotManager:
 
         return odds_message
 
-    async def display_odds(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-        latest_odds = self.bet_manager.get_latest_odds(
-            league_round=self.league_state.current_round_num
-        )
-        if not latest_odds:
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="Odds have not been generated yet for this round. Please check back soon!",
-            )
-            return
-        odds_message = await self.create_odds_message(odds_dict=latest_odds)
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=odds_message,
-        )
-
-    async def get_ranked_guesses(self) -> list[RankedGuess]:
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
+    async def __get_ranked_guesses(self) -> list[RankedGuess]:
         if (
             self.league_state is None
             or self.league_state.is_finished
@@ -612,7 +601,7 @@ class BotManager:
         ranked_guesses = get_ranked_guesses(round_result)
         return ranked_guesses
 
-    async def get_round_leaderboard_message(
+    def __get_round_leaderboard_message(
         self,
         scores_hidden: bool,
         players_played: dict[str, AbbreviatedRoundScore | None],
@@ -650,15 +639,12 @@ class BotManager:
 
         return leaderboard_message
 
-    async def get_league_projections_for_round(
+    def get_league_projections_for_round(
         self,
         round_result: ChallengeResult,
         best_guess_player: str,
         worst_guess_player: str,
     ) -> str:
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if (
             self.league_state is None
             or self.league_state.is_finished
@@ -704,10 +690,8 @@ class BotManager:
         )
         return "\n".join(projection_message_lines)
 
+    @ensure_initialised
     async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
@@ -730,9 +714,9 @@ class BotManager:
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        await self.status_update(context, chat_id, round_result, player_id)
+        await self.__status_update(context, chat_id, round_result, player_id)
 
-    async def status_update(
+    async def __status_update(
         self,
         context: ContextTypes.DEFAULT_TYPE,
         chat_id: int,
@@ -743,7 +727,7 @@ class BotManager:
         if not self.league_state.round_in_progress:
             status_message += "- No round currently in progress.\n"
         else:
-            players_scores = await self.player_round_status(round_result)
+            players_scores = self.__player_round_status(round_result)
             players_played = set(
                 player
                 for player, score in players_scores.items()
@@ -763,14 +747,14 @@ class BotManager:
             status_message += (
                 f"- Current round in progress (ends in {format_time(time_left)})\n\n"
             )
-            status_message += await self.get_round_leaderboard_message(
+            status_message += self.__get_round_leaderboard_message(
                 scores_hidden=not player_has_played,
                 players_played=players_scores,
             )
 
             if player_has_played:
                 # Reply in private chat if the player has played
-                ranked_guesses = await self.get_ranked_guesses()
+                ranked_guesses = await self.__get_ranked_guesses()
                 status_message += (
                     f"\n<b>Projected Awards:</b>\n{format_awards_html(ranked_guesses)}"
                 )
@@ -779,12 +763,10 @@ class BotManager:
 
                 best_guess_player = ranked_guesses[0].player.name
                 worst_guess_player = ranked_guesses[-1].player.name
-                projected_leaderboard_message = (
-                    await self.get_league_projections_for_round(
-                        round_result=round_result,
-                        best_guess_player=best_guess_player,
-                        worst_guess_player=worst_guess_player,
-                    )
+                projected_leaderboard_message = self.get_league_projections_for_round(
+                    round_result=round_result,
+                    best_guess_player=best_guess_player,
+                    worst_guess_player=worst_guess_player,
                 )
                 status_message += f"\n\n{projected_leaderboard_message}"
 
@@ -795,9 +777,6 @@ class BotManager:
         )
 
     async def reminder(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-        if chat_id is None:
-            raise ValueError("chat_id must be provided to reminder")
-
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
             handicaps=self.handicaps,
@@ -841,12 +820,10 @@ class BotManager:
 
         await context.bot.send_message(chat_id, message, parse_mode="MarkdownV2")
 
+    @ensure_initialised
     async def end_round_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if update.effective_user.id != self.admin_id:
             await update.message.reply_text(
                 "You are not authorized to use this command."
@@ -863,10 +840,8 @@ class BotManager:
 
         await self.end_round(context, update.effective_chat.id)
 
+    @ensure_initialised
     async def guesses_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
@@ -879,7 +854,7 @@ class BotManager:
             )
             return
 
-        ranked_guesses = await self.get_ranked_guesses()
+        ranked_guesses = await self.__get_ranked_guesses()
 
         top_5_guesses = []
         locations_seen_top_5 = set()
@@ -947,9 +922,9 @@ class BotManager:
             parse_mode="HTML",
         )
 
-        await self.clear_players_from_lounge_chat(context)
+        await self.__clear_players_from_lounge_chat(context)
 
-        await self.show_leaderboard(context, chat_id)
+        await self.__show_leaderboard(context, chat_id)
 
         if self.league_state.is_finished:
             winner = self.league_state.get_winner()
@@ -1033,12 +1008,10 @@ class BotManager:
                 chat_id=chat_id,
             )
 
+    @ensure_initialised
     async def outcomes_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
@@ -1071,7 +1044,9 @@ class BotManager:
             parse_mode="HTML",
         )
 
-    async def show_leaderboard(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    async def __show_leaderboard(
+        self, context: ContextTypes.DEFAULT_TYPE, chat_id: int
+    ):
         leaderboard = self.league_state.get_leaderboard_data()
         leaderboard_text = format_leaderboard_html(**leaderboard)
 
@@ -1112,7 +1087,7 @@ class BotManager:
         # Still print to logs
         logger.info(f"Exception while handling update {update}: {context.error}")
 
-    async def player_round_status(
+    def __player_round_status(
         self, round_result: ChallengeResult
     ) -> dict[str, AbbreviatedRoundScore | None]:
         net_scores = {}
@@ -1178,14 +1153,11 @@ class BotManager:
             text=message,
         )
 
-    async def invite_player_to_lounge(
+    async def __invite_player_to_lounge(
         self,
         context: ContextTypes.DEFAULT_TYPE,
         player_name: str,
     ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.players_lounge_group_id is None:
             raise ValueError("players_lounge_group_id is not set.")
 
@@ -1210,10 +1182,9 @@ class BotManager:
             ),
         )
 
-    async def clear_players_from_lounge_chat(self, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
+    async def __clear_players_from_lounge_chat(
+        self, context: ContextTypes.DEFAULT_TYPE
+    ):
         if self.players_lounge_group_id is None:
             logger.info(
                 "No players lounge group ID set, skipping clearing lounge chat."
@@ -1260,10 +1231,8 @@ class BotManager:
                     text=f"⚠️ Failed to remove player {player_name} from lounge chat: {e}",
                 )
 
+    @ensure_initialised
     async def lounge_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
@@ -1287,7 +1256,7 @@ class BotManager:
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        round_status = await self.player_round_status(round_result)
+        round_status = self.__player_round_status(round_result)
         player_score = round_status.get(player_name)
 
         if player_score is None or not player_score.is_finished:
@@ -1296,17 +1265,15 @@ class BotManager:
             )
             return
 
-        await self.invite_player_to_lounge(
+        await self.__invite_player_to_lounge(
             context,
             player_name=player_name,
         )
 
+    @ensure_initialised
     async def handicaps_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         sorted_handicaps = sorted(self.handicaps.items(), key=lambda item: item[1])
 
         message = "📉 Current Handicaps:\n\n"
@@ -1315,10 +1282,8 @@ class BotManager:
 
         await update.message.reply_text(message)
 
+    @ensure_initialised
     async def start_bet(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.__initialised:
-            raise RuntimeError("BotManager not initialised!")
-
         if self.league_state is None or self.league_state.is_finished:
             await update.message.reply_text(
                 "No active league. Start a new league with /startleague."
@@ -1349,7 +1314,7 @@ class BotManager:
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        players_played = await self.player_round_status(round_result)
+        players_played = self.__player_round_status(round_result)
         if players_played.get(player_name) is not None:
             await update.message.reply_text(
                 "You have already started this round, so you cannot place bets. Please wait for the next round to start."
