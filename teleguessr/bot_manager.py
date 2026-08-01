@@ -823,9 +823,8 @@ class BotManager:
                 chat_id, f"🏆 League finished. Winner: {winner}"
             )
             # Calculate and update handicaps
-            player_ranks = get_ranks_from_scores(
-                self.league_state.get_leaderboard_data()["scores"]
-            )
+            final_leaderboard = self.league_state.get_leaderboard_data()
+            player_ranks = get_ranks_from_scores(final_leaderboard["scores"])
             new_handicaps = calculate_new_handicaps(player_ranks, self.league_settings)
 
             update_handicaps(
@@ -852,6 +851,8 @@ class BotManager:
             self.record_manager.update_records(
                 gross_winner=gross_winner,
                 net_winner=winner,
+                best_guesses=final_leaderboard["best_guesses"],
+                worst_guesses=final_leaderboard["worst_guesses"],
             )
 
             replayed_leaderboard_text = format_leaderboard_html(
@@ -925,7 +926,7 @@ class BotManager:
         records = self.record_manager.get_records()
 
         records_message = "🏆 All-Time Records:\n"
-        records_message += "Net = 🏅; Gross = 👑\n\n"
+        records_message += "Net = 🏅; Gross = 👑; Best Guess = 🐐; Worst Guess = 🎣\n\n"
 
         for player, record in records.items():
             records_message += f"- {player}:\n"
@@ -940,6 +941,9 @@ class BotManager:
             else:
                 gross_win_str = "0\n"
             records_message += f"    - 👑x{gross_win_str}"
+
+            records_message += f"    - 🐐x{record.best_guesses}\n"
+            records_message += f"    - 🎣x{record.worst_guesses}\n"
 
         await update.message.reply_text(
             records_message,

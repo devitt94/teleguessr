@@ -35,22 +35,27 @@ class RecordManager:
             )
 
     def update_records(
-        self, net_winner: str, gross_winner: str, date: datetime = None
+        self,
+        net_winner: str,
+        gross_winner: str,
+        best_guesses: dict[str, int],
+        worst_guesses: dict[str, int],
+        date: datetime | None = None,
     ) -> dict[str, Records]:
         if date is None:
             date = datetime.utcnow().date()
 
         records = self.get_records()
         if net_winner == gross_winner:
-            record = records.get(net_winner, Records(net_wins=0, gross_wins=0))
+            record = records.get(net_winner, Records())
             record.net_wins += 1
             record.gross_wins += 1
             record.most_recent_net_win = date
             record.most_recent_gross_win = date
             records[net_winner] = record
         else:
-            gross_record = records.get(gross_winner, Records(net_wins=0, gross_wins=0))
-            net_record = records.get(net_winner, Records(net_wins=0, gross_wins=0))
+            gross_record = records.get(gross_winner, Records())
+            net_record = records.get(net_winner, Records())
 
             net_record.net_wins += 1
             net_record.most_recent_net_win = date
@@ -59,6 +64,16 @@ class RecordManager:
 
             records[net_winner] = net_record
             records[gross_winner] = gross_record
+
+        for player, count in best_guesses.items():
+            record = records.get(player, Records())
+            record.best_guesses += count
+            records[player] = record
+
+        for player, count in worst_guesses.items():
+            record = records.get(player, Records())
+            record.worst_guesses += count
+            records[player] = record
 
         self._save_records(records)
         return records

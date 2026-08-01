@@ -181,8 +181,10 @@ class Bet(BaseModel):
 
 
 class Records(BaseModel):
-    net_wins: int
-    gross_wins: int
+    net_wins: int = 0
+    gross_wins: int = 0
+    best_guesses: int = 0
+    worst_guesses: int = 0
     most_recent_net_win: date | None = None
     most_recent_gross_win: date | None = None
 
