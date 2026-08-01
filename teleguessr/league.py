@@ -278,3 +278,34 @@ class LeagueState(BaseModel):
         if not self.round_in_progress:
             return set()
         return set(self.current_round.players_finished)
+
+    def get_streamer_for_round(self) -> str | None:
+        if not self.round_in_progress:
+            return None
+
+        if self.current_round_num < self.num_rounds:
+            return None  # Only determine streamer for the final round
+
+        sorted_leaderboard = sorted(
+            self.__scores.items(), key=lambda x: x[1], reverse=True
+        )
+        top_score = sorted_leaderboard[0][1]
+        top_players = [p for p, s in sorted_leaderboard if s == top_score]
+        if len(top_players) == 1:
+            return top_players[0]
+
+        # Tie-breaker: return the player with the lowest total net points across previous rounds
+        lowest_total_net_points = float("inf")
+        streamer = None
+        for player in top_players:
+            total_net_points = sum(
+                rs.compute_net_score()
+                for result in self.results
+                for rs in result.scores
+                if rs.player.name == player
+            )
+            if total_net_points < lowest_total_net_points:
+                lowest_total_net_points = total_net_points
+                streamer = player
+
+        return streamer

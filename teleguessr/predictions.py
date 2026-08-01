@@ -1,7 +1,6 @@
 from copy import deepcopy
 import json
 from pathlib import Path
-import random
 import multiprocessing
 import numpy as np
 from functools import partial
@@ -68,16 +67,17 @@ def _simulate_league(
     n_rounds: int,
     hcaps: dict[str, float],
 ) -> LeagueState:
+    streamer_mu_adjustment = 0.1
     while not league_state.is_finished:
         challenge_settings = challenge_settings_generator(
             league_state.current_round_num
         )
 
-        streamer = None
+        streamer = league_state.get_streamer_for_round()
         if league_state.current_round_num == n_rounds - 1:
-            mu_adjustment = 0.25
-            streamer = random.choice(league_state.current_leaders)
-            lognormal_fits[streamer].mu += mu_adjustment
+            logger.info("Applying mu adjustment for streamer in final round")
+            if streamer is not None:
+                lognormal_fits[streamer].mu *= 1 + streamer_mu_adjustment
 
         round_result = _simulate_round(lognormal_fits, hcaps, challenge_settings)
         ranked_guesses = get_ranked_guesses(round_result)
@@ -85,8 +85,8 @@ def _simulate_league(
         league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
 
         if streamer is not None:
-            lognormal_fits[streamer].mu -= mu_adjustment
-            streamer = None
+            logger.info(f"Reverting mu adjustment for streamer {streamer}")
+            lognormal_fits[streamer].mu /= 1 + streamer_mu_adjustment
 
     return league_state
 

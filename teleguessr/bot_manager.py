@@ -337,6 +337,8 @@ class BotManager:
             challenge_settings=challenge_settings,
         )
 
+        streamer = self.league_state.get_streamer_for_round()
+
         round_ends_in_seconds = self.league_state.get_time_left_seconds()
         logger.info(
             f"Started round {self.league_state.current_round_num} with challenge URL: {challenge_url}. "
@@ -355,6 +357,12 @@ class BotManager:
             ),
             parse_mode="HTML",
         )
+
+        if streamer is not None:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"🎥 Streamer for this round: {streamer}",
+            )
 
         await context.bot.pin_chat_message(
             chat_id=chat_id,
