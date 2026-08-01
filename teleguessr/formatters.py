@@ -1,8 +1,27 @@
 from datetime import date, datetime
 
 from teleguessr.league import skewed_ranking_score_manager
-from teleguessr.models import ChallengeResult, ChallengeSettings, RankedGuess
+from teleguessr.models import (
+    AbbreviatedRoundScore,
+    ChallengeResult,
+    ChallengeSettings,
+    RankedGuess,
+)
 from teleguessr.odds import FractionalOdds
+
+
+NUMBER_EMOJI_MAP = {
+    1: "1️⃣",
+    2: "2️⃣",
+    3: "3️⃣",
+    4: "4️⃣",
+    5: "5️⃣",
+    6: "6️⃣",
+    7: "7️⃣",
+    8: "8️⃣",
+    9: "9️⃣",
+    10: "🔟",
+}
 
 
 def get_rank_emoji(position: int, total_participants: int) -> str:
@@ -67,25 +86,19 @@ def get_position_str(position: int, tied: bool = False) -> str:
 
 
 def format_awards_html(ranked_guesses: list[RankedGuess]) -> str:
-    lines = []
+    def format_guess(ranked_guess: RankedGuess) -> str:
+        return (
+            f"   • Player: {ranked_guess.player.name}\n"
+            f"   • Location: <b>{ranked_guess.location_index}</b>\n"
+            f"   • Distance: <b>{ranked_guess.guess.distance_km:.2f} km</b>\n"
+            f"   • Points: <b>{ranked_guess.guess.score} pts</b>\n"
+            f"   • Guess Rating: <b>{ranked_guess.adjusted_score:.1f}</b>\n"
+        )
 
-    bg = ranked_guesses[0]
-    lines.append(
-        f"🐐 <b>Best Guess Award</b>\n"
-        f"   • Player: {bg.player.name}\n"
-        f"   • Distance: <b>{bg.guess.distance_km:.2f} km</b> (Median: {bg.guess_stats.median_distance:.2f} km)\n"
-        f"   • Score: <b>{bg.guess.score} pts</b> (Median: {bg.guess_stats.median_pts:.2f} pts)\n"
-        f"   • Location: <b>{bg.location_index}</b>"
+    return (
+        f"🐐 <b>Best Guess Award</b>\n{format_guess(ranked_guesses[0])}\n"
+        f"🎣 <b>Worst Guess Award</b>\n{format_guess(ranked_guesses[-1])}"
     )
-    wg = ranked_guesses[-1]
-    lines.append(
-        f"🎣 <b>Worst Guess Award</b>\n"
-        f"   • Player: {wg.player.name}\n"
-        f"   • Distance: <b>{wg.guess.distance_km:.2f} km</b> (Median: {wg.guess_stats.median_distance:.2f} km)\n"
-        f"   • Score: <b>{wg.guess.score} pts</b> (Median: {wg.guess_stats.median_pts:.2f} pts)\n"
-        f"   • Location: <b>{wg.location_index}</b>"
-    )
-    return "\n\n".join(lines)
 
 
 def format_round_result_html(
@@ -250,9 +263,7 @@ def format_outcomes_message(
     bet_outcomes_message = "📊 Bet Outcomes:\n\n"
     for player, current_odds in all_odds.items():
         bet_outcomes_message += f"{player}: (current odds: {current_odds.formatted})\n"
-        outcomes = outcomes_by_winner.get(player, {})
-
-        for bettor, pnl in outcomes[player].items():
+        for bettor, pnl in outcomes_by_winner[player].items():
             bet_outcomes_message += f"    - {bettor}: {format_signed_amount(pnl)}\n"
         bet_outcomes_message += "\n"
 
@@ -268,11 +279,51 @@ def format_odds_message(
     odds_message = "📊 Current Odds:\n\n"
     for player, odds in back_odds.items():
         if player in lay_odds:
-            odds_message += f"- {player}: {odds.formatted} (Back) / {lay_odds[player].formatted} (Lay)\n"
+            odds_message += (
+                f"- {player}: {odds.formatted} ({lay_odds[player].formatted} to lay)\n"
+            )
         else:
-            odds_message += f"- {player}: {odds.formatted} (Back) / N/A (Lay)\n"
+            odds_message += f"- {player}: {odds.formatted}\n"
 
     odds_message += "\n DM me with /bet to place your bets!"
     odds_message += "\n Use /position to check your current betting position."
 
     return odds_message
+
+
+def format_round_leaderboard_message(
+    scores_hidden: bool,
+    players_played: dict[str, AbbreviatedRoundScore | None],
+) -> str:
+    leaderboard_message = ""
+    if not scores_hidden:
+        leaderboard_message += "<b>Current rankings for this round:</b>\n"
+        for player, abbreviated_score in players_played.items():
+            if abbreviated_score is None:
+                rank_emoji = "❓"
+                net_score_str = ""
+            elif not abbreviated_score.is_finished:
+                rank_emoji = "⏳"
+                net_score_str = f" ({abbreviated_score.net_score} pts, {abbreviated_score.rounds_played}/{abbreviated_score.total_rounds} played)"
+            else:
+                rank_emoji = NUMBER_EMOJI_MAP.get(abbreviated_score.rank, "❓")
+                net_score_str = f" ({abbreviated_score.net_score} pts)"
+
+            leaderboard_message += f"  {rank_emoji}: {player} {net_score_str}\n"
+
+    else:
+        leaderboard_message += "- Players who have played this round\n"
+
+        # Sort players by alphabetical order for consistent display
+        sorted_players = sorted(players_played.items())
+
+        for player, abbreviated_score in sorted_players:
+            if abbreviated_score is None:
+                emoji = "❌"
+            elif not abbreviated_score.is_finished:
+                emoji = "⏳"
+            else:
+                emoji = "✅"
+            leaderboard_message += f"  - {emoji} {player}\n"
+
+    return leaderboard_message

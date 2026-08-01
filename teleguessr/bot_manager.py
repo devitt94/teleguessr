@@ -16,6 +16,7 @@ from teleguessr.challenge_settings_generators import (
     ChallengeSettingsGenerator,
 )
 from teleguessr.formatters import (
+    NUMBER_EMOJI_MAP,
     format_awards_html,
     format_challenge_settings,
     format_datetime_to_time_ago,
@@ -25,6 +26,7 @@ from teleguessr.formatters import (
     format_ranked_guesses,
     format_round_result_html,
     format_signed_amount,
+    format_round_leaderboard_message,
     format_time,
 )
 from teleguessr.odds import FractionalOdds
@@ -62,20 +64,6 @@ from telegram.ext import ContextTypes
 
 
 BET_SELECT_PLAYER, BET_SELECT_BET_TYPE, BET_SELECT_AMOUNT = range(3)
-
-NUMBER_EMOJI_MAP = {
-    1: "1️⃣",
-    2: "2️⃣",
-    3: "3️⃣",
-    4: "4️⃣",
-    5: "5️⃣",
-    6: "6️⃣",
-    7: "7️⃣",
-    8: "8️⃣",
-    9: "9️⃣",
-    10: "🔟",
-}
-
 
 HandlerFunc = Callable[
     ["BotManager", Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]
@@ -460,57 +448,12 @@ class BotManager:
         ranked_guesses = get_ranked_guesses(round_result)
         return ranked_guesses
 
-    def __get_round_leaderboard_message(
-        self,
-        scores_hidden: bool,
-        players_played: dict[str, AbbreviatedRoundScore | None],
-    ) -> str:
-        leaderboard_message = ""
-        if not scores_hidden:
-            leaderboard_message += "<b>Current rankings for this round:</b>\n"
-            for player, abbreviated_score in players_played.items():
-                if abbreviated_score is None:
-                    rank_emoji = "❓"
-                    net_score_str = ""
-                elif not abbreviated_score.is_finished:
-                    rank_emoji = "⏳"
-                    net_score_str = f" ({abbreviated_score.net_score} pts, {abbreviated_score.rounds_played}/{abbreviated_score.total_rounds} played)"
-                else:
-                    rank_emoji = NUMBER_EMOJI_MAP.get(abbreviated_score.rank, "❓")
-                    net_score_str = f" ({abbreviated_score.net_score} pts)"
-
-                leaderboard_message += f"  {rank_emoji}: {player} {net_score_str}\n"
-
-        else:
-            leaderboard_message += "- Players who have played this round\n"
-
-            # Sort players by alphabetical order for consistent display
-            sorted_players = sorted(players_played.items())
-
-            for player, abbreviated_score in sorted_players:
-                if abbreviated_score is None:
-                    emoji = "❌"
-                elif not abbreviated_score.is_finished:
-                    emoji = "⏳"
-                else:
-                    emoji = "✅"
-                leaderboard_message += f"  - {emoji} {player}\n"
-
-        return leaderboard_message
-
     def __get_league_projections_for_round(
         self,
         round_result: ChallengeResult,
         best_guess_player: str,
         worst_guess_player: str,
     ) -> str:
-        if (
-            self.league_state is None
-            or self.league_state.is_finished
-            or not self.league_state.round_in_progress
-        ):
-            raise RuntimeError("No active round.")
-
         current_leaderboard = self.league_state.get_leaderboard_data()["scores"]
         projected_scores = current_leaderboard.copy()
         points_for_round = skewed_ranking_score_manager(round_result)
@@ -557,51 +500,54 @@ class BotManager:
         from_perspective_of_player_id: int | None = None,
     ) -> str:
         status_message = f"League Status:\n- Rounds completed: {self.league_state.last_round_finished_num}/{self.league_state.num_rounds}\n"
-        if not self.league_state.round_in_progress:
-            status_message += "- No round currently in progress.\n"
+
+        players_scores = self.__player_round_status(round_result)
+        players_played = set(
+            player
+            for player, score in players_scores.items()
+            if score is not None and score.is_finished
+        )
+
+        time_left = self.league_state.get_time_left_seconds()
+
+        hide_scores: bool
+        if chat_id == self.players_lounge_group_id:
+            hide_scores = False
+        elif chat_id == self.league_state.chat_id:
+            hide_scores = True
         else:
-            players_scores = self.__player_round_status(round_result)
-            players_played = set(
-                player
-                for player, score in players_scores.items()
-                if score is not None and score.is_finished
-            )
-
-            time_left = self.league_state.get_time_left_seconds()
-
             if from_perspective_of_player_id is not None:
                 player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(
                     from_perspective_of_player_id
                 )
-                player_has_played = player_name in players_played
+                hide_scores = player_name not in players_played
             else:
-                player_has_played = True
+                hide_scores = True
 
+        status_message += (
+            f"- Current round in progress (ends in {format_time(time_left)})\n\n"
+        )
+        status_message += format_round_leaderboard_message(
+            scores_hidden=hide_scores,
+            players_played=players_scores,
+        )
+
+        if not hide_scores:
+            ranked_guesses = await self.__get_ranked_guesses()
             status_message += (
-                f"- Current round in progress (ends in {format_time(time_left)})\n\n"
+                f"\n<b>Projected Awards:</b>\n{format_awards_html(ranked_guesses)}"
             )
-            status_message += self.__get_round_leaderboard_message(
-                scores_hidden=not player_has_played,
-                players_played=players_scores,
+            if self.league_state.chat_id == chat_id:
+                chat_id = from_perspective_of_player_id
+
+            best_guess_player = ranked_guesses[0].player.name
+            worst_guess_player = ranked_guesses[-1].player.name
+            projected_leaderboard_message = self.__get_league_projections_for_round(
+                round_result=round_result,
+                best_guess_player=best_guess_player,
+                worst_guess_player=worst_guess_player,
             )
-
-            if player_has_played:
-                # Reply in private chat if the player has played
-                ranked_guesses = await self.__get_ranked_guesses()
-                status_message += (
-                    f"\n<b>Projected Awards:</b>\n{format_awards_html(ranked_guesses)}"
-                )
-                if self.league_state.chat_id == chat_id:
-                    chat_id = from_perspective_of_player_id
-
-                best_guess_player = ranked_guesses[0].player.name
-                worst_guess_player = ranked_guesses[-1].player.name
-                projected_leaderboard_message = self.__get_league_projections_for_round(
-                    round_result=round_result,
-                    best_guess_player=best_guess_player,
-                    worst_guess_player=worst_guess_player,
-                )
-                status_message += f"\n\n{projected_leaderboard_message}"
+            status_message += f"\n{projected_leaderboard_message}"
 
         await context.bot.send_message(
             chat_id=chat_id,
@@ -1000,7 +946,7 @@ class BotManager:
             parse_mode="HTML",
         )
 
-    @command_handler(league_in_progress=True)
+    @command_handler(league_in_progress=True, round_in_progress=True)
     async def status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         player_id = update.effective_user.id
         chat_id = update.effective_chat.id
