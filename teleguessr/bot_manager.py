@@ -20,7 +20,11 @@ from teleguessr.formatters import (
     format_challenge_settings,
     format_datetime_to_time_ago,
     format_leaderboard_html,
+    format_odds_message,
+    format_outcomes_message,
+    format_ranked_guesses,
     format_round_result_html,
+    format_signed_amount,
     format_time,
 )
 from teleguessr.odds import FractionalOdds
@@ -236,11 +240,9 @@ class BotManager:
                 runner, position, runner_odds
             )
 
-            position_message += (
-                f"- {runner}: {self.bet_manager.compute_signed_amount(position)}\n"
-            )
+            position_message += f"- {runner}: {format_signed_amount(position)}\n"
 
-        position_message += f"\nEstimated cash out (adjusted for odds): {self.bet_manager.compute_signed_amount(total_equity)}"
+        position_message += f"\nEstimated cash out (adjusted for odds): {format_signed_amount(total_equity)}"
         return position_message
 
     async def __poll_for_round_updates(self, context: ContextTypes.DEFAULT_TYPE):
@@ -432,24 +434,12 @@ class BotManager:
             back_odds=back_win_odds_dict,
             lay_odds=lay_win_odds_dict,
         )
-        odds_message = self.__create_odds_message(odds_dict=back_win_odds_dict)
+        odds_message = format_odds_message(back_win_odds_dict, lay_win_odds_dict)
 
         await context.bot.send_message(
             chat_id=chat_id,
             text=odds_message,
         )
-
-    def __create_odds_message(self, odds_dict: dict[str, FractionalOdds]) -> str:
-        if not odds_dict:
-            return "Odds are not available."
-        odds_message = "📊 Current Odds:\n\n"
-        for player, odds in odds_dict.items():
-            odds_message += f"- {player}: {odds.formatted}\n"
-
-        odds_message += "\n DM me with /bet to place your bets!"
-        odds_message += "\n Use /position to check your current betting position."
-
-        return odds_message
 
     async def __get_ranked_guesses(self) -> list[RankedGuess]:
         if (
@@ -937,12 +927,12 @@ class BotManager:
             if bet_pnls:
                 bet_results_message = "💰 Bet Results:\n\n"
                 for player, pnl in bet_pnls.items():
-                    bet_results_message += (
-                        f"- {player}: {self.bet_manager.compute_signed_amount(pnl)}\n"
-                    )
+                    bet_results_message += f"- {player}: {format_signed_amount(pnl)}\n"
 
                 bookmaker_pnl = -sum(bet_pnls.values())
-                bet_results_message += f"\nBookmaker P&L: {self.bet_manager.compute_signed_amount(bookmaker_pnl)}"
+                bet_results_message += (
+                    f"\nBookmaker P&L: {format_signed_amount(bookmaker_pnl)}"
+                )
 
                 await context.bot.send_message(
                     chat_id,
@@ -1089,37 +1079,7 @@ class BotManager:
 
         ranked_guesses = await self.__get_ranked_guesses()
 
-        top_5_guesses = []
-        locations_seen_top_5 = set()
-        for ranked_guess in ranked_guesses:
-            if ranked_guess.location_index not in locations_seen_top_5:
-                top_5_guesses.append(ranked_guess)
-                locations_seen_top_5.add(ranked_guess.location_index)
-            if len(top_5_guesses) >= 5:
-                break
-
-        bottom_5_guesses = []
-        locations_seen_bottom_5 = set()
-        for ranked_guess in reversed(ranked_guesses):
-            if ranked_guess.location_index not in locations_seen_bottom_5:
-                bottom_5_guesses.append(ranked_guess)
-                locations_seen_bottom_5.add(ranked_guess.location_index)
-            if len(bottom_5_guesses) >= 5:
-                break
-
-        guesses_message = "📊 Current Round Guesses:\n\n"
-
-        def format_guess(ranked_guess: RankedGuess) -> str:
-            return f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score})"
-
-        guesses_message += "Top 5 guesses:\n"
-        for ranked_guess in top_5_guesses:
-            guesses_message += f"{format_guess(ranked_guess)}\n"
-
-        guesses_message += "\nBottom 5 guesses:\n"
-        for ranked_guess in bottom_5_guesses:
-            guesses_message += f"{format_guess(ranked_guess)}\n"
-
+        guesses_message = format_ranked_guesses(ranked_guesses)
         logger.info(
             f"Sending guesses update to chat {update.effective_chat.id}\n\n{guesses_message}"
         )
@@ -1141,17 +1101,11 @@ class BotManager:
             )
             return
 
-        bet_outcomes_message = "📊 Bet Outcomes:\n\n"
-        for player, odds in odds.items():
-            bet_outcomes_message += f"{player}: (current odds: {odds.formatted})\n"
+        outcomes = {
+            player: self.bet_manager.compute_bet_pnls(winner=player) for player in odds
+        }
 
-            for bettor, pnl in self.bet_manager.compute_bet_pnls(winner=player).items():
-                bet_outcomes_message += (
-                    f"    - {bettor}: {self.bet_manager.compute_signed_amount(pnl)}\n"
-                )
-
-            bet_outcomes_message += "\n"
-
+        bet_outcomes_message = format_outcomes_message(odds, outcomes)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=bet_outcomes_message,
@@ -1160,17 +1114,20 @@ class BotManager:
 
     @command_handler(league_in_progress=True)
     async def odds_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        latest_odds = self.bet_manager.get_latest_odds(
+        latest_back_odds = self.bet_manager.get_latest_odds(
             league_round=self.league_state.current_round_num
         )
-        if not latest_odds:
+        if not latest_back_odds:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text="Odds have not been generated yet for this round. Please check back soon!",
             )
             return
 
-        odds_message = self.__create_odds_message(odds_dict=latest_odds)
+        latest_lay_odds = self.bet_manager.get_latest_odds(
+            league_round=self.league_state.current_round_num, bet_type=BetType.LAY
+        )
+        odds_message = format_odds_message(latest_back_odds, latest_lay_odds)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=odds_message,

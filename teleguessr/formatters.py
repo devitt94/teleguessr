@@ -2,6 +2,7 @@ from datetime import date, datetime
 
 from teleguessr.league import skewed_ranking_score_manager
 from teleguessr.models import ChallengeResult, ChallengeSettings, RankedGuess
+from teleguessr.odds import FractionalOdds
 
 
 def get_rank_emoji(position: int, total_participants: int) -> str:
@@ -195,3 +196,83 @@ def format_datetime_to_time_ago(dt: datetime | date | None) -> str:
         return f"{days} day{'s' if days > 1 else ''} ago"
 
     return "today"
+
+
+def format_guess(ranked_guess: RankedGuess) -> str:
+    return f"- {ranked_guess.player.name} - R{ranked_guess.location_index} (guess rating: {ranked_guess.adjusted_score})"
+
+
+def format_ranked_guesses(ranked_guesses: list[RankedGuess]) -> str:
+    """Format a list of ranked guesses into a human-readable string."""
+    top_5_guesses = []
+    locations_seen_top_5 = set()
+    for ranked_guess in ranked_guesses:
+        if ranked_guess.location_index not in locations_seen_top_5:
+            top_5_guesses.append(ranked_guess)
+            locations_seen_top_5.add(ranked_guess.location_index)
+        if len(top_5_guesses) >= 5:
+            break
+
+    bottom_5_guesses = []
+    locations_seen_bottom_5 = set()
+    for ranked_guess in reversed(ranked_guesses):
+        if ranked_guess.location_index not in locations_seen_bottom_5:
+            bottom_5_guesses.append(ranked_guess)
+            locations_seen_bottom_5.add(ranked_guess.location_index)
+        if len(bottom_5_guesses) >= 5:
+            break
+
+    guesses_message = "📊 Current Round Guesses:\n\n"
+
+    guesses_message += "Top 5 guesses:\n"
+    for ranked_guess in top_5_guesses:
+        guesses_message += f"{format_guess(ranked_guess)}\n"
+
+    guesses_message += "\nBottom 5 guesses:\n"
+    for ranked_guess in bottom_5_guesses:
+        guesses_message += f"{format_guess(ranked_guess)}\n"
+
+    return guesses_message
+
+
+def format_signed_amount(amount: float) -> str:
+    if amount > 0:
+        return f"+€{amount:.2f}"
+    elif amount < 0:
+        return f"-€{abs(amount):.2f}"
+    else:
+        return "€0.00"
+
+
+def format_outcomes_message(
+    all_odds: dict[str, FractionalOdds], outcomes_by_winner: dict[str, dict[str, float]]
+) -> str:
+    bet_outcomes_message = "📊 Bet Outcomes:\n\n"
+    for player, current_odds in all_odds.items():
+        bet_outcomes_message += f"{player}: (current odds: {current_odds.formatted})\n"
+        outcomes = outcomes_by_winner.get(player, {})
+
+        for bettor, pnl in outcomes[player].items():
+            bet_outcomes_message += f"    - {bettor}: {format_signed_amount(pnl)}\n"
+        bet_outcomes_message += "\n"
+
+    return bet_outcomes_message
+
+
+def format_odds_message(
+    back_odds: dict[str, FractionalOdds],
+    lay_odds: dict[str, FractionalOdds],
+) -> str:
+    if not back_odds:
+        return "Odds are not available."
+    odds_message = "📊 Current Odds:\n\n"
+    for player, odds in back_odds.items():
+        if player in lay_odds:
+            odds_message += f"- {player}: {odds.formatted} (Back) / {lay_odds[player].formatted} (Lay)\n"
+        else:
+            odds_message += f"- {player}: {odds.formatted} (Back) / N/A (Lay)\n"
+
+    odds_message += "\n DM me with /bet to place your bets!"
+    odds_message += "\n Use /position to check your current betting position."
+
+    return odds_message

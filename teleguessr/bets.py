@@ -271,15 +271,6 @@ class BetManager:
             adjusted_probability = max(min_prob, min(max_prob, adjusted_probability))
         return net_position * adjusted_probability
 
-    @staticmethod
-    def compute_signed_amount(amount: float) -> str:
-        if amount > 0:
-            return f"+€{amount:.2f}"
-        elif amount < 0:
-            return f"-€{abs(amount):.2f}"
-        else:
-            return "€0.00"
-
     def compute_max_stake(
         self,
         bettor: str,
