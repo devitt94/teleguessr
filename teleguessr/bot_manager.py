@@ -285,7 +285,6 @@ class BotManager:
                     context,
                     chat_id=self.players_lounge_group_id,
                     round_result=round_result,
-                    from_perspective_of_player_id=None,
                 )
 
         should_end_round = not still_pending_players or (
@@ -484,7 +483,6 @@ class BotManager:
         context: ContextTypes.DEFAULT_TYPE,
         chat_id: int,
         round_result: ChallengeResult,
-        from_perspective_of_player_id: int | None = None,
     ) -> str:
         status_message = f"League Status:\n- Rounds completed: {self.league_state.last_round_finished_num}/{self.league_state.num_rounds}\n"
 
@@ -503,13 +501,9 @@ class BotManager:
         elif chat_id == self.league_state.chat_id:
             hide_scores = True
         else:
-            if from_perspective_of_player_id is not None:
-                player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(
-                    from_perspective_of_player_id
-                )
-                hide_scores = player_name not in players_played
-            else:
-                hide_scores = True
+            player_id = chat_id
+            player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+            hide_scores = player_name not in players_played
 
         status_message += f"- Current round in progress (ends in {formatters.format_time(time_left)})\n\n"
         status_message += formatters.format_round_leaderboard_message(
@@ -520,9 +514,6 @@ class BotManager:
         if not hide_scores:
             ranked_guesses = await self.__get_ranked_guesses()
             status_message += f"\n<b>Projected Awards:</b>\n{formatters.format_awards_html(ranked_guesses)}"
-            if self.league_state.chat_id == chat_id:
-                chat_id = from_perspective_of_player_id
-
             best_guess_player = ranked_guesses[0].player.name
             worst_guess_player = ranked_guesses[-1].player.name
             projected_leaderboard_message = self.__get_league_projections_for_round(
@@ -942,9 +933,7 @@ class BotManager:
 
         player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
 
-        logger.info(
-            f"Sending status update to chat {chat_id} for player {player_name} (ID: {player_id})"
-        )
+        logger.info(f"Sending status update to chat {chat_id} for player {player_name}")
 
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
@@ -953,7 +942,7 @@ class BotManager:
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        await self.__status_update(context, chat_id, round_result, player_id)
+        await self.__status_update(context, chat_id, round_result)
 
     @command_handler(admin=True, league_in_progress=False)
     async def start_league_handler(
