@@ -327,3 +327,24 @@ def format_round_leaderboard_message(
             leaderboard_message += f"  - {emoji} {player}\n"
 
     return leaderboard_message
+
+
+def format_projected_leaderboard_message(
+    projected_ranks: dict[str, int],
+    projected_scores: dict[str, int],
+    players_played: dict[str, AbbreviatedRoundScore | None],
+) -> str:
+    sorted_projected = sorted(projected_ranks.items(), key=lambda x: x[1])
+    projection_message_lines = ["<b>Projected league standings after this round:</b>"]
+    for player, rank in sorted_projected:
+        rank_emoji = NUMBER_EMOJI_MAP.get(rank, "❓")
+        row = f"{rank_emoji}: {player} ({projected_scores[player]})"
+        if player not in players_played:
+            line = f"  <i>{row}*</i>"
+        else:
+            line = f"  <b>{row}</b>"
+
+        projection_message_lines.append(line)
+
+    projection_message_lines.append("\n*Players who have not played this round yet.")
+    return "\n".join(projection_message_lines)
