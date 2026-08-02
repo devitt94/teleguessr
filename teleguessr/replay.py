@@ -33,6 +33,7 @@ async def replay_league(
     league_state = LeagueState(
         num_rounds=league_settings.number_of_rounds,
         filepath=replayed_league_path,
+        players=set(handicaps.keys()),
     )
 
     round_results = [ChallengeResult(**rr) for rr in league_data["results"]]

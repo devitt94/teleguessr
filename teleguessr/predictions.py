@@ -75,7 +75,6 @@ def _simulate_league(
 
         streamer = league_state.get_streamer_for_round()
         if league_state.current_round_num == n_rounds - 1:
-            logger.info("Applying mu adjustment for streamer in final round")
             if streamer is not None:
                 lognormal_fits[streamer].mu *= 1 + streamer_mu_adjustment
 
@@ -85,7 +84,6 @@ def _simulate_league(
         league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
 
         if streamer is not None:
-            logger.info(f"Reverting mu adjustment for streamer {streamer}")
             lognormal_fits[streamer].mu /= 1 + streamer_mu_adjustment
 
     return league_state
@@ -114,7 +112,9 @@ def simulate_n_leagues(
     else:
         logger.info(f"Loading active league state from {league_state_file}")
         league_state = LeagueState(
-            filepath=league_state_file, num_rounds=league_settings.number_of_rounds
+            filepath=league_state_file,
+            num_rounds=league_settings.number_of_rounds,
+            players=set(hcaps.keys()),
         )
         league_state.load_from_file()
         current_round = league_state.current_round_num
@@ -258,6 +258,7 @@ def fractional_odds_to_decimal(odds: str) -> float:
 
 async def generate_outright_odds_predictions(
     n_sims: int,
+    runners: list[str],
     include_legacy_rounds: bool = False,
 ) -> pl.DataFrame:
     score_data: pl.DataFrame = await get_score_data(
@@ -281,6 +282,11 @@ async def generate_outright_odds_predictions(
     else:
         adjustments = {}
 
+    adjustments = {
+        player: adjustment
+        for player, adjustment in adjustments.items()
+        if player in runners
+    }
     logger.info(f"Using adjustments: {adjustments}")
     lognormal_fits = fit_all_players(score_data, adjustments=adjustments)
 

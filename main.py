@@ -7,9 +7,10 @@ import json
 
 from loguru import logger
 
+from teleguessr.active_players import PlayerManager
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
-from teleguessr.handicaps import calculate_new_handicaps
+from teleguessr.handicaps import calculate_new_handicaps, get_latest_handicaps
 from teleguessr.league import get_last_finished_league_date
 from teleguessr.ranks import get_ranks_from_scores
 from teleguessr.replay import replay_league
@@ -18,6 +19,7 @@ from teleguessr.bot_manager import (
     BET_SELECT_AMOUNT,
     BET_SELECT_BET_TYPE,
     BET_SELECT_PLAYER,
+    OPT_IN_CALLBACK,
     BotManager,
 )
 from telegram.ext import (
@@ -36,6 +38,10 @@ async def initlise_bot_manager(
     settings.data_dir.mkdir(parents=True, exist_ok=True)
 
     geoguessr_client = GeoguessrClient(ncfa_cookie=settings.geoguessr_ncfa_cookie)
+    handicaps = get_latest_handicaps(settings.league)
+    player_manager = PlayerManager(
+        data_dir=settings.data_dir, initial_players=set(handicaps.keys())
+    )
 
     if test_mode:
         latest_league_file = list(
@@ -72,6 +78,7 @@ async def initlise_bot_manager(
         league_settings=settings.league,
         model_settings=settings.model,
         geoguessr_client=geoguessr_client,
+        player_manager=player_manager,
     )
     await bot_manager.initialise()
     return bot_manager
@@ -124,6 +131,9 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("guesses", bot_manager.guesses_handler))
     app.add_handler(CommandHandler("outcomes", bot_manager.outcomes_handler))
     app.add_handler(CommandHandler("records", bot_manager.records_handler))
+    app.add_handler(
+        CallbackQueryHandler(bot_manager.handle_opt_in, pattern=f"^{OPT_IN_CALLBACK}$")
+    )
     app.add_handler(bet_handler)
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")
@@ -286,9 +296,15 @@ def predictions(
     """Generate outright odds predictions for the current league."""
     from teleguessr.predictions import generate_outright_odds_predictions
 
+    player_manager = PlayerManager(
+        data_dir=get_settings().data_dir,
+        initial_players=set(get_latest_handicaps(get_settings().league).keys()),
+    )
     preds = asyncio.run(
         generate_outright_odds_predictions(
-            n_sims=n_sims, include_legacy_rounds=include_legacy_rounds
+            n_sims=n_sims,
+            runners=player_manager.get_active_players(),
+            include_legacy_rounds=include_legacy_rounds,
         )
     )
     print(preds)

@@ -100,8 +100,11 @@ async def get_legacy_challenge_results(
     geoguessr_client: GeoguessrClient,
 ) -> list[ChallengeResult]:
     results = []
+    player_handicaps = get_latest_handicaps(get_settings().league)
     for challenge_url in LEGACY_CHALLENGE_URLS:
-        result = await geoguessr_client.get_challenge_scores(challenge_url, {}, 0.0)
+        result = await geoguessr_client.get_challenge_scores(
+            challenge_url, player_handicaps
+        )
         results.append(result)
 
     return results

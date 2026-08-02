@@ -53,7 +53,6 @@ class GeoguessrClient:
         self,
         url: str,
         handicaps: dict[str, float],
-        default_handicap: float,
         challenge_settings: ChallengeSettings | None = None,
     ) -> ChallengeResult:
         """
@@ -75,7 +74,12 @@ class GeoguessrClient:
                 )
                 continue
 
-            hcap_multiplier = handicaps.get(playername, default_handicap)
+            hcap_multiplier = handicaps.get(playername)
+            if hcap_multiplier is None:
+                logger.warning(
+                    f"Skipping player {playername} as they are not in the handicaps list."
+                )
+                continue
 
             guess_points = geoguessr_score.gamePlayerGuessesRoundScoreInPoints
             guess_distances = geoguessr_score.gamePlayerGuessesDistanceInMeters

@@ -9,6 +9,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application as TelegramApp, ConversationHandler
 from telegram.error import NetworkError
 
+from teleguessr.active_players import PlayerManager
 from teleguessr.awards import get_ranked_guesses
 from teleguessr.bets import BetManager
 from teleguessr.challenge_settings_generators import (
@@ -51,6 +52,8 @@ from telegram.ext import ContextTypes
 
 
 BET_SELECT_PLAYER, BET_SELECT_BET_TYPE, BET_SELECT_AMOUNT = range(3)
+
+OPT_IN_CALLBACK = "optin_next_league"
 
 HandlerFunc = Callable[
     ["BotManager", Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]
@@ -117,6 +120,7 @@ class BotManager:
         league_settings: LeagueSettings,
         model_settings: ModelSettings,
         geoguessr_client: GeoguessrClient,
+        player_manager: PlayerManager,
     ):
         self.admin_id = admin_id
         self.players_lounge_group_id = players_lounge_group_id
@@ -128,6 +132,7 @@ class BotManager:
         self.bet_manager = None
         self._initialised = False
         self.geoguessr_client = geoguessr_client
+        self.player_manager = player_manager
 
         self.challenge_settings_generator: ChallengeSettingsGenerator = (
             CHALLENGE_SETTINGS[league_settings.challenge_settings_name]
@@ -140,6 +145,14 @@ class BotManager:
     @property
     def finished_league_dir(self) -> Path:
         return self.data_dir / "leagues" / "finished"
+
+    @property
+    def active_handicaps(self) -> dict[str, float]:
+        return {
+            player: handicap
+            for player, handicap in self.handicaps.items()
+            if player in self.player_manager.get_active_players()
+        }
 
     async def initialise(self):
         self.active_league_dir.mkdir(parents=True, exist_ok=True)
@@ -169,7 +182,7 @@ class BotManager:
                 model_settings=self.model_settings,
                 data_dir=self.data_dir,
                 league_date=self.league_state.start_date,
-                all_runners=list(self.handicaps.keys()),
+                all_runners=list(self.player_manager.get_active_players()),
             )
 
         self._initialised = True
@@ -234,8 +247,7 @@ class BotManager:
 
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
+            handicaps=self.active_handicaps,
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
@@ -387,6 +399,7 @@ class BotManager:
         logger.info(f"Generating and sending odds update to chat {chat_id}.")
         odds_df = await generate_outright_odds_predictions(
             n_sims=self.model_settings.n_sims,
+            runners=self.player_manager.get_active_players(),
         )
 
         back_win_odds_dict = {
@@ -427,6 +440,64 @@ class BotManager:
             text=odds_message,
         )
 
+    async def __announce_league_end(
+        self, context: ContextTypes.DEFAULT_TYPE, chat_id: int
+    ):
+        """Call this when the current league finishes."""
+        self.player_manager.clear_active_players()
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "✅ I'm in for next week", callback_data=OPT_IN_CALLBACK
+                    )
+                ]
+            ]
+        )
+
+        text = (
+            "Next week's league will begin on Sunday at 12pm UK time.\n"
+            "Tap below to opt in:"
+        )
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=keyboard,
+        )
+
+    async def handle_opt_in(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        user = query.from_user
+
+        if query.data != OPT_IN_CALLBACK:
+            return
+
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(user.id)
+
+        newly_added = self.player_manager.add_active_player(player_name)
+
+        if not newly_added:
+            await query.answer("You're already signed up!")
+            return
+
+        await query.answer("You're in! 🎉")
+
+        # Update the message to show current sign-ups
+        count = len(self.player_manager.get_active_players())
+        await query.edit_message_reply_markup(
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            f"✅ I'm in ({count} joined)", callback_data=OPT_IN_CALLBACK
+                        )
+                    ]
+                ]
+            )
+        )
+
     async def __get_ranked_guesses(self) -> list[RankedGuess]:
         if (
             self.league_state is None
@@ -438,8 +509,7 @@ class BotManager:
         challenge_url = self.league_state.current_round.challenge_url
         round_result = await self.geoguessr_client.get_challenge_scores(
             challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
+            handicaps=self.active_handicaps,
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
@@ -532,12 +602,11 @@ class BotManager:
     async def __reminder(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
+            handicaps=self.active_handicaps,
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        players_finished = await self.__player_round_status(round_result)
+        players_finished = self.__player_round_status(round_result)
 
         time_left = self.league_state.get_time_left_seconds()
         time_left_str = formatters.format_time(time_left)
@@ -647,7 +716,7 @@ class BotManager:
 
         players_to_remove = []
 
-        for player_name in self.handicaps.keys():
+        for player_name in self.active_handicaps.keys():
             player_telegram_id = PLAYER_NAME_TO_TELEGRAM_ID.get(player_name)
             if player_telegram_id is None:
                 logger.warning(f"No Telegram ID found for player {player_name}.")
@@ -740,7 +809,7 @@ class BotManager:
 
         ranks = get_ranks_from_scores(net_scores)
 
-        result = {player: None for player in self.handicaps.keys()}
+        result = {player: None for player in self.active_handicaps.keys()}
 
         for player, rank in ranks.items():
             result[player] = AbbreviatedRoundScore(
@@ -768,8 +837,7 @@ class BotManager:
         challenge_settings = self.league_state.current_round.challenge_settings
         round_result = await self.geoguessr_client.get_challenge_scores(
             challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
+            handicaps=self.active_handicaps,
             challenge_settings=challenge_settings,
         )
 
@@ -870,6 +938,11 @@ class BotManager:
 
             await self.__end_league()
 
+            await self.__announce_league_end(
+                context,
+                chat_id=chat_id,
+            )
+
         else:
             await self.__start_round(
                 context,
@@ -937,8 +1010,7 @@ class BotManager:
 
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
+            handicaps=self.active_handicaps,
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
@@ -953,20 +1025,23 @@ class BotManager:
         self.league_state = LeagueState(
             filepath=league_filepath,
             num_rounds=self.league_settings.number_of_rounds,
+            players=self.player_manager.get_active_players(),
         )
 
         self.bet_manager = BetManager(
             model_settings=self.model_settings,
             data_dir=self.data_dir,
             league_date=self.league_state.start_date,
-            all_runners=list(self.handicaps.keys()),
+            all_runners=list(self.player_manager.get_active_players()),
         )
 
         logger.info(f"Starting new league at {league_filepath.absolute()}")
 
         await update.message.reply_text("New league starting...")
 
-        sorted_handicaps = sorted(self.handicaps.items(), key=lambda item: item[1])
+        sorted_handicaps = sorted(
+            self.active_handicaps.items(), key=lambda item: item[1]
+        )
 
         handicap_message = "📉 Handicaps:\n\n"
         for player, handicap in sorted_handicaps:
@@ -1102,8 +1177,7 @@ class BotManager:
 
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
+            handicaps=self.active_handicaps,
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
@@ -1125,7 +1199,9 @@ class BotManager:
     async def handicaps_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        sorted_handicaps = sorted(self.handicaps.items(), key=lambda item: item[1])
+        sorted_handicaps = sorted(
+            self.active_handicaps.items(), key=lambda item: item[1]
+        )
 
         message = "📉 Current Handicaps:\n\n"
         for player, handicap in sorted_handicaps:
@@ -1154,12 +1230,11 @@ class BotManager:
 
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
-            handicaps=self.handicaps,
-            default_handicap=self.league_settings.default_handicap_multiplier,
+            handicaps=self.active_handicaps,
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        players_played = await self.player_round_status(round_result)
+        players_played = self.__player_round_status(round_result)
         if player_id != self.admin_id and players_played.get(player_name) is not None:
             await update.message.reply_text(
                 "You have already started this round, so you cannot place bets. Please wait for the next round to start."
