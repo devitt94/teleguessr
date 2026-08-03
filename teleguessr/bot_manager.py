@@ -626,7 +626,7 @@ class BotManager:
         ]
 
         pending_list = "\n".join(
-            f"- [{player}](tg://user?id={telegram_id})"
+            f"\- [{player}](tg://user?id={telegram_id})"
             for player, telegram_id in players_with_telegram_ids
         )
 
@@ -637,7 +637,6 @@ class BotManager:
         message = (
             f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}\.\n"
             f"The following players have not completed this round yet:\n{pending_list}\n\n"
-            f"Round URL: {self.league_state.current_round.challenge_url}"
         )
 
         await context.bot.send_message(chat_id, message, parse_mode="MarkdownV2")
