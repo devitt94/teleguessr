@@ -1379,7 +1379,7 @@ class BotManager:
             return ConversationHandler.END
 
         try:
-            self.bet_manager.validate_bet(
+            self.bet_manager.place_bet(
                 bettor=bettor,
                 runner=player,
                 amount=amount,
