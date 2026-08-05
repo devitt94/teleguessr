@@ -59,6 +59,12 @@ BET_AMOUNTS = [
 ]
 
 
+class BettingSuspendedError(Exception):
+    """Custom exception raised when betting is suspended."""
+
+    pass
+
+
 class BetManager:
     def __init__(
         self,
@@ -74,6 +80,12 @@ class BetManager:
         self.odds_dir.mkdir(parents=True, exist_ok=True)
         self.bets_dir.mkdir(parents=True, exist_ok=True)
         self.all_runners = all_runners
+
+    @property
+    def betting_suspended(self) -> bool:
+        """Check if betting is suspended by looking for a 'suspend' file in the bets directory."""
+        suspend_file = self.bets_dir / "suspend"
+        return suspend_file.exists()
 
     def get_odds_file_path(
         self, round_num: int, market_type: MarketType, bet_type: BetType
@@ -197,6 +209,11 @@ class BetManager:
         market_type: MarketType = MarketType.WINNER,
         bet_type: BetType = BetType.BACK,
     ) -> Bet:
+        if self.betting_suspended:
+            raise BettingSuspendedError(
+                "Betting is currently suspended. Cannot place bets."
+            )
+
         bet = Bet(
             bettor=bettor,
             runner=runner,
@@ -339,3 +356,24 @@ class BetManager:
             max_stake = min(max_stake, allowed)
 
         return round(max(0.0, max_stake), 2)
+
+    def suspend_betting(self) -> bool:
+        """Suspend betting by creating a 'suspend' file in the bets directory."""
+        if self.betting_suspended:
+            logger.warning("Betting is already suspended.")
+            return False
+
+        suspend_file = self.bets_dir / "suspend"
+        suspend_file.touch()
+        logger.info(f"Betting suspended. Created {suspend_file}.")
+        return True
+
+    def resume_betting(self) -> bool:
+        """Resume betting by removing the 'suspend' file in the bets directory."""
+        suspend_file = self.bets_dir / "suspend"
+        if suspend_file.exists():
+            logger.info(f"Resuming betting. Removing {suspend_file}.")
+            suspend_file.unlink()
+            return True
+        else:
+            return False

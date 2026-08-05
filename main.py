@@ -133,6 +133,8 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("guesses", bot_manager.guesses_handler))
     app.add_handler(CommandHandler("outcomes", bot_manager.outcomes_handler))
     app.add_handler(CommandHandler("records", bot_manager.records_handler))
+    app.add_handler(CommandHandler("suspend", bot_manager.suspend_handler))
+    app.add_handler(CommandHandler("unsuspend", bot_manager.unsuspend_handler))
     app.add_handler(
         CallbackQueryHandler(bot_manager.handle_opt_in, pattern=f"^{OPT_IN_CALLBACK}$")
     )

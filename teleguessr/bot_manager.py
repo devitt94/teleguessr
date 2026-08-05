@@ -11,7 +11,7 @@ from telegram.error import NetworkError
 
 from teleguessr.active_players import PlayerManager
 from teleguessr.awards import get_ranked_guesses
-from teleguessr.bets import BetManager
+from teleguessr.bets import BetManager, BettingSuspendedError
 from teleguessr.challenge_settings_generators import (
     CHALLENGE_SETTINGS,
     ChallengeSettingsGenerator,
@@ -1378,6 +1378,21 @@ class BotManager:
             )
             return ConversationHandler.END
 
+        try:
+            self.bet_manager.validate_bet(
+                bettor=bettor,
+                runner=player,
+                amount=amount,
+                odds=bet_odds,
+                market_type=MarketType.WINNER,
+                bet_type=context.user_data["bet_type"],
+            )
+        except BettingSuspendedError:
+            await query.edit_message_text(
+                "⚠️ Betting is currently suspended for this round. Please try again later."
+            )
+            return ConversationHandler.END
+
         bet = self.bet_manager.place_bet(
             bettor=bettor,
             runner=player,
@@ -1407,3 +1422,29 @@ class BotManager:
     ) -> int:
         await update.message.reply_text("Bet cancelled.")
         return ConversationHandler.END
+
+    @command_handler(admin=True, league_in_progress=True)
+    async def suspend_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        is_newly_suspended = self.bet_manager.suspend_betting()
+
+        if is_newly_suspended:
+            await update.message.reply_text(
+                "⚠️ Betting has been suspended for this round."
+            )
+        else:
+            await update.message.reply_text(
+                "⚠️ Betting was already suspended for this round."
+            )
+
+    @command_handler(admin=True, league_in_progress=True)
+    async def resume_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        is_newly_resumed = self.bet_manager.resume_betting()
+
+        if is_newly_resumed:
+            await update.message.reply_text(
+                "✅ Betting has been resumed for this round."
+            )
+        else:
+            await update.message.reply_text(
+                "✅ Betting was already active for this round."
+            )
