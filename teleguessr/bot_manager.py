@@ -1437,7 +1437,9 @@ class BotManager:
             )
 
     @command_handler(admin=True, league_in_progress=True)
-    async def resume_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def unsuspend_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         is_newly_resumed = self.bet_manager.resume_betting()
 
         if is_newly_resumed:
