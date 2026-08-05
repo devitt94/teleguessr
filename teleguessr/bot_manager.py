@@ -1194,7 +1194,7 @@ class BotManager:
             player_name=player_name,
         )
 
-    @command_handler
+    @command_handler()
     async def handicaps_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
