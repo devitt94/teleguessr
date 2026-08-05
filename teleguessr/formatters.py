@@ -278,13 +278,12 @@ def format_odds_message(
         return "Odds are not available."
     odds_message = "📊 Current Odds:\n\n"
     for player, odds in back_odds.items():
-        if player in lay_odds:
-            odds_message += (
-                f"- {player}: {odds.formatted} ({lay_odds[player].formatted} to lay)\n"
-            )
-        else:
-            odds_message += f"- {player}: {odds.formatted}\n"
+        odds_message += f"- {player}: {odds.formatted}\n"
 
+    back_overround = sum(odds.implied_probability for odds in back_odds.values()) - 1.0
+    lay_overround = 1.0 - sum(odds.implied_probability for odds in lay_odds.values())
+    odds_message += f"\nBack overround: {back_overround:.2%}"
+    odds_message += f"\nLay overround: {lay_overround:.2%}"
     odds_message += "\n DM me with /bet to place your bets!"
     odds_message += "\n Use /position to check your current betting position."
 

@@ -7,11 +7,13 @@ import json
 
 from loguru import logger
 
+from teleguessr import formatters
 from teleguessr.active_players import PlayerManager
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.handicaps import calculate_new_handicaps, get_latest_handicaps
 from teleguessr.league import get_last_finished_league_date
+from teleguessr.odds import FractionalOdds
 from teleguessr.ranks import get_ranks_from_scores
 from teleguessr.replay import replay_league
 from teleguessr.settings import AppSettings, get_settings
@@ -309,8 +311,29 @@ def predictions(
     )
     print(preds)
     print("\n\n")
+    back_odds = dict(
+        zip(
+            preds["player"],
+            (
+                FractionalOdds.from_str(odds)
+                for odds in preds["back_win_odds"]
+                if odds is not None
+            ),
+        )
+    )
+    lay_odds = dict(
+        zip(
+            preds["player"],
+            (
+                FractionalOdds.from_str(odds)
+                for odds in preds["lay_win_odds"]
+                if odds is not None
+            ),
+        )
+    )
     print("Predicted outright odds:")
     print(json.dumps(dict(zip(preds["player"], preds["back_win_odds"])), indent=4))
+    print(formatters.format_odds_message(back_odds, lay_odds))
 
 
 @app.command()
