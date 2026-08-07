@@ -1,9 +1,12 @@
 from datetime import datetime, date
 from enum import StrEnum
-from pydantic import BaseModel, Field, confloat, conlist, field_serializer
+from typing_extensions import Annotated
+from pydantic import BaseModel, Field, conlist, field_serializer
 
 
 MAX_ROUND_SCORE = 5000
+
+HandicapMultiplier = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class Guess(BaseModel):
@@ -13,7 +16,7 @@ class Guess(BaseModel):
 
 class Player(BaseModel):
     name: str
-    hcap_multiplier: confloat(ge=0.0, le=1.0)
+    hcap_multiplier: HandicapMultiplier
 
 
 class ChallengeSettings(BaseModel):
@@ -183,10 +186,14 @@ class Bet(BaseModel):
 class Records(BaseModel):
     net_wins: int = 0
     gross_wins: int = 0
+    podium_finishes: int = 0
+    wooden_spoon_finishes: int = 0
     best_guesses: int = 0
     worst_guesses: int = 0
     most_recent_net_win: date | None = None
     most_recent_gross_win: date | None = None
+    min_handicap: HandicapMultiplier | None = None
+    max_handicap: HandicapMultiplier | None = None
 
     @field_serializer("most_recent_net_win", "most_recent_gross_win")
     def serialize_date(self, value: date | None) -> str | None:

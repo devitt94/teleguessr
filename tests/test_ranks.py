@@ -25,6 +25,10 @@ from teleguessr.ranks import get_ranks_from_scores
             {"Alice": 150, "Bob": 100, "Charlie": 100, "Dave": 100, "Eve": 50},
             {"Alice": 1, "Bob": 2, "Charlie": 2, "Dave": 2, "Eve": 5},
         ),
+        (
+            {"Alice": 100, "Bob": 100, "Charlie": 100, "Dave": 50},
+            {"Alice": 1, "Bob": 1, "Charlie": 1, "Dave": 4},
+        ),
     ),
 )
 def test_get_ranks_from_scores(scores, expected_ranks):

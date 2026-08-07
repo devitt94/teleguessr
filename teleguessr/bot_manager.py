@@ -992,6 +992,16 @@ class BotManager:
 
             records_message += f"    - 🐐x{record.best_guesses}\n"
             records_message += f"    - 🎣x{record.worst_guesses}\n"
+            records_message += (
+                f"    - 📉 Min Handicap: {record.min_handicap:.0%}\n"
+                if record.min_handicap is not None
+                else ""
+            )
+            records_message += (
+                f"    - 📈 Max Handicap: {record.max_handicap:.0%}\n"
+                if record.max_handicap is not None
+                else ""
+            )
 
         await update.message.reply_text(
             records_message,

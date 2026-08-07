@@ -40,6 +40,7 @@ class RecordManager:
         gross_winner: str,
         best_guesses: dict[str, int],
         worst_guesses: dict[str, int],
+        handicaps: dict[str, float],
         date: datetime | None = None,
     ) -> dict[str, Records]:
         if date is None:
@@ -73,6 +74,12 @@ class RecordManager:
         for player, count in worst_guesses.items():
             record = records.get(player, Records())
             record.worst_guesses += count
+            records[player] = record
+
+        for player, handicap in handicaps.items():
+            record = records.get(player, Records())
+            record.min_handicap = min(record.min_handicap or handicap, handicap)
+            record.max_handicap = max(record.max_handicap or handicap, handicap)
             records[player] = record
 
         self._save_records(records)
