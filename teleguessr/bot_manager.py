@@ -974,7 +974,7 @@ class BotManager:
         records = self.record_manager.get_records()
 
         records_message = "🏆 All-Time Records:\n"
-        records_message += "Net = 🏅; Gross = 👑; Best Guess = 🐐; Worst Guess = 🎣\n\n"
+        records_message += "Net = 🏅; Gross = 👑; Best Guess = 🐐; Worst Guess = 🎣; Min Handicap = 📉; Max Handicap = 📈\n\n"
 
         for player, record in records.items():
             records_message += f"- {player}:\n"
@@ -993,12 +993,12 @@ class BotManager:
             records_message += f"    - 🐐x{record.best_guesses}\n"
             records_message += f"    - 🎣x{record.worst_guesses}\n"
             records_message += (
-                f"    - 📉 Min Handicap: {record.min_handicap:.0%}\n"
+                f"    - 📉: {record.min_handicap:.0%}\n"
                 if record.min_handicap is not None
                 else ""
             )
             records_message += (
-                f"    - 📈 Max Handicap: {record.max_handicap:.0%}\n"
+                f"    - 📈: {record.max_handicap:.0%}\n"
                 if record.max_handicap is not None
                 else ""
             )
