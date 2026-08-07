@@ -15,6 +15,11 @@ from teleguessr.gross_handler import build_gross_stats_handler
 from teleguessr.handicaps import calculate_new_handicaps, get_latest_handicaps
 from teleguessr.league import get_last_finished_league_date
 from teleguessr.odds import FractionalOdds
+from teleguessr.player_handler import (
+    PLAYER_STATS_CALLBACK_PREFIX,
+    build_player_callback_handler,
+    build_player_command_handler,
+)
 from teleguessr.ranks import get_ranks_from_scores
 from teleguessr.replay import replay_league
 from teleguessr.settings import AppSettings, get_settings
@@ -137,10 +142,19 @@ def main(test_mode: bool = False):
     app.add_handler(
         CommandHandler("gross", build_gross_stats_handler(settings.data_dir))
     )
+    app.add_handler(
+        CommandHandler("player", build_player_command_handler(settings.data_dir))
+    )
     app.add_handler(CommandHandler("suspend", bot_manager.suspend_handler))
     app.add_handler(CommandHandler("unsuspend", bot_manager.unsuspend_handler))
     app.add_handler(
         CallbackQueryHandler(bot_manager.handle_opt_in, pattern=f"^{OPT_IN_CALLBACK}$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            build_player_callback_handler(settings.data_dir),
+            pattern=f"^{PLAYER_STATS_CALLBACK_PREFIX}",
+        )
     )
     app.add_handler(bet_handler)
     app.add_error_handler(bot_manager.error_handler)
