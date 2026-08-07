@@ -980,8 +980,16 @@ class BotManager:
         records = self.record_manager.get_records()
 
         records_message = "🏆 All-Time Records:\n"
-        records_message += "Net = 🏅; Gross = 👑; Best Guess = 🐐; Worst Guess = 🎣; Min Handicap = 📉; Max Handicap = 📈\n\n"
-
+        records_message += (
+            "Net = 🏆; "
+            "Gross = 👑; "
+            "Best Guess = 🐐; "
+            "Worst Guess = 🎣; "
+            "Min Handicap = 📉; "
+            "Max Handicap = 📈; "
+            "Podium finishes = 🏅; "
+            "Wooden Spoon = 🥄\n\n"
+        )
         for player, record in records.items():
             records_message += f"- {player}:\n"
             if record.net_wins > 0:
