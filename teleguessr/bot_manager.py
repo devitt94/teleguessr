@@ -859,9 +859,12 @@ class BotManager:
         await self.__show_leaderboard(context, chat_id)
 
         if self.league_state.is_finished:
-            winner = self.league_state.get_winner()
+            winner, second, third, *_, last = (
+                self.league_state.get_final_sorted_leaderboard()
+            )
             await context.bot.send_message(
-                chat_id, f"🏆 League finished. Winner: {winner}"
+                chat_id,
+                f"🏆 League finished.\n\n🥇: {winner}\n🥈: {second}\n🥉: {third}\n🥄: {last}",
             )
             # Calculate and update handicaps
             final_leaderboard = self.league_state.get_leaderboard_data()
@@ -892,6 +895,9 @@ class BotManager:
             self.record_manager.update_records(
                 gross_winner=gross_winner,
                 net_winner=winner,
+                second_place=second,
+                third_place=third,
+                last_place=last,
                 best_guesses=final_leaderboard["best_guesses"],
                 worst_guesses=final_leaderboard["worst_guesses"],
             )

@@ -38,6 +38,9 @@ class RecordManager:
         self,
         net_winner: str,
         gross_winner: str,
+        second_place: str,
+        third_place: str,
+        last_place: str,
         best_guesses: dict[str, int],
         worst_guesses: dict[str, int],
         handicaps: dict[str, float],
@@ -65,6 +68,15 @@ class RecordManager:
 
             records[net_winner] = net_record
             records[gross_winner] = gross_record
+
+        last_place_record = records.get(last_place, Records())
+        last_place_record.wooden_spoon_finishes += 1
+        records[last_place] = last_place_record
+
+        for player in [second_place, third_place]:
+            record = records.get(player, Records())
+            record.podium_finishes += 1
+            records[player] = record
 
         for player, count in best_guesses.items():
             record = records.get(player, Records())

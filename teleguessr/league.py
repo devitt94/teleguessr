@@ -177,35 +177,35 @@ class LeagueState(BaseModel):
             "rounds_played": self.last_round_finished_num or 0,
         }
 
-    def get_winner(self) -> str:
+    def get_final_sorted_leaderboard(self) -> list[str]:
+        """Returns a list of player names sorted by their final scores, handling ties appropriately."""
         if not self.is_finished:
             raise ValueError("League is not finished yet.")
         if not self.__scores:
             raise ValueError("No scores available to determine a winner.")
 
+        last_round = self.results[-1]
+        last_round_scores = {
+            rs.player.name: rs.compute_net_score() for rs in last_round.scores
+        }
+
+        def sort_key(player: str) -> tuple[int, int]:
+            return (
+                self.__scores[player],
+                last_round_scores.get(player, 0),
+            )
+
+        sorted_leaderboard = sorted(self.__scores.keys(), key=sort_key, reverse=True)
+        return sorted_leaderboard
+
+    def get_winner(self) -> str:
         # For tie bre
         if not self.is_finished:
             raise ValueError("League is not finished yet.")
         if not self.__scores:
             raise ValueError("No scores available to determine a winner.")
 
-        # For tie breakers, the player who had the best score in the last round wins.
-        sorted_leaderboard = sorted(
-            self.__scores.items(), key=lambda x: x[1], reverse=True
-        )
-        top_score = sorted_leaderboard[0][1]
-        top_players = [p for p, s in sorted_leaderboard if s == top_score]
-        if len(top_players) == 1:
-            return top_players[0]
-
-        last_round = self.results[-1]
-        last_round_scores = {
-            rs.player.name: rs.compute_net_score() for rs in last_round.scores
-        }
-        top_players_sorted = sorted(
-            top_players, key=lambda p: last_round_scores.get(p, 0), reverse=True
-        )
-        return top_players_sorted[0]
+        return self.get_final_sorted_leaderboard()[0]
 
     def start_round(
         self, url: str, end_time_hours: int, challenge_settings: ChallengeSettings
