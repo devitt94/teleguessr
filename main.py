@@ -11,6 +11,7 @@ from teleguessr import formatters
 from teleguessr.active_players import PlayerManager
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
+from teleguessr.gross_handler import build_gross_stats_handler
 from teleguessr.handicaps import calculate_new_handicaps, get_latest_handicaps
 from teleguessr.league import get_last_finished_league_date
 from teleguessr.odds import FractionalOdds
@@ -133,6 +134,9 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("guesses", bot_manager.guesses_handler))
     app.add_handler(CommandHandler("outcomes", bot_manager.outcomes_handler))
     app.add_handler(CommandHandler("records", bot_manager.records_handler))
+    app.add_handler(
+        CommandHandler("gross", build_gross_stats_handler(settings.data_dir))
+    )
     app.add_handler(CommandHandler("suspend", bot_manager.suspend_handler))
     app.add_handler(CommandHandler("unsuspend", bot_manager.unsuspend_handler))
     app.add_handler(
