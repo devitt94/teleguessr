@@ -996,7 +996,7 @@ class BotManager:
                 net_win_str = f"{record.net_wins} (most recent: {formatters.format_datetime_to_time_ago(record.most_recent_net_win)}) \n"
             else:
                 net_win_str = "0\n"
-            records_message += f"    - 🏅x{net_win_str}"
+            records_message += f"    - 🏆x{net_win_str}"
 
             if record.gross_wins > 0:
                 gross_win_str = f"{record.gross_wins} (most recent: {formatters.format_datetime_to_time_ago(record.most_recent_gross_win)}) \n"
@@ -1016,6 +1016,9 @@ class BotManager:
                 if record.max_handicap is not None
                 else ""
             )
+
+            records_message += f"    - 🏅x{record.podium_finishes}\n"
+            records_message += f"    - 🥄x{record.wooden_spoon_finishes}\n"
 
         await update.message.reply_text(
             records_message,
