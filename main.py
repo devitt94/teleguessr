@@ -21,6 +21,14 @@ from teleguessr.player_handler import (
     build_player_command_handler,
 )
 from teleguessr.ranks import get_ranks_from_scores
+from teleguessr.ryder_handler import (
+    RYDER_OPT_IN_CALLBACK,
+    build_ryder_card_handler,
+    build_ryder_draw_handler,
+    build_ryder_handler,
+    build_ryder_opt_in_handler,
+    build_ryder_signup_handler,
+)
 from teleguessr.replay import replay_league
 from teleguessr.settings import AppSettings, get_settings
 from teleguessr.bot_manager import (
@@ -145,6 +153,22 @@ def main(test_mode: bool = False):
     app.add_handler(
         CommandHandler("player", build_player_command_handler(settings.data_dir))
     )
+    app.add_handler(CommandHandler("ryder", build_ryder_handler(settings.data_dir)))
+    app.add_handler(
+        CommandHandler("rydercard", build_ryder_card_handler(settings.data_dir))
+    )
+    app.add_handler(
+        CommandHandler(
+            "rydersignup",
+            build_ryder_signup_handler(settings.data_dir, settings.telegram_admin_id),
+        )
+    )
+    app.add_handler(
+        CommandHandler(
+            "ryderdraw",
+            build_ryder_draw_handler(settings.data_dir, settings.telegram_admin_id),
+        )
+    )
     app.add_handler(CommandHandler("suspend", bot_manager.suspend_handler))
     app.add_handler(CommandHandler("unsuspend", bot_manager.unsuspend_handler))
     app.add_handler(
@@ -154,6 +178,12 @@ def main(test_mode: bool = False):
         CallbackQueryHandler(
             build_player_callback_handler(settings.data_dir),
             pattern=f"^{PLAYER_STATS_CALLBACK_PREFIX}",
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            build_ryder_opt_in_handler(settings.data_dir),
+            pattern=f"^{RYDER_OPT_IN_CALLBACK}$",
         )
     )
     app.add_handler(bet_handler)
