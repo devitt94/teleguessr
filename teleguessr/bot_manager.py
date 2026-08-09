@@ -1407,7 +1407,7 @@ class BotManager:
             return ConversationHandler.END
 
         try:
-            self.bet_manager.place_bet(
+            bet = self.bet_manager.place_bet(
                 bettor=bettor,
                 runner=player,
                 amount=amount,
@@ -1420,15 +1420,6 @@ class BotManager:
                 "⚠️ Betting is currently suspended for this round. Please try again later."
             )
             return ConversationHandler.END
-
-        bet = self.bet_manager.place_bet(
-            bettor=bettor,
-            runner=player,
-            amount=amount,
-            odds=bet_odds,
-            market_type=MarketType.WINNER,
-            bet_type=context.user_data["bet_type"],
-        )
 
         message = f"✅ Bet placed\n\n{bet}"
 
