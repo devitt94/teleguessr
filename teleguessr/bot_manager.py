@@ -900,6 +900,7 @@ class BotManager:
                 last_place=last,
                 best_guesses=final_leaderboard["best_guesses"],
                 worst_guesses=final_leaderboard["worst_guesses"],
+                handicaps=self.handicaps,
             )
 
             replayed_leaderboard_text = formatters.format_leaderboard_html(
