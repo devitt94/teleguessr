@@ -35,8 +35,16 @@ def ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
     return scores
 
 
-def skewed_ranking_score_manager(result: ChallengeResult) -> dict[str, int]:
-    rank_points = [14, 11, 9, 7, 6, 5, 4, 3, 2, 1]
+def skewed_ranking_score_manager(
+    result: ChallengeResult, num_players: int = 10
+) -> dict[str, int]:
+    first_place_points = num_players + 4
+    second_place_points = first_place_points - 3
+    third_place_points = second_place_points - 2
+    rank_points = [first_place_points, second_place_points, third_place_points] + list(
+        range(num_players - 3, 0, -1)
+    )
+
     sorted_scores = sorted(
         result.scores,
         key=lambda rs: rs.compute_net_score(),
