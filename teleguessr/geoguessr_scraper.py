@@ -67,13 +67,6 @@ class GeoguessrClient:
         challenge_scores: list[ChallengeScore] = []
         for geoguessr_score in geoguessr_scores:
             playername = geoguessr_score.gamePlayerNick
-
-            if playername == "Rory Devitt":
-                logger.warning(
-                    f"Skipping player {playername} as they are the bot creator."
-                )
-                continue
-
             hcap_multiplier = handicaps.get(playername)
             if hcap_multiplier is None:
                 logger.warning(
