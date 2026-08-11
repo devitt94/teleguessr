@@ -21,6 +21,10 @@ from teleguessr.odds import FractionalOdds
 from teleguessr.predictions import generate_outright_odds_predictions
 from teleguessr.replay import replay_league
 from teleguessr.record_manager import RecordManager
+from teleguessr.ryder_announce import (
+    announce_round_end as announce_ryder_round_end,
+    announce_round_start as announce_ryder_round_start,
+)
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import (
     LeagueState,
@@ -368,6 +372,10 @@ class BotManager:
             chat_id=chat_id,
             message_id=round_start_message.message_id,
             disable_notification=True,
+        )
+
+        await announce_ryder_round_start(
+            context.bot, chat_id, self.data_dir, self.league_state.current_round_num
         )
 
         await context.bot.send_message(
@@ -857,6 +865,13 @@ class BotManager:
         await self.__clear_players_from_lounge_chat(context)
 
         await self.__show_leaderboard(context, chat_id)
+
+        await announce_ryder_round_end(
+            context.bot,
+            chat_id,
+            self.data_dir,
+            self.league_state.last_round_finished_num,
+        )
 
         if self.league_state.is_finished:
             winner, second, third, *_, last = (
