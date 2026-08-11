@@ -1,3 +1,4 @@
+import asyncio
 import json
 import random
 from datetime import date
@@ -25,7 +26,9 @@ from teleguessr.ryder_formats import (
     format_for_round,
     score_match,
 )
+from teleguessr.ryder_announce import announce_round_end, announce_round_start
 from teleguessr.ryder_formatters import (
+    format_day_result_html,
     format_draw_html,
     format_points,
     format_scorecard_html,
@@ -656,3 +659,106 @@ def test_pairs_are_joined_with_plus_not_ampersand():
     message = format_standings_html(compute_standings(cup, []))
 
     assert "Bosnia & GetsTheGoldSweena + Theoland" in message
+
+
+# --- automatic announcements -------------------------------------------------
+
+
+class FakeBot:
+    """Captures what the bot would post."""
+
+    def __init__(self, fail: bool = False):
+        self.messages = []
+        self.fail = fail
+
+    async def send_message(self, chat_id, text, parse_mode=None, **kwargs):
+        if self.fail:
+            raise RuntimeError("telegram is down")
+        self.messages.append(text)
+
+
+def cup_league(tmp_path, rounds_played: int):
+    """A five-a-side cup with a given number of rounds already in the file."""
+    players = [f"P{i}" for i in range(10)]
+    cup = draw_cup(date(2025, 1, 6), 5, players, seed=21)
+    save_cup(tmp_path, cup)
+
+    rounds = [
+        make_round([make_score(p, [4000 - 100 * i] * 5) for i, p in enumerate(players)])
+        for _ in range(rounds_played)
+    ]
+    write_league(tmp_path, "20250106", rounds, num_rounds=5)
+    return cup
+
+
+def test_round_start_announcement_lists_the_pairings(tmp_path):
+    cup = cup_league(tmp_path, rounds_played=0)
+    bot = FakeBot()
+
+    asyncio.run(announce_round_start(bot, 1, tmp_path, 1))
+
+    assert len(bot.messages) == 1
+    message = bot.messages[0]
+    assert "Day 1" in message
+    assert "Fourballs" in message
+    for player in cup.team_a:
+        assert player in message
+
+
+def test_round_end_announcement_reports_the_day(tmp_path):
+    cup_league(tmp_path, rounds_played=1)
+    bot = FakeBot()
+
+    asyncio.run(announce_round_end(bot, 1, tmp_path, 1))
+
+    assert len(bot.messages) == 1
+    message = bot.messages[0]
+    assert "Day 1" in message
+    assert TEAM_A_NAME in message
+    assert "still to play for" in message
+
+
+def test_announcements_are_silent_without_a_cup(tmp_path):
+    write_league(tmp_path, "20250106", [], num_rounds=5)
+    bot = FakeBot()
+
+    asyncio.run(announce_round_start(bot, 1, tmp_path, 1))
+    asyncio.run(announce_round_end(bot, 1, tmp_path, 1))
+
+    assert bot.messages == []
+
+
+def test_announcements_are_silent_without_a_league(tmp_path):
+    bot = FakeBot()
+
+    asyncio.run(announce_round_start(bot, 1, tmp_path, 1))
+    asyncio.run(announce_round_end(bot, 1, tmp_path, 1))
+
+    assert bot.messages == []
+
+
+def test_a_broken_announcement_never_raises(tmp_path):
+    """A failure in the cup must not be able to interrupt a round."""
+    cup_league(tmp_path, rounds_played=1)
+    bot = FakeBot(fail=True)
+
+    asyncio.run(announce_round_start(bot, 1, tmp_path, 1))
+    asyncio.run(announce_round_end(bot, 1, tmp_path, 1))
+
+    assert bot.messages == []
+
+
+def test_round_end_announces_the_winner_on_the_final_day(tmp_path):
+    cup_league(tmp_path, rounds_played=5)
+    bot = FakeBot()
+
+    asyncio.run(announce_round_end(bot, 1, tmp_path, 5))
+
+    assert "wins the cup" in bot.messages[0]
+
+
+def test_day_result_for_an_unplayed_round_is_empty(tmp_path):
+    cup = cup_league(tmp_path, rounds_played=1)
+    standings = compute_standings(cup, [])
+
+    assert format_day_result_html(standings, 1) == ""

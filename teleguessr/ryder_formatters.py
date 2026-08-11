@@ -127,6 +127,43 @@ def format_round_preview_html(cup: RyderCup, round_number: int) -> str:
     return message
 
 
+def format_day_result_html(standings: Standings, round_number: int) -> str:
+    """One day's matches and the score after them, for the end-of-round post."""
+    day = next(
+        (r for r in standings.rounds if r.round_number == round_number),
+        None,
+    )
+    if day is None:
+        return ""
+
+    message = (
+        f"🏆 <b>Ryder Cup — Day {day.round_number}: "
+        f"{FORMAT_LABELS[day.match_format]}</b>\n\n"
+    )
+    for result in day.results:
+        message += _format_match_result(result)
+
+    message += (
+        f"\n<b>Day {day.round_number}: "
+        f"{format_points(day.team_a_points)}–{format_points(day.team_b_points)}</b>\n"
+        f"{format_scoreboard_line(standings)}\n"
+    )
+
+    if standings.is_decided:
+        winner = standings.winner
+        message += (
+            "\n<i>The cup finished level and is shared.</i>\n"
+            if winner is None
+            else f"\n🎉 <b>Team {winner} wins the cup!</b>\n"
+        )
+    else:
+        message += (
+            f"\n<i>{format_points(standings.points_remaining)} still to play for.</i>\n"
+        )
+
+    return message
+
+
 def _format_match_result(result: MatchResult) -> str:
     match: Match = result.match
 
