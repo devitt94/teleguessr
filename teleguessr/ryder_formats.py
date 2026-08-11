@@ -112,14 +112,18 @@ def format_for_round(round_number: int, num_rounds: int) -> RyderFormat:
     return DEFAULT_ROUND_FORMATS.get(round_number, RyderFormat.FOURBALL)
 
 
+CUMULATIVE_DAY_POINTS = 2.0
+
+
 def cumulative_points(team_size: int) -> float:
-    """Weight the cumulative day the same as a pairs day, so it cannot dominate."""
-    return float(_matches_on_a_pairs_day(team_size))
+    """The cumulative day is worth a flat two points, whatever the team size.
 
-
-def _matches_on_a_pairs_day(team_size: int) -> int:
-    """Pairs where possible, plus one single if the team size is odd."""
-    return team_size // 2 + team_size % 2
+    It is a single winner-takes-all match, so it can never be split the way a
+    pairs day is: backtesting showed it whitewashing every time and swinging
+    the cup more than any other day. Two points keeps it meaningful without
+    letting one number decide the week.
+    """
+    return CUMULATIVE_DAY_POINTS
 
 
 def _split_into_sides(players: list[str], rng: random.Random) -> list[list[str]]:

@@ -120,19 +120,29 @@ def test_odd_team_size_gets_pairs_plus_one_single():
     assert sorted(p for m in matches for p in m.side_a) == team_a
 
 
-def test_cumulative_is_one_match_weighted_like_a_pairs_day():
+def test_cumulative_is_a_single_match():
     matches = build_matches(3, RyderFormat.CUMULATIVE, TEAM_A, TEAM_B, random.Random(4))
 
     assert len(matches) == 1
     assert matches[0].side_a == TEAM_A
-    assert matches[0].points == 2  # four a side -> two pairs -> two points
+    assert matches[0].points == 2
 
 
-@pytest.mark.parametrize(
-    ("team_size", "expected"), [(4, 2), (5, 3), (6, 3), (7, 4), (8, 4)]
-)
-def test_cumulative_points_match_the_pairs_day(team_size, expected):
-    assert cumulative_points(team_size) == expected
+@pytest.mark.parametrize("team_size", [4, 5, 6, 7, 8])
+def test_cumulative_is_a_flat_two_points_at_any_team_size(team_size):
+    """It is one all-or-nothing match, so it must not scale with the roster."""
+    assert cumulative_points(team_size) == 2
+
+    pairs_day_matches = len(
+        build_matches(
+            1,
+            RyderFormat.FOURBALL,
+            [f"A{i}" for i in range(team_size)],
+            [f"B{i}" for i in range(team_size)],
+            random.Random(1),
+        )
+    )
+    assert cumulative_points(team_size) <= pairs_day_matches
 
 
 def test_singles_uses_the_league_net_score():
@@ -337,8 +347,8 @@ def test_draw_covers_every_round():
 def test_total_points_are_balanced_across_days():
     cup = draw_cup(date(2025, 1, 6), 5, [f"P{i}" for i in range(10)], seed=1)
 
-    # 3 + 3 + 3 + 3 + 5 for five a side
-    assert cup.total_points == 17
+    # Five a side: 3 fourballs + 3 foursomes + 2 cumulative + 3 fourballs + 5 singles
+    assert cup.total_points == 16
 
 
 def test_draw_needs_four_players():
