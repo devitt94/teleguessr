@@ -347,3 +347,16 @@ def format_projected_leaderboard_message(
 
     projection_message_lines.append("\n*Players who have not played this round yet.")
     return "\n".join(projection_message_lines)
+
+
+def format_gross_scores_needed_message(
+    gross_scores_needed: dict[str, list[float]],
+) -> str:
+    message = "📊 Gross Scores Needed:\n\n"
+    for player, scores_needed_per_rank in gross_scores_needed.items():
+        message += f"- {player}:\n"
+        for rank, score_needed in enumerate(scores_needed_per_rank, start=1):
+            message += f"    - {NUMBER_EMOJI_MAP.get(rank, '❓')}: {score_needed:.2f}\n"
+
+        message += "\n"
+    return message

@@ -10,6 +10,7 @@ from telegram.ext import Application as TelegramApp, ConversationHandler
 from telegram.error import NetworkError
 
 from teleguessr.active_players import PlayerManager
+from teleguessr.analysis import all_gross_scores_needed
 from teleguessr.awards import get_ranked_guesses
 from teleguessr.bets import BetManager, BettingSuspendedError
 from teleguessr.challenge_settings_generators import (
@@ -1235,6 +1236,48 @@ class BotManager:
             message += f"- {player}: {handicap:.0%}\n"
 
         await update.message.reply_text(message)
+
+    @command_handler(league_in_progress=True, round_in_progress=True)
+    async def gross_scores_needed_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        player_id = update.effective_user.id
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+
+        if player_name is None:
+            await update.message.reply_text(
+                "You are not registered as a player in this league."
+            )
+            return
+
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            self.league_state.current_round.challenge_url,
+            handicaps=self.active_handicaps,
+            challenge_settings=self.league_state.current_round.challenge_settings,
+        )
+
+        players_played = self.__player_round_status(round_result)
+        if players_played.get(player_name) is None:
+            await update.message.reply_text(
+                "You have not completed this round yet. Please complete your round to see the gross score needed."
+            )
+            return
+
+        if update.effective_chat.id == self.league_state.chat_id:
+            reply_chat = player_id
+        else:
+            reply_chat = update.effective_chat.id
+
+        gross_scores_needed = all_gross_scores_needed(
+            self.active_handicaps,
+            [
+                status.net_score
+                for status in players_played.values()
+                if status.is_finished
+            ],
+        )
+        message = formatters.format_gross_scores_needed_message(gross_scores_needed)
+        await update.message.reply_text(message, chat_id=reply_chat)
 
     @command_handler(league_in_progress=True, round_in_progress=True)
     async def start_bet(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

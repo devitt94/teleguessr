@@ -275,3 +275,21 @@ def gross_score_needed(
         return net_score_to_beat - max_adjustment
     else:
         return (net_score_to_beat - (max_score * handicap)) / (1 - handicap)
+
+
+def all_gross_scores_needed(
+    active_handicaps: dict[str, float],
+    current_net_scores: list[int],
+    max_score: float = 50_000,
+) -> dict[str, list[int]]:
+    players_yet_to_play = set(active_handicaps.keys()) - set(current_net_scores)
+    gross_scores_needed = {}
+
+    for player in players_yet_to_play:
+        handicap = active_handicaps[player]
+        gross_scores_needed[player] = [
+            gross_score_needed(handicap, net_score, max_score)
+            for net_score in current_net_scores
+        ]
+
+    return gross_scores_needed

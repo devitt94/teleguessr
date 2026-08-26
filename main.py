@@ -140,6 +140,9 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("outcomes", bot_manager.outcomes_handler))
     app.add_handler(CommandHandler("records", bot_manager.records_handler))
     app.add_handler(
+        CommandHandler("scoresneeded", bot_manager.gross_scores_needed_handler)
+    )
+    app.add_handler(
         CommandHandler("gross", build_gross_stats_handler(settings.data_dir))
     )
     app.add_handler(
@@ -358,32 +361,6 @@ def predictions(
     print(json.dumps(dict(zip(preds["player"], preds["lay_win_odds"])), indent=4))
     print("\n\n")
     print(formatters.format_odds_message(back_odds, lay_odds))
-
-
-@app.command()
-def gross_score_needed(
-    net_score_to_beat: float = typer.Argument(
-        ...,
-        help="The net score that needs to be beaten (i.e. the current best net score on the leaderboard).",
-    ),
-    handicap: float = typer.Argument(
-        ...,
-        help="The player's handicap multiplier (e.g. 0.1 for a 10% handicap).",
-    ),
-    max_score: int = typer.Option(
-        50000,
-        "--max-score",
-        "-m",
-        help="The maximum possible score for the round (e.g. 50000 for a standard round).",
-    ),
-):
-    """Calculate the gross score needed to beat a given net score, taking into account the player's handicap."""
-    from teleguessr.analysis import gross_score_needed
-
-    required_gross_score = gross_score_needed(handicap, net_score_to_beat, max_score)
-    print(
-        f"Gross score needed to beat a net score of {net_score_to_beat:.2f} with a handicap of {handicap:.0%}: {required_gross_score:.0f}"
-    )
 
 
 if __name__ == "__main__":
