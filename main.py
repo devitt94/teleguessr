@@ -353,6 +353,10 @@ def predictions(
     )
     print("Predicted outright odds:")
     print(json.dumps(dict(zip(preds["player"], preds["back_win_odds"])), indent=4))
+    print("\n\n")
+    print("Predicted lay odds:")
+    print(json.dumps(dict(zip(preds["player"], preds["lay_win_odds"])), indent=4))
+    print("\n\n")
     print(formatters.format_odds_message(back_odds, lay_odds))
 
 
