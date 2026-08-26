@@ -352,11 +352,13 @@ def format_projected_leaderboard_message(
 def format_gross_scores_needed_message(
     gross_scores_needed: dict[str, list[float]],
 ) -> str:
-    message = "📊 Gross Scores Needed:\n\n"
+    message = "📊 <b>Gross Scores Needed</b> (to beat the respective currently ranked player net this round):\n\n"
     for player, scores_needed_per_rank in gross_scores_needed.items():
-        message += f"- {player}:\n"
+        message += f"<b>{player}:</b>\n"
         for rank, score_needed in enumerate(scores_needed_per_rank, start=1):
-            message += f"    - {NUMBER_EMOJI_MAP.get(rank, '❓')}: {score_needed:.2f}\n"
+            message += (
+                f"{NUMBER_EMOJI_MAP.get(rank, '❓')}: <b>{int(score_needed)}</b>\n"
+            )
 
         message += "\n"
     return message

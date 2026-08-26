@@ -1256,8 +1256,8 @@ class BotManager:
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
-        players_played = self.__player_round_status(round_result)
-        if players_played.get(player_name) is None:
+        player_status_map = self.__player_round_status(round_result)
+        if player_status_map.get(player_name) is None:
             await update.message.reply_text(
                 "You have not completed this round yet. Please complete your round to see the gross score needed."
             )
@@ -1268,16 +1268,24 @@ class BotManager:
         else:
             reply_chat = update.effective_chat.id
 
+        net_scores = []
+        players_played_names = set()
+        for player, status in player_status_map.items():
+            if status is not None and status.is_finished:
+                net_scores.append(status.net_score)
+                players_played_names.add(player)
+
         gross_scores_needed = all_gross_scores_needed(
             self.active_handicaps,
-            [
-                status.net_score
-                for status in players_played.values()
-                if status.is_finished
-            ],
+            sorted(net_scores, reverse=True),
+            players_played=players_played_names,
         )
         message = formatters.format_gross_scores_needed_message(gross_scores_needed)
-        await update.message.reply_text(message, chat_id=reply_chat)
+        await context.bot.send_message(
+            chat_id=reply_chat,
+            text=message,
+            parse_mode="HTML",
+        )
 
     @command_handler(league_in_progress=True, round_in_progress=True)
     async def start_bet(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

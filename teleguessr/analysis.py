@@ -280,9 +280,10 @@ def gross_score_needed(
 def all_gross_scores_needed(
     active_handicaps: dict[str, float],
     current_net_scores: list[int],
+    players_played: set[str],
     max_score: float = 50_000,
 ) -> dict[str, list[int]]:
-    players_yet_to_play = set(active_handicaps.keys()) - set(current_net_scores)
+    players_yet_to_play = set(active_handicaps.keys()) - players_played
     gross_scores_needed = {}
 
     for player in players_yet_to_play:
