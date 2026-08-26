@@ -39,8 +39,8 @@ class ModelSettings(BaseModel):
     n_sims: int = 40_000
     overround: float = 0.25
     max_profit_self: float = 100.0
-    max_profit_non_self: float = 30.0
-    max_loss_self: float = 0.0
+    max_profit_non_self: float = 25.0
+    max_loss_self: float = 25.0
     max_loss_non_self: float = 100.0
     min_odds_for_other_bet: float = 4.0
     min_profit_bet: float = 1.0
