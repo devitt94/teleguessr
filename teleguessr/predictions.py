@@ -67,27 +67,15 @@ def _simulate_league(
     n_rounds: int,
     hcaps: dict[str, float],
 ) -> LeagueState:
-    # streamer_mu_adjustment = 0.1
     while not league_state.is_finished:
         challenge_settings = challenge_settings_generator(
             league_state.current_round_num
         )
 
-        # streamer = league_state.get_streamer_for_round()
-        # if league_state.current_round_num == n_rounds - 1:
-        #     if streamer is not None:
-        #         lognormal_fits[streamer].mu *= (1 - streamer_mu_adjustment)
-        #         logger.info(
-        #             f"Adjusting {streamer}'s mu for final round: {lognormal_fits[streamer].mu}"
-        #         )
-
         round_result = _simulate_round(lognormal_fits, hcaps, challenge_settings)
         ranked_guesses = get_ranked_guesses(round_result)
         league_state.add_round_result(round_result)
         league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
-
-        # if streamer is not None:
-        #     lognormal_fits[streamer].mu /= (1 - streamer_mu_adjustment)
 
     return league_state
 
