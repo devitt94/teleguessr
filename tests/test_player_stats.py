@@ -3,13 +3,13 @@ import json
 import pytest
 
 from teleguessr.models import ChallengeSettings
-from teleguessr.player_formatters import format_player_profile_html
-from teleguessr.player_handler import (
+from teleguessr.other_handlers.player_formatters import format_player_profile_html
+from teleguessr.other_handlers.player_handler import (
     decode_callback_data,
     encode_callback_data,
     MAX_CALLBACK_DATA_BYTES,
 )
-from teleguessr.player_stats import (
+from teleguessr.other_handlers.player_stats import (
     compute_player_profile,
     list_players,
     resolve_player,

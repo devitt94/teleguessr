@@ -11,12 +11,16 @@ from loguru import logger
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from teleguessr.gross_formatters import split_message
-from teleguessr.player_formatters import (
+from teleguessr.other_handlers.gross_formatters import split_message
+from teleguessr.other_handlers.player_formatters import (
     format_player_list_html,
     format_player_profile_html,
 )
-from teleguessr.player_stats import compute_player_profile, list_players, resolve_player
+from teleguessr.other_handlers.player_stats import (
+    compute_player_profile,
+    list_players,
+    resolve_player,
+)
 
 
 PLAYER_STATS_CALLBACK_PREFIX = "pstats:"

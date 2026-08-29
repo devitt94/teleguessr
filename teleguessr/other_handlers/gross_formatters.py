@@ -1,6 +1,10 @@
 """Telegram message formatting for the handicap-free stats table."""
 
-from teleguessr.gross_stats import GrossStatsTable, PlayerGrossStats, SortKey
+from teleguessr.other_handlers.gross_stats import (
+    GrossStatsTable,
+    PlayerGrossStats,
+    SortKey,
+)
 
 
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096

@@ -302,18 +302,18 @@ class LeagueState(BaseModel):
         if len(top_players) == 1:
             return top_players[0]
 
-        # Tie-breaker: return the player with the lowest total net points across previous rounds
-        lowest_total_net_points = float("inf")
+        # Tie-breaker: Highest net score in 3rd round streams
+        highest_net_points_r3 = float("-inf")
         streamer = None
+        r3_round_result = self.results[-2]
         for player in top_players:
-            total_net_points = sum(
+            net_points_r3 = next(
                 rs.compute_net_score()
-                for result in self.results
-                for rs in result.scores
+                for rs in r3_round_result.scores
                 if rs.player.name == player
             )
-            if total_net_points < lowest_total_net_points:
-                lowest_total_net_points = total_net_points
+            if net_points_r3 > highest_net_points_r3:
+                highest_net_points_r3 = net_points_r3
                 streamer = player
 
         return streamer

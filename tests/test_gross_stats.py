@@ -2,11 +2,11 @@ import json
 
 import pytest
 
-from teleguessr.gross_formatters import (
+from teleguessr.other_handlers.gross_formatters import (
     format_gross_stats_html,
     split_message,
 )
-from teleguessr.gross_stats import (
+from teleguessr.other_handlers.gross_stats import (
     SortKey,
     compute_gross_stats,
     finishers,

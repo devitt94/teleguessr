@@ -21,7 +21,7 @@ from teleguessr.challenge_settings_generators import (
     MOVING_WORLD_MAP_ID,
     URBAN_WORLD_MAP_ID,
 )
-from teleguessr.gross_stats import (
+from teleguessr.other_handlers.gross_stats import (
     MIN_FINISHERS_PER_ROUND,
     canonical_name,
     finishers,

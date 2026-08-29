@@ -1,7 +1,7 @@
 """Telegram formatting for the per-player profile."""
 
 from teleguessr.formatters import get_position_str
-from teleguessr.player_stats import PlayerProfile, Split
+from teleguessr.other_handlers.player_stats import PlayerProfile, Split
 
 
 def format_player_profile_html(profile: PlayerProfile) -> str:

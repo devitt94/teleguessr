@@ -11,11 +11,11 @@ from teleguessr import formatters
 from teleguessr.active_players import PlayerManager
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
-from teleguessr.gross_handler import build_gross_stats_handler
+from teleguessr.other_handlers.gross_handler import build_gross_stats_handler
 from teleguessr.handicaps import calculate_new_handicaps, get_latest_handicaps
 from teleguessr.league import get_last_finished_league_date
 from teleguessr.odds import FractionalOdds
-from teleguessr.player_handler import (
+from teleguessr.other_handlers.player_handler import (
     PLAYER_STATS_CALLBACK_PREFIX,
     build_player_callback_handler,
     build_player_command_handler,
