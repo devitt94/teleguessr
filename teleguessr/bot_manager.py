@@ -1404,15 +1404,18 @@ class BotManager:
             return ConversationHandler.END
 
         context.user_data["bet_type"] = BetType(query.data)
+        bettor = TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id)
+        bettor_is_active = bettor in self.active_handicaps
 
         valid_bet_amounts = self.bet_manager.calculate_bet_amounts(
-            bettor=TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id),
+            bettor=bettor,
             runner=context.user_data["bet_player"],
             odds=context.user_data["back_odds"]
             if context.user_data["bet_type"] == BetType.BACK
             else context.user_data["lay_odds"],
             market_type=MarketType.WINNER,
             bet_type=context.user_data["bet_type"],
+            bettor_is_active=bettor_is_active,
         )
 
         if not valid_bet_amounts:

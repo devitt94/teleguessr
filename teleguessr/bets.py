@@ -146,6 +146,7 @@ class BetManager:
         odds: FractionalOdds,
         bet_type: BetType = BetType.BACK,
         market_type: MarketType = MarketType.WINNER,
+        bettor_is_active: bool = True,
     ) -> list[float]:
         """Calculate bet amounts based on odds and settings."""
         bet_on_self = bettor == runner
@@ -160,7 +161,9 @@ class BetManager:
             f"Calculating bet amounts {bettor=} {runner=} {odds.formatted=} {bet_type=} {market_type=} {bet_on_self=}"
         )
         min_stake = self.model_settings.min_profit_bet / (odds.decimal - 1)
-        max_stake = self.compute_max_stake(bettor, runner, odds, bet_type)
+        max_stake = self.compute_max_stake(
+            bettor, runner, odds, bet_type, bettor_is_active
+        )
         logger.info(f"Calculated min_stake={min_stake:.2f}, max_stake={max_stake:.2f}")
         # Filter bet amounts to be within min and max stake
         valid_bets = [
@@ -294,6 +297,7 @@ class BetManager:
         selected_runner: str,
         odds: FractionalOdds,
         bet_type: BetType,
+        bettor_is_active: bool = True,
     ) -> float:
         """
         Compute the maximum stake `bettor` can place on `selected_runner` at `odds`,
@@ -316,6 +320,11 @@ class BetManager:
         # anything already tracked in the position dict.
 
         def position_bounds(runner: str) -> tuple[float, float]:
+            if not bettor_is_active:
+                return (
+                    -self.model_settings.max_loss_non_self,
+                    self.model_settings.max_profit_self,
+                )
             if runner == bettor:
                 return (
                     -self.model_settings.max_loss_self,
