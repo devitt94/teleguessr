@@ -716,7 +716,7 @@ class BotManager:
 
         players_to_remove = []
 
-        for player_name in self.active_handicaps.keys():
+        for player_name in self.handicaps.keys():
             player_telegram_id = PLAYER_NAME_TO_TELEGRAM_ID.get(player_name)
             if player_telegram_id is None:
                 logger.warning(f"No Telegram ID found for player {player_name}.")
@@ -1203,20 +1203,21 @@ class BotManager:
             )
             return
 
-        round_result = await self.geoguessr_client.get_challenge_scores(
-            self.league_state.current_round.challenge_url,
-            handicaps=self.active_handicaps,
-            challenge_settings=self.league_state.current_round.challenge_settings,
-        )
-
-        round_status = self.__player_round_status(round_result)
-        player_score = round_status.get(player_name)
-
-        if player_score is None or not player_score.is_finished:
-            await update.message.reply_text(
-                "You have not completed this round yet. Please complete your round to join the lounge."
+        if player_name in self.active_handicaps:
+            round_result = await self.geoguessr_client.get_challenge_scores(
+                self.league_state.current_round.challenge_url,
+                handicaps=self.active_handicaps,
+                challenge_settings=self.league_state.current_round.challenge_settings,
             )
-            return
+
+            round_status = self.__player_round_status(round_result)
+            player_score = round_status.get(player_name)
+
+            if player_score is None or not player_score.is_finished:
+                await update.message.reply_text(
+                    "You have not completed this round yet. Please complete your round to join the lounge."
+                )
+                return
 
         await self.__invite_player_to_lounge(
             context,
