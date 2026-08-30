@@ -463,11 +463,12 @@ class BotManager:
             "Tap below to opt in:"
         )
 
-        await context.bot.send_message(
+        join_league_message = await context.bot.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=keyboard,
         )
+        await join_league_message.pin()
 
     async def handle_opt_in(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
