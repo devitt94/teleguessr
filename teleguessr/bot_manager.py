@@ -432,6 +432,7 @@ class BotManager:
             back_odds=back_win_odds_dict,
             lay_odds=lay_win_odds_dict,
         )
+        self.bet_manager.suspend_betting()
         odds_message = formatters.format_odds_message(
             back_win_odds_dict, lay_win_odds_dict
         )
