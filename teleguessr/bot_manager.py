@@ -527,7 +527,9 @@ class BotManager:
     ) -> str:
         current_leaderboard = self.league_state.get_leaderboard_data()["scores"]
         projected_scores = current_leaderboard.copy()
-        points_for_round = skewed_ranking_score_manager(round_result)
+        points_for_round = skewed_ranking_score_manager(
+            round_result, num_players=len(self.active_handicaps)
+        )
         players_played = set()
         for score in round_result.scores:
             if score.is_finished:
@@ -845,11 +847,15 @@ class BotManager:
 
         ranked_guesses = get_ranked_guesses(round_result)
 
-        self.league_state.add_round_result(round_result)
+        self.league_state.add_round_result(
+            round_result, num_players=len(self.active_handicaps)
+        )
         self.league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
         self.league_state.save()
 
-        round_text = formatters.format_round_result_html(round_result, ranked_guesses)
+        round_text = formatters.format_round_result_html(
+            round_result, ranked_guesses, num_players=len(self.active_handicaps)
+        )
 
         await context.bot.send_message(
             chat_id=chat_id,
@@ -890,7 +896,7 @@ class BotManager:
 
             gross_replay_league_state = await replay_league(
                 league_path=self.league_state.filepath,
-                handicaps={},
+                handicaps={player: 0.0 for player in self.active_handicaps},
                 league_settings=self.league_settings,
             )
 

@@ -74,7 +74,7 @@ def _simulate_league(
 
         round_result = _simulate_round(lognormal_fits, hcaps, challenge_settings)
         ranked_guesses = get_ranked_guesses(round_result)
-        league_state.add_round_result(round_result)
+        league_state.add_round_result(round_result, num_players=len(hcaps))
         league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
 
     return league_state
@@ -265,6 +265,7 @@ async def generate_outright_odds_predictions(
         latest_active_league_file = None
 
     hcaps = get_latest_handicaps(league_settings)
+    hcaps = {player: hcap for player, hcap in hcaps.items() if player in runners}
 
     adjustments_file = settings.data_dir / "adjustments" / "adjustments.json"
     if adjustments_file.exists():

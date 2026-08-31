@@ -44,7 +44,7 @@ async def replay_league(
         round_result = apply_handicaps_to_challenge_result(round_result, handicaps)
         ranked_guesses = get_ranked_guesses(round_result)
 
-        league_state.add_round_result(round_result)
+        league_state.add_round_result(round_result, num_players=len(handicaps))
         league_state.add_awards(ranked_guesses[0], ranked_guesses[-1])
         league_state.save()
 

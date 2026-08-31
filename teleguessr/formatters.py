@@ -104,11 +104,12 @@ def format_awards_html(ranked_guesses: list[RankedGuess]) -> str:
 def format_round_result_html(
     result: ChallengeResult,
     ranked_guesses: list[RankedGuess],
+    num_players: int,
 ) -> str:
     if not result.scores:
         return "⚠️ No scores available!"
 
-    rank_scores = skewed_ranking_score_manager(result)
+    rank_scores = skewed_ranking_score_manager(result, num_players=num_players)
 
     sorted_player_scores = sorted(
         result.scores, key=lambda rs: rs.compute_net_score(), reverse=True

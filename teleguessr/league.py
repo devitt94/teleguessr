@@ -239,9 +239,9 @@ class LeagueState(BaseModel):
             players_finished=set(),
         )
 
-    def add_round_result(self, result: ChallengeResult):
+    def add_round_result(self, result: ChallengeResult, num_players: int):
         self.results.append(result)
-        added_scores = skewed_ranking_score_manager(result)
+        added_scores = skewed_ranking_score_manager(result, num_players=num_players)
         for player, score in added_scores.items():
             self.__scores[player] = self.__scores.get(player, 0) + score
             self.__round_results_by_player[player][str(self.current_round_num - 1)] = (
