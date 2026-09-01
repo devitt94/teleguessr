@@ -41,7 +41,7 @@ class ModelSettings(BaseModel):
     max_profit_self: float = 150.0
     max_profit_non_self: float = 75.0
     max_loss_self: float = 0.0
-    max_loss_non_self: float = 100.0
+    max_loss_non_self: float = 200.0
     min_odds_for_other_bet: float = 4.0
     min_profit_bet: float = 1.0
 
