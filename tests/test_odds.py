@@ -10,7 +10,7 @@ def test_probability_to_odds__margin_always_within_expected_range(probability):
     odds = probability_to_odds(probability)
     assert odds is not None
     margin = odds.implied_probability - probability
-    assert 0.02 <= margin <= 0.045
+    assert 0.025 <= margin <= 0.05
 
 
 def test_probability_to_odds__invalid_probability_raises_value_error():
