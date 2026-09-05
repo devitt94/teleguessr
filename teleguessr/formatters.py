@@ -363,3 +363,11 @@ def format_gross_scores_needed_message(
 
         message += "\n"
     return message
+
+
+def format_rank_scores(rank_scores: list[int]) -> str:
+    message = "📊 <b>Points awarded for each rank position</b>:\n\n"
+    for rank, score in enumerate(rank_scores, start=1):
+        message += f"{NUMBER_EMOJI_MAP.get(rank)}: {score}\n"
+
+    return message

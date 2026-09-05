@@ -25,6 +25,7 @@ from teleguessr.record_manager import RecordManager
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.league import (
     LeagueState,
+    get_rank_scores_list,
     skewed_ranking_score_manager,
 )
 from teleguessr.models import (
@@ -1535,3 +1536,11 @@ class BotManager:
             await update.message.reply_text(
                 "✅ Betting was already active for this round."
             )
+
+    @command_handler(league_in_progress=True)
+    async def rank_scores_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        rank_scores = get_rank_scores_list(len(self.active_handicaps))
+        msg = formatters.format_rank_scores(rank_scores)
+        await update.message.reply_text(msg, parse_mode="HTML")
