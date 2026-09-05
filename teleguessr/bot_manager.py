@@ -1320,7 +1320,7 @@ class BotManager:
 
         round_result = await self.geoguessr_client.get_challenge_scores(
             self.league_state.current_round.challenge_url,
-            handicaps=self.active_handicaps,
+            handicaps=self.handicaps,
             challenge_settings=self.league_state.current_round.challenge_settings,
         )
 
