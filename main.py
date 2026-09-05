@@ -140,6 +140,7 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("outcomes", bot_manager.outcomes_handler))
     app.add_handler(CommandHandler("records", bot_manager.records_handler))
     app.add_handler(CommandHandler("rankscores", bot_manager.rank_scores_handler))
+    app.add_handler(CommandHandler("livescores", bot_manager.live_scoring_handler))
     app.add_handler(
         CommandHandler("scoresneeded", bot_manager.gross_scores_needed_handler)
     )

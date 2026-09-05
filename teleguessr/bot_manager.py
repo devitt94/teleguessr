@@ -1543,3 +1543,54 @@ class BotManager:
         rank_scores = get_rank_scores_list(len(self.active_handicaps))
         msg = formatters.format_rank_scores(rank_scores)
         await update.message.reply_text(msg, parse_mode="HTML")
+
+    @command_handler(league_in_progress=True, round_in_progress=True)
+    async def live_scoring_handler(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ):
+        player_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+
+        if chat_id not in (player_id, self.players_lounge_group_id):
+            await update.message.reply_text(
+                "This command is only available in the bot DM or the players lounge."
+            )
+            return
+
+        player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
+
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            self.league_state.current_round.challenge_url,
+            handicaps=self.handicaps,
+            challenge_settings=self.league_state.current_round.challenge_settings,
+        )
+        n_rounds_total = round_result.num_rounds
+
+        player_status_map = self.__player_round_status(round_result)
+        player_status = player_status_map.get(player_name)
+        if player_status is None:
+            await update.message.reply_text("You have not started this round yet.")
+            return
+
+        if player_status.is_finished:
+            await update.message.reply_text(
+                "You have already completed this round. Use /status to see the final scores."
+            )
+            return
+
+        rounds_completed = player_status.rounds_played
+
+        for score in round_result.scores:
+            score.guesses = score.guesses[:rounds_completed]
+
+        live_scores = self.__player_round_status(round_result)
+
+        live_leaderboard_message = formatters.format_round_leaderboard_message(
+            scores_hidden=False,
+            players_played=live_scores,
+        )
+
+        message = f"<b>Live leaderboard ({rounds_completed}/{n_rounds_total} played)</b>\n\n{live_leaderboard_message}"
+        await update.message.reply_text(message, parse_mode="HTML")
