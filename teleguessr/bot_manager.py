@@ -976,6 +976,9 @@ class BotManager:
             "/bet - Place a bet on the league winner\n"
             "/position - Show your current betting position\n"
             "/guesses - Show current round guesses and rankings\n"
+            "/exposure - Show the bookmaker's position"
+            "/scoresneeded - Show the gross scores needed by each remaining player in the round\n"
+            "/outcomes - Show all betting outcomes"
             "/records - Show all-time records\n"
             "/help - Show this help message\n\n"
         )
