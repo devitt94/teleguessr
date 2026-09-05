@@ -1215,21 +1215,20 @@ class BotManager:
             )
             return
 
-        if player_name in self.active_handicaps:
-            round_result = await self.geoguessr_client.get_challenge_scores(
-                self.league_state.current_round.challenge_url,
-                handicaps=self.active_handicaps,
-                challenge_settings=self.league_state.current_round.challenge_settings,
+        round_result = await self.geoguessr_client.get_challenge_scores(
+            self.league_state.current_round.challenge_url,
+            handicaps=self.handicaps,
+            challenge_settings=self.league_state.current_round.challenge_settings,
+        )
+
+        round_status = self.__player_round_status(round_result)
+        player_score = round_status.get(player_name)
+
+        if player_score is None or not player_score.is_finished:
+            await update.message.reply_text(
+                "You have not completed this round yet. Please complete your round to join the lounge."
             )
-
-            round_status = self.__player_round_status(round_result)
-            player_score = round_status.get(player_name)
-
-            if player_score is None or not player_score.is_finished:
-                await update.message.reply_text(
-                    "You have not completed this round yet. Please complete your round to join the lounge."
-                )
-                return
+            return
 
         await self.__invite_player_to_lounge(
             context,
