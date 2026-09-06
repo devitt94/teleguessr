@@ -31,6 +31,7 @@ from teleguessr.bot_manager import (
     BotManager,
 )
 from telegram.ext import (
+    Application,
     ApplicationBuilder,
     CallbackQueryHandler,
     CommandHandler,
@@ -92,6 +93,25 @@ async def initlise_bot_manager(
     return bot_manager
 
 
+async def post_init(application: Application) -> None:
+    commands = [
+        ("status", "Display the current status of the round"),
+        ("handicaps", "Display the current player handicaps"),
+        ("lounge", "Join the players lounge after your round"),
+        ("odds", "Display current odds."),
+        ("position", "Display your current betting position"),
+        ("bet", "Place a bet"),
+        ("exposure", "Display DevBet's position"),
+        ("outcomes", "Display all betting outcomes"),
+        ("records", "Display all-time records"),
+        ("rankscores", "Display the points awarded for each rank in a round"),
+        ("livescores", "Display the live leaderboard for a round."),
+        ("guesses", "Display the ranked guesses for the current round."),
+    ]
+
+    await application.bot.set_my_commands(commands)
+
+
 def main(test_mode: bool = False):
     settings = get_settings()
 
@@ -124,7 +144,11 @@ def main(test_mode: bool = False):
     )
 
     app = (
-        ApplicationBuilder().token(settings.telegram_bot_token).request(request).build()
+        ApplicationBuilder()
+        .token(settings.telegram_bot_token)
+        .post_init(post_init)
+        .request(request)
+        .build()
     )
     app.add_handler(CommandHandler("help", bot_manager.help_handler))
     app.add_handler(CommandHandler("startleague", bot_manager.start_league_handler))
