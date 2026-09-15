@@ -1,5 +1,5 @@
 from typing import Protocol
-
+import random
 from teleguessr.models import ChallengeSettings
 
 
@@ -7,6 +7,16 @@ CLASSIC_WORLD_MAP_ID = "WORLD"
 COMMUNITY_WORLD_MAP_ID = "62a44b22040f04bd36e8a914"
 MOVING_WORLD_MAP_ID = "696fe47c5b07bed052077a95"
 URBAN_WORLD_MAP_ID = "640d01bf1b14982128374759"
+ARBITRARY_WORLD_MAP_ID = "6089bfcff6a0770001f645dd"
+PINPOINTABLE_WORLD_MAP_ID = "6029991c5048850001d572a9"
+I_SAW_THE_SIGN_MAP_ID = "5cfda2c9bc79e16dd866104d"
+CAPITALS_OF_THE_WORLD_MAP_ID = "60de2a8a81b92c00015f29e1"
+GEODETECTIVE_MAP_ID = "5d374dc141d2a43c1cd4527b"
+VARIED_WORLD_MAP_ID = "64ce812adc7614680516ff8c"
+DRONE_WORLD_MAP_ID = "5ffdf324d32ba4000169ff6e"
+ABANDONED_PLACES_MAP_ID = "5e8cafac2ad6cf626cd89384"
+UNESCO_WORLD_HERITAGE_SITES_MAP_ID = "5ad0b0cb2a3e0d4da46cc44c"
+DIVERSE_COMPLETE_WORLD_MAP_ID = "5ff7033214a99c00012fe738"
 
 
 class ChallengeSettingsGenerator(Protocol):
@@ -36,17 +46,27 @@ def classic_challenge_settings_generator(
 
 
 def mixed_challenge_settings_generator(round_number: int) -> ChallengeSettings:
-    """
-    New challenge settings generator that could be used for future leagues. For now, it returns the same settings as the classic generator, but it could be easily modified to return different settings for different rounds.
-    """
-
     if round_number == 1:
+        map_id = random.choice(
+            [
+                ARBITRARY_WORLD_MAP_ID,
+                PINPOINTABLE_WORLD_MAP_ID,
+                I_SAW_THE_SIGN_MAP_ID,
+                CAPITALS_OF_THE_WORLD_MAP_ID,
+                GEODETECTIVE_MAP_ID,
+                VARIED_WORLD_MAP_ID,
+                DRONE_WORLD_MAP_ID,
+                ABANDONED_PLACES_MAP_ID,
+                UNESCO_WORLD_HERITAGE_SITES_MAP_ID,
+                DIVERSE_COMPLETE_WORLD_MAP_ID,
+            ]
+        )
         return ChallengeSettings(
             time_limit_seconds=90,
-            map_id=URBAN_WORLD_MAP_ID,
+            map_id=map_id,
             pan_allowed=True,
             zoom_allowed=True,
-            move_allowed=True,
+            move_allowed=False,
             number_of_locations=10,
         )
     elif round_number == 3:
