@@ -107,6 +107,10 @@ async def post_init(application: Application) -> None:
         ("rankscores", "Display the points awarded for each rank in a round"),
         ("livescores", "Display the live leaderboard for a round."),
         ("guesses", "Display the ranked guesses for the current round."),
+        (
+            "scoresneeded",
+            "Display the gross scores the remaining players would need to rank.",
+        ),
     ]
 
     await application.bot.set_my_commands(commands)
