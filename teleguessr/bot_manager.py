@@ -208,14 +208,18 @@ class BotManager:
         )
 
     def __construct_position_message(
-        self, player_name: str, is_bookmaker: bool = False
+        self, player_name: str, market_type: MarketType, is_bookmaker: bool = False
     ) -> str:
         if is_bookmaker:
-            position = self.bet_manager.compute_bookmaker_exposure()
-            position_message = "📈 Bookmaker's exposure:\n\n"
+            position = self.bet_manager.compute_bookmaker_exposure(market_type)
+            position_message = f"📈 Bookmaker's exposure for {market_type}:\n\n"
         else:
-            position_message = "📈 Your current betting position:\n\n"
-            position = self.bet_manager.compute_position(bettor=player_name)
+            position_message = (
+                f"📈 Your current betting position for {market_type}:\n\n"
+            )
+            position = self.bet_manager.compute_position(
+                bettor=player_name, market_type=market_type
+            )
 
         total_equity = 0.0
 
@@ -380,9 +384,7 @@ class BotManager:
         logger.info(
             f"Writing empty odds file for round {self.league_state.current_round_num}"
         )
-        self.bet_manager.update_odds(
-            round_num=self.league_state.current_round_num, back_odds={}, lay_odds={}
-        )
+        self.bet_manager.suspend_betting()
 
         context.job_queue.run_once(
             self.__generate_and_send_odds_update,
@@ -403,39 +405,46 @@ class BotManager:
             n_sims=self.model_settings.n_sims,
             runners=self.player_manager.get_active_players(),
         )
-
-        back_win_odds_dict = {
-            player: FractionalOdds.from_str(odds)
-            for player, odds in odds_df.select("player", "back_win_odds")
-            .drop_nulls("back_win_odds")
-            .iter_rows()
-        }
-
-        lay_win_odds_dict = {
-            player: FractionalOdds.from_str(odds)
-            for player, odds in odds_df.select("player", "lay_win_odds")
-            .drop_nulls("lay_win_odds")
-            .iter_rows()
-        }
+        market_cols = [
+            (MarketType.WINNER, BetType.BACK, "back_win_odds"),
+            (MarketType.WINNER, BetType.LAY, "lay_win_odds"),
+            (MarketType.PODIUM, BetType.BACK, "back_podium_odds"),
+            (MarketType.PODIUM, BetType.LAY, "lay_podium_odds"),
+            (MarketType.WOODEN_SPOON, BetType.BACK, "back_ws_odds"),
+            (MarketType.WOODEN_SPOON, BetType.LAY, "lay_ws_odds"),
+        ]
+        all_odds = {}
+        for _, _, col in market_cols:
+            all_odds[col] = {
+                player: FractionalOdds.from_str(odds)
+                for player, odds in odds_df.select("player", col)
+                .drop_nulls(col)
+                .iter_rows()
+            }
 
         back_overround = (
-            sum(odds.implied_probability for odds in back_win_odds_dict.values()) - 1
+            sum(odds.implied_probability for odds in all_odds["back_win_odds"].values())
+            - 1
         )
         lay_overround = (
-            sum(odds.implied_probability for odds in lay_win_odds_dict.values()) - 1
+            sum(odds.implied_probability for odds in all_odds["lay_win_odds"].values())
+            - 1
         )
         logger.info(
             f"Odds predictions generated\n\n{odds_df}\\n\nOverrounds: Back - {back_overround:.2%}, Lay - {lay_overround:.2%}"
         )
 
-        self.bet_manager.update_odds(
-            round_num=self.league_state.current_round_num,
-            back_odds=back_win_odds_dict,
-            lay_odds=lay_win_odds_dict,
-        )
+        for market_type, bet_type, field in market_cols:
+            self.bet_manager.update_odds(
+                round_num=self.league_state.current_round_num,
+                odds=all_odds[field],
+                bet_type=bet_type,
+                market_type=market_type,
+            )
+
         self.bet_manager.suspend_betting()
         odds_message = formatters.format_odds_message(
-            back_win_odds_dict, lay_win_odds_dict
+            all_odds["back_win_odds"], all_odds["lay_win_odds"]
         )
 
         await context.bot.send_message(
@@ -925,9 +934,7 @@ class BotManager:
             gross_replay_league_state.filepath.unlink(missing_ok=True)
 
             # Comupute bet P&L and send final bet results
-            bet_pnls = self.bet_manager.compute_bet_pnls(
-                winner=winner,
-            )
+            bet_pnls = self.bet_manager.compute_bet_pnls(winner, second, third, last)
 
             if bet_pnls:
                 bet_results_message = "💰 Bet Results:\n\n"
@@ -1177,7 +1184,7 @@ class BotManager:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         exposure_message = self.__construct_position_message(
-            player_name=None, is_bookmaker=True
+            player_name=None, market_type=MarketType.WINNER, is_bookmaker=True
         )
 
         await update.message.reply_text(
@@ -1197,7 +1204,9 @@ class BotManager:
             )
             return
 
-        position_message = self.__construct_position_message(player_name=player_name)
+        position_message = self.__construct_position_message(
+            player_name=player_name, market_type=MarketType.WINNER
+        )
         await update.message.reply_text(
             position_message,
             parse_mode="HTML",

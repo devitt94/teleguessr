@@ -127,7 +127,17 @@ def simulate_n_leagues(
         )
         final_leaderboard = final_state.get_leaderboard_data()
         player_scores = final_leaderboard["scores"]
-        league_final_leaderboards.append(player_scores)
+        first, second, third, *_, last = final_state.get_final_sorted_leaderboard()
+
+        league_final_leaderboards.append(
+            {
+                "winner": first,
+                "second": second,
+                "third": third,
+                "loser": last,
+                "scores": player_scores,
+            }
+        )
 
     df = pl.DataFrame(league_final_leaderboards)
 
@@ -174,29 +184,21 @@ def outright_win_probabilities(sim_df: pl.DataFrame) -> pl.DataFrame:
     Based on this, compute the probabilities of each player coming first.
     """
 
-    player_cols = sim_df.columns
-
-    sim_df = sim_df.with_columns(
-        pl.Series(
-            [
-                player_cols[max(range(len(player_cols)), key=lambda i: row[i])]
-                for row in sim_df.select(player_cols).iter_rows()
-            ]
-        ).alias("winner"),
-        pl.Series(
-            [
-                player_cols[min(range(len(player_cols)), key=lambda i: row[i])]
-                for row in sim_df.select(player_cols).iter_rows()
-            ]
-        ).alias("loser"),
-    )
-
     win_probs = sim_df.group_by("winner").agg(
         (pl.len() / sim_df.height).alias("win_probability")
     )
 
     wooden_spoon_probs = sim_df.group_by("loser").agg(
         (pl.len() / sim_df.height).alias("wooden_spoon_probability")
+    )
+
+    podium_probs = (
+        sim_df.select("winner", "second", "third")
+        .unpivot(variable_name="position", value_name="player")
+        .group_by("player")
+        .len()
+        .with_columns((pl.col("len") / sim_df.height).alias("podium_probability"))
+        .sort("podium_probability", descending=True)
     )
 
     return (
@@ -207,10 +209,14 @@ def outright_win_probabilities(sim_df: pl.DataFrame) -> pl.DataFrame:
             how="full",
             coalesce=True,
         )
+        .join(
+            podium_probs, left_on="winner", right_on="player", how="full", coalesce=True
+        )
         .select(
             pl.col("winner").alias("player"),
             pl.col("win_probability"),
             pl.col("wooden_spoon_probability"),
+            pl.col("podium_probability"),
         )
         .sort("win_probability", descending=True)
         .fill_null(0.0)
@@ -320,8 +326,6 @@ async def generate_outright_odds_predictions(
 
     all_df = all_df.sort("win_probability", descending=True)
 
-    all_df = all_df.with_columns()
-
     all_df = all_df.with_columns(
         (1.0 - pl.col("win_probability")).alias("not_win_probability")
     )
@@ -336,6 +340,14 @@ async def generate_outright_odds_predictions(
     ws_odds = probs_to_odds(
         all_df["wooden_spoon_probability"].to_list(),
     )
+
+    lay_ws_odds = probs_to_odds((1.0 - all_df["wooden_spoon_probability"]).to_list())
+    lay_ws_odds = [f.invert() if f is not None else None for f in lay_ws_odds]
+
+    podium_odds = probs_to_odds(all_df["podium_probability"].to_list())
+
+    lay_podium_odds = probs_to_odds((1.0 - all_df["podium_probability"]).to_list())
+    lay_podium_odds = [f.invert() if f is not None else None for f in lay_podium_odds]
 
     all_df = all_df.with_columns(
         [
@@ -363,8 +375,16 @@ async def generate_outright_odds_predictions(
                 [f.formatted if f is not None else None for f in ws_odds],
             ),
             pl.Series(
-                "back_ws_implied_prob",
-                [f.implied_probability if f is not None else None for f in ws_odds],
+                "lay_ws_odds",
+                [f.formatted if f is not None else None for f in lay_ws_odds],
+            ),
+            pl.Series(
+                "back_podium_odds",
+                [f.formatted if f is not None else None for f in podium_odds],
+            ),
+            pl.Series(
+                "lay_podium_odds",
+                [f.formatted if f is not None else None for f in lay_podium_odds],
             ),
         ]
     )
@@ -379,18 +399,23 @@ async def generate_outright_odds_predictions(
         .round(2)
         .cast(pl.String)
         .alias("wooden_spoon_pct"),
+        (pl.col("podium_probability") * 100)
+        .round(2)
+        .cast(pl.String)
+        .alias("podium_pct"),
         pl.col("mean_guess_distance_km").round(2).alias("mean_guess_distance_km"),
         pl.col("median_guess_distance_km").round(2).alias("median_guess_distance_km"),
     ).select(
         "player",
         "win_pct",
         "wooden_spoon_pct",
+        "podium_pct",
         "back_win_odds",
-        "back_win_implied_prob",
         "lay_win_odds",
-        "lay_win_implied_prob",
-        # "back_ws_odds",
-        # "back_ws_implied_prob",
+        "back_ws_odds",
+        "lay_ws_odds",
+        "back_podium_odds",
+        "lay_podium_odds",
     )
 
     return all_df

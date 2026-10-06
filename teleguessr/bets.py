@@ -113,18 +113,21 @@ class BetManager:
             runner: FractionalOdds.from_str(odds) for runner, odds in odds_data.items()
         }
 
-    def get_all_bets(self) -> list[Bet]:
+    def get_all_bets(self, market_type: MarketType | None = None) -> list[Bet]:
         bets_file = self.bets_dir / f"bets_{self.league_date.strftime('%Y%m%d')}.json"
         if not bets_file.exists():
             return []
         with open(bets_file, "r") as f:
             bets_data = json.load(f)
-        return [Bet(**bet) for bet in bets_data]
+        all_bets = [Bet(**bet) for bet in bets_data]
+        if market_type is None:
+            return all_bets
+        return [bet for bet in all_bets if bet.market_type == market_type]
 
     def get_current_position(
         self, bettor: str, runner: str, market_type: MarketType = MarketType.WINNER
     ) -> float:
-        bets = self.get_all_bets()
+        bets = self.get_all_bets(market_type=market_type)
         position = 0.0
         relevant_bets = [
             bet
@@ -150,10 +153,9 @@ class BetManager:
     ) -> list[float]:
         """Calculate bet amounts based on odds and settings."""
         bet_on_self = bettor == runner
-        if (
-            bet_type == BetType.LAY
-            and market_type != MarketType.WOODEN_SPOON
-            and bet_on_self
+        if bet_on_self and (
+            (bet_type == BetType.LAY and market_type != MarketType.WOODEN_SPOON)
+            or (bet_type == BetType.BACK and market_type == MarketType.WOODEN_SPOON)
         ):
             return []
 
@@ -162,7 +164,7 @@ class BetManager:
         )
         min_stake = self.model_settings.min_profit_bet / (odds.decimal - 1)
         max_stake = self.compute_max_stake(
-            bettor, runner, odds, bet_type, bettor_is_active
+            bettor, runner, odds, market_type, bet_type, bettor_is_active
         )
         logger.info(f"Calculated min_stake={min_stake:.2f}, max_stake={max_stake:.2f}")
         # Filter bet amounts to be within min and max stake
@@ -179,28 +181,15 @@ class BetManager:
     def update_odds(
         self,
         round_num: int,
-        back_odds: dict[str, FractionalOdds],
-        lay_odds: dict[str, FractionalOdds],
+        odds: dict[str, FractionalOdds],
+        bet_type: BetType,
         market_type: MarketType = MarketType.WINNER,
     ) -> None:
-        back_win_odds_file = self.get_odds_file_path(
-            round_num, market_type, BetType.BACK
-        )
-        lay_win_odds_file = self.get_odds_file_path(round_num, market_type, BetType.LAY)
+        odds_file = self.get_odds_file_path(round_num, market_type, bet_type)
         available_odds = {
-            runner: odds.formatted
-            for runner, odds in back_odds.items()
-            if odds is not None
+            runner: odds.formatted for runner, odds in odds.items() if odds is not None
         }
-        with back_win_odds_file.open("w") as f:
-            json.dump(available_odds, f, indent=2)
-
-        available_odds = {
-            runner: odds.formatted
-            for runner, odds in lay_odds.items()
-            if odds is not None
-        }
-        with lay_win_odds_file.open("w") as f:
+        with odds_file.open("w") as f:
             json.dump(available_odds, f, indent=2)
 
     def place_bet(
@@ -209,7 +198,7 @@ class BetManager:
         runner: str,
         amount: float,
         odds: FractionalOdds,
-        market_type: MarketType = MarketType.WINNER,
+        market_type: MarketType,
         bet_type: BetType = BetType.BACK,
     ) -> Bet:
         if self.betting_suspended:
@@ -238,21 +227,34 @@ class BetManager:
 
         return bet
 
-    def compute_bet_pnls(self, winner: str) -> dict[str, float]:
+    def compute_bet_pnls(
+        self, winner: str, second: str, third: str, last: str
+    ) -> dict[str, float]:
         bets = self.get_all_bets()
 
         pnls = defaultdict(float)
+
+        def runner_satisfies_bet_market(market_type: MarketType, runner: str):
+            if market_type == MarketType.WINNER:
+                return runner == winner
+            elif market_type == MarketType.WOODEN_SPOON:
+                return runner == last
+            elif market_type == MarketType.PODIUM:
+                return runner in (winner, second, third)
+
         for bet in bets:
             bettor = bet.bettor
-            if (bet.runner == winner) ^ (bet.bet_type == BetType.LAY):
+            if runner_satisfies_bet_market(bet.market_type, bet.runner) ^ (
+                bet.bet_type == BetType.LAY
+            ):
                 pnls[bettor] += bet.potential_profit
             else:
                 pnls[bettor] -= bet.stake
 
         return dict(pnls)
 
-    def compute_bookmaker_exposure(self) -> dict[str, float]:
-        bets = self.get_all_bets()
+    def compute_bookmaker_exposure(self, market_type: MarketType) -> dict[str, float]:
+        bets = self.get_all_bets(market_type=market_type)
         exposure = {runner: 0.0 for runner in self.all_runners}
         for bet in bets:
             for runner in self.all_runners:
@@ -297,6 +299,7 @@ class BetManager:
         selected_runner: str,
         odds: FractionalOdds,
         bet_type: BetType,
+        market_type: MarketType,
         bettor_is_active: bool = True,
     ) -> float:
         """
@@ -314,7 +317,7 @@ class BetManager:
         too (mutually exclusive market), so all known runners must be checked.
         """
 
-        current_bettor_position = self.compute_position(bettor)
+        current_bettor_position = self.compute_position(bettor, market_type)
         # Universe of runners whose position could be affected / constrained.
         # We must at least consider selected_runner and bettor themselves, plus
         # anything already tracked in the position dict.
@@ -330,7 +333,7 @@ class BetManager:
                     -self.model_settings.max_loss_self,
                     self.model_settings.max_profit_self,
                 )
-            if bet_type == BetType.LAY:
+            if bet_type == BetType.LAY or market_type == MarketType.WOODEN_SPOON:
                 return (
                     -self.model_settings.max_loss_non_self,
                     self.model_settings.max_profit_self,
