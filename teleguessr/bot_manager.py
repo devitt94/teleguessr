@@ -53,7 +53,7 @@ from teleguessr.ranks import get_ranks_from_scores
 from telegram.ext import ContextTypes
 
 
-BET_SELECT_PLAYER, BET_SELECT_BET_TYPE, BET_SELECT_AMOUNT = range(3)
+BET_SELECT_MARKET, BET_SELECT_PLAYER, BET_SELECT_BET_TYPE, BET_SELECT_AMOUNT = range(4)
 
 OPT_IN_CALLBACK = "optin_next_league"
 
@@ -1346,6 +1346,42 @@ class BotManager:
         await update.message.reply_text(
             "Who would you like to bet on?", reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return BET_SELECT_MARKET
+
+    async def handle_market_selection(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+        query = update.callback_query
+        await query.answer()
+
+        if query.data == "cancel":
+            await query.edit_message_text("Bet cancelled.")
+            return ConversationHandler.END
+
+        context.user_data["bet_player"] = query.data
+        keyboard = [
+            [InlineKeyboardButton("Winner", callback_data=MarketType.WINNER)],
+            [
+                InlineKeyboardButton(
+                    "Podium Finish",
+                    callback_data=MarketType.PODIUM,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "Wooden Spoon",
+                    callback_data=MarketType.WOODEN_SPOON,
+                )
+            ],
+            [InlineKeyboardButton("Cancel", callback_data="cancel")],
+        ]
+
+        await query.edit_message_text(
+            f"Runner: *{query.data}*\nWhich market would you like to bet on?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
+        )
+
         return BET_SELECT_PLAYER
 
     async def handle_player_selection(
@@ -1358,24 +1394,29 @@ class BotManager:
             await query.edit_message_text("Bet cancelled.")
             return ConversationHandler.END
 
-        context.user_data["bet_player"] = query.data
+        market_type = MarketType(query.data)
+        context.user_data["market_type"] = market_type
+        runner = context.user_data["bet_player"]
 
         runner_back_odds = self.bet_manager.get_latest_odds(
-            self.league_state.current_round_num, bet_type=BetType.BACK
-        ).get(query.data)
+            self.league_state.current_round_num,
+            market_type=market_type,
+            bet_type=BetType.BACK,
+        ).get(runner)
         runner_lay_odds = self.bet_manager.get_latest_odds(
-            self.league_state.current_round_num, bet_type=BetType.LAY
-        ).get(query.data)
+            self.league_state.current_round_num,
+            market_type=market_type,
+            bet_type=BetType.LAY,
+        ).get(runner)
 
         if not (runner_back_odds or runner_lay_odds):
             await query.edit_message_text(
-                f"Sorry, odds for {query.data} are not available. Please try again later."
+                f"Sorry, odds for {runner}/{market_type.value} are not available. Please try again later."
             )
             return ConversationHandler.END
 
         context.user_data["back_odds"] = runner_back_odds
         context.user_data["lay_odds"] = runner_lay_odds
-
         keyboard = [
             [
                 InlineKeyboardButton(
@@ -1397,7 +1438,7 @@ class BotManager:
         ]
 
         await query.edit_message_text(
-            f"Runner: *{query.data}*\nWould you like to place a Back or Lay bet?",
+            f"Runner: *{runner}*\nMarket:*{market_type}*\nWould you like to place a Back or Lay bet?",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
@@ -1415,6 +1456,7 @@ class BotManager:
             return ConversationHandler.END
 
         context.user_data["bet_type"] = BetType(query.data)
+        market_type = MarketType(context.user_data["market_type"])
         bettor = TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id)
         bettor_is_active = bettor in self.active_handicaps
 
@@ -1424,7 +1466,7 @@ class BotManager:
             odds=context.user_data["back_odds"]
             if context.user_data["bet_type"] == BetType.BACK
             else context.user_data["lay_odds"],
-            market_type=MarketType.WINNER,
+            market_type=market_type,
             bet_type=context.user_data["bet_type"],
             bettor_is_active=bettor_is_active,
         )
@@ -1445,7 +1487,7 @@ class BotManager:
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
-        return BET_SELECT_AMOUNT  # ← move to next state
+        return BET_SELECT_AMOUNT
 
     async def handle_amount_selection(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -1458,6 +1500,7 @@ class BotManager:
             return ConversationHandler.END
 
         player = context.user_data["bet_player"]
+        market_type = context.user_data["market_type"]
         bet_odds: FractionalOdds = (
             context.user_data["back_odds"]
             if context.user_data["bet_type"] == BetType.BACK
@@ -1478,7 +1521,7 @@ class BotManager:
                 runner=player,
                 amount=amount,
                 odds=bet_odds,
-                market_type=MarketType.WINNER,
+                market_type=market_type,
                 bet_type=context.user_data["bet_type"],
             )
         except BettingSuspendedError:

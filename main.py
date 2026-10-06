@@ -26,6 +26,7 @@ from teleguessr.settings import AppSettings, get_settings
 from teleguessr.bot_manager import (
     BET_SELECT_AMOUNT,
     BET_SELECT_BET_TYPE,
+    BET_SELECT_MARKET,
     BET_SELECT_PLAYER,
     OPT_IN_CALLBACK,
     BotManager,
@@ -127,6 +128,10 @@ def main(test_mode: bool = False):
     bet_handler = ConversationHandler(
         entry_points=[CommandHandler("bet", bot_manager.start_bet)],
         states={
+            BET_SELECT_MARKET: [
+                CallbackQueryHandler(bot_manager.handle_market_selection),
+                CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
+            ],
             BET_SELECT_PLAYER: [
                 CallbackQueryHandler(bot_manager.handle_player_selection),
                 CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
