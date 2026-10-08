@@ -5,6 +5,7 @@ from teleguessr.models import (
     AbbreviatedRoundScore,
     ChallengeResult,
     ChallengeSettings,
+    MarketType,
     RankedGuess,
 )
 from teleguessr.odds import FractionalOdds
@@ -274,19 +275,25 @@ def format_outcomes_message(
 def format_odds_message(
     back_odds: dict[str, FractionalOdds],
     lay_odds: dict[str, FractionalOdds],
+    market_type: MarketType = MarketType.WINNER,
 ) -> str:
     if not back_odds:
         return "Odds are not available."
-    odds_message = "📊 Current Odds:\n\n"
-    for player, odds in back_odds.items():
-        odds_message += f"- {player}: {odds.formatted}\n"
 
-    back_overround = sum(odds.implied_probability for odds in back_odds.values()) - 1.0
-    lay_overround = 1.0 - sum(odds.implied_probability for odds in lay_odds.values())
-    odds_message += f"\nBack overround: {back_overround:.2%}"
-    odds_message += f"\nLay overround: {lay_overround:.2%}"
-    odds_message += "\n DM me with /bet to place your bets!"
-    odds_message += "\n Use /position to check your current betting position."
+    odds_message = f"*Market Type: {market_type.value}*\n"
+    for player, odds in back_odds.items():
+        odds_message += f"- {player}: *{odds.formatted}*\n"
+
+    market_multiplier = 3.0 if market_type == MarketType.PODIUM else 1.0
+
+    back_overround = (
+        sum(odds.implied_probability for odds in back_odds.values()) - market_multiplier
+    )
+    lay_overround = market_multiplier - sum(
+        odds.implied_probability for odds in lay_odds.values()
+    )
+    odds_message += f"\nBack overround: *{back_overround:.2%}*"
+    odds_message += f"\nLay overround: *{lay_overround:.2%}*\n\n"
 
     return odds_message
 

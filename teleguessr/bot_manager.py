@@ -229,7 +229,8 @@ class BotManager:
             total_equity = 0.0
 
             latest_odds = self.bet_manager.get_latest_odds(
-                self.league_state.current_round_num
+                self.league_state.current_round_num,
+                market_type=market_type,
             )
             for runner, position in sorted(
                 position.items(), key=lambda x: x[1], reverse=True
@@ -449,7 +450,9 @@ class BotManager:
 
         self.bet_manager.suspend_betting()
         odds_message = formatters.format_odds_message(
-            all_odds["back_win_odds"], all_odds["lay_win_odds"]
+            all_odds["back_win_odds"],
+            all_odds["lay_win_odds"],
+            market_type=MarketType.WINNER,
         )
 
         await context.bot.send_message(
@@ -1165,23 +1168,31 @@ class BotManager:
 
     @command_handler(league_in_progress=True)
     async def odds_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        latest_back_odds = self.bet_manager.get_latest_odds(
-            league_round=self.league_state.current_round_num
-        )
-        if not latest_back_odds:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Odds have not been generated yet for this round. Please check back soon!",
+        odds_message = "📊 Current Odds:\n\n"
+        for market in MarketType:
+            latest_back_odds = self.bet_manager.get_latest_odds(
+                league_round=self.league_state.current_round_num, market_type=market
             )
-            return
 
-        latest_lay_odds = self.bet_manager.get_latest_odds(
-            league_round=self.league_state.current_round_num, bet_type=BetType.LAY
-        )
-        odds_message = formatters.format_odds_message(latest_back_odds, latest_lay_odds)
+            if not latest_back_odds:
+                logger.warning(f"No odds for {market=}")
+                continue
+
+            latest_lay_odds = self.bet_manager.get_latest_odds(
+                league_round=self.league_state.current_round_num,
+                market_type=market,
+                bet_type=BetType.LAY,
+            )
+            odds_message += formatters.format_odds_message(
+                latest_back_odds, latest_lay_odds, market
+            )
+
+        odds_message += "\n DM me with /bet to place your bets!"
+        odds_message += "\n Use /position to check your current betting position."
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=odds_message,
+            parse_mode="Markdown",
         )
 
     @command_handler(league_in_progress=True)
