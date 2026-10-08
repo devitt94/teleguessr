@@ -164,7 +164,7 @@ class BetManager:
         )
         min_stake = self.model_settings.min_profit_bet / (odds.decimal - 1)
         max_stake = self.compute_max_stake(
-            bettor, runner, odds, market_type, bet_type, bettor_is_active
+            bettor, runner, odds, bet_type, market_type, bettor_is_active
         )
         logger.info(f"Calculated min_stake={min_stake:.2f}, max_stake={max_stake:.2f}")
         # Filter bet amounts to be within min and max stake
@@ -324,24 +324,21 @@ class BetManager:
 
         def position_bounds(runner: str) -> tuple[float, float]:
             if not bettor_is_active:
-                return (
-                    -self.model_settings.max_loss_non_self,
-                    self.model_settings.max_profit_self,
-                )
+                return (-200.0, 150.0)
             if runner == bettor:
-                return (
-                    -self.model_settings.max_loss_self,
-                    self.model_settings.max_profit_self,
-                )
-            if bet_type == BetType.LAY or market_type == MarketType.WOODEN_SPOON:
-                return (
-                    -self.model_settings.max_loss_non_self,
-                    self.model_settings.max_profit_self,
-                )
-            return (
-                -self.model_settings.max_loss_non_self,
-                self.model_settings.max_profit_non_self,
-            )
+                if market_type == MarketType.WOODEN_SPOON:
+                    return (-100.0, 0.0)
+                elif market_type == MarketType.PODIUM:
+                    return (0.0, 75.0)
+                else:
+                    return (0.0, 150.0)
+            else:
+                if market_type == MarketType.WOODEN_SPOON:
+                    return (25.0, 100.0)
+                elif market_type == MarketType.PODIUM:
+                    return (-100.0, 25.0)
+                else:
+                    return (-200.0, 50.0)
 
         max_stake = float("inf")
         decimal_odds = odds.decimal
@@ -365,6 +362,9 @@ class BetManager:
                     # Any other runner winning: position increases by S * (odds - 1)
                     allowed = (upper - pos) * (decimal_odds - 1)
 
+            logger.info(
+                f"Computed position bounds for {bettor=} {runner=} {pos=} {lower=} {upper=} {allowed=}"
+            )
             max_stake = min(max_stake, allowed)
 
         return round(max(0.0, max_stake), 2)
