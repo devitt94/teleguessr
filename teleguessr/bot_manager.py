@@ -208,37 +208,42 @@ class BotManager:
         )
 
     def __construct_position_message(
-        self, player_name: str, market_type: MarketType, is_bookmaker: bool = False
+        self, player_name: str, is_bookmaker: bool = False
     ) -> str:
         if is_bookmaker:
-            position = self.bet_manager.compute_bookmaker_exposure(market_type)
-            position_message = f"📈 Bookmaker's exposure for {market_type}:\n\n"
+            position_message = "📈 DevBet's exposure\n"
         else:
-            position_message = (
-                f"📈 Your current betting position for {market_type}:\n\n"
-            )
-            position = self.bet_manager.compute_position(
-                bettor=player_name, market_type=market_type
-            )
+            position_message = "📈 Your current betting position\n"
 
-        total_equity = 0.0
+        for market_type in MarketType:
+            if is_bookmaker:
+                position = self.bet_manager.compute_bookmaker_exposure(market_type)
+            else:
+                position = self.bet_manager.compute_position(
+                    bettor=player_name, market_type=market_type
+                )
+                if all(pos == 0.0 for pos in position.values()):
+                    continue
 
-        for runner, position in sorted(
-            position.items(), key=lambda x: x[1], reverse=True
-        ):
-            runner_odds = self.bet_manager.get_latest_odds(
+            position_message += f"\nMarket: {market_type}\n"
+            total_equity = 0.0
+
+            latest_odds = self.bet_manager.get_latest_odds(
                 self.league_state.current_round_num
-            ).get(runner)
-
-            total_equity += self.bet_manager.compute_equity(
-                runner, position, runner_odds
             )
+            for runner, position in sorted(
+                position.items(), key=lambda x: x[1], reverse=True
+            ):
+                total_equity += self.bet_manager.compute_equity(
+                    runner, position, latest_odds.get(runner)
+                )
 
-            position_message += (
-                f"- {runner}: {formatters.format_signed_amount(position)}\n"
-            )
+                position_message += (
+                    f"- {runner}: {formatters.format_signed_amount(position)}\n"
+                )
 
         position_message += f"\nEstimated cash out (adjusted for odds): {formatters.format_signed_amount(total_equity)}"
+
         return position_message
 
     async def __poll_for_round_updates(self, context: ContextTypes.DEFAULT_TYPE):
@@ -1184,7 +1189,7 @@ class BotManager:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         exposure_message = self.__construct_position_message(
-            player_name=None, market_type=MarketType.WINNER, is_bookmaker=True
+            player_name=None, is_bookmaker=True
         )
 
         await update.message.reply_text(
@@ -1205,7 +1210,7 @@ class BotManager:
             return
 
         position_message = self.__construct_position_message(
-            player_name=player_name, market_type=MarketType.WINNER
+            player_name=player_name,
         )
         await update.message.reply_text(
             position_message,
