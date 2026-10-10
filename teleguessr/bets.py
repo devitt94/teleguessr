@@ -327,16 +327,16 @@ class BetManager:
                 return (-200.0, 150.0)
             if runner == bettor:
                 if market_type == MarketType.WOODEN_SPOON:
-                    return (-100.0, 0.0)
+                    return (-60.0, 0.0)
                 elif market_type == MarketType.PODIUM:
                     return (0.0, 75.0)
                 else:
                     return (0.0, 150.0)
             else:
                 if market_type == MarketType.WOODEN_SPOON:
-                    return (25.0, 100.0)
+                    return (-15.0, 60.0)
                 elif market_type == MarketType.PODIUM:
-                    return (-100.0, 25.0)
+                    return (-60.0, 15.0)
                 else:
                     return (-200.0, 50.0)
 

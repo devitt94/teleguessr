@@ -391,23 +391,13 @@ def predictions(
             ),
         )
     )
-    lay_odds = dict(
-        zip(
-            preds["player"],
-            (
-                FractionalOdds.from_str(odds)
-                for odds in preds["lay_win_odds"]
-                if odds is not None
-            ),
-        )
-    )
     print("Predicted outright odds:")
     print(json.dumps(dict(zip(preds["player"], preds["back_win_odds"])), indent=4))
     print("\n\n")
     print("Predicted lay odds:")
     print(json.dumps(dict(zip(preds["player"], preds["lay_win_odds"])), indent=4))
     print("\n\n")
-    print(formatters.format_odds_message(back_odds, lay_odds))
+    print(formatters.format_odds_message(back_odds))
 
 
 if __name__ == "__main__":

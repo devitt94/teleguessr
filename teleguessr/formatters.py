@@ -274,7 +274,6 @@ def format_outcomes_message(
 
 def format_odds_message(
     back_odds: dict[str, FractionalOdds],
-    lay_odds: dict[str, FractionalOdds],
     market_type: MarketType = MarketType.WINNER,
 ) -> str:
     if not back_odds:
@@ -283,18 +282,7 @@ def format_odds_message(
     odds_message = f"*Market Type: {market_type.value}*\n"
     for player, odds in back_odds.items():
         odds_message += f"- {player}: *{odds.formatted}*\n"
-
-    market_multiplier = 3.0 if market_type == MarketType.PODIUM else 1.0
-
-    back_overround = (
-        sum(odds.implied_probability for odds in back_odds.values()) - market_multiplier
-    )
-    lay_overround = market_multiplier - sum(
-        odds.implied_probability for odds in lay_odds.values()
-    )
-    odds_message += f"\nBack overround: *{back_overround:.2%}*"
-    odds_message += f"\nLay overround: *{lay_overround:.2%}*\n\n"
-
+    odds_message += "\n"
     return odds_message
 
 

@@ -4,6 +4,7 @@ from functools import wraps
 from pathlib import Path
 import traceback
 from typing import Awaitable
+from telegram.helpers import escape_markdown
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application as TelegramApp, ConversationHandler
@@ -215,6 +216,8 @@ class BotManager:
         else:
             position_message = "📈 Your current betting position\n"
 
+        total_equity = 0.0
+
         for market_type in MarketType:
             if is_bookmaker:
                 position = self.bet_manager.compute_bookmaker_exposure(market_type)
@@ -226,8 +229,6 @@ class BotManager:
                     continue
 
             position_message += f"\nMarket: {market_type}\n"
-            total_equity = 0.0
-
             latest_odds = self.bet_manager.get_latest_odds(
                 self.league_state.current_round_num,
                 market_type=market_type,
@@ -451,13 +452,11 @@ class BotManager:
         self.bet_manager.suspend_betting()
         odds_message = formatters.format_odds_message(
             all_odds["back_win_odds"],
-            all_odds["lay_win_odds"],
             market_type=MarketType.WINNER,
         )
 
         await context.bot.send_message(
-            chat_id=chat_id,
-            text=odds_message,
+            chat_id=chat_id, text=odds_message, parse_mode="Markdown"
         )
 
     async def __announce_league_end(
@@ -649,7 +648,7 @@ class BotManager:
         ]
 
         pending_list = "\n".join(
-            f"\- [{player}](tg://user?id={telegram_id})"
+            escape_markdown(f"[{player}](tg://user?id={telegram_id})", version=2)
             for player, telegram_id in players_with_telegram_ids
         )
 
@@ -657,9 +656,10 @@ class BotManager:
             f"Sending reminder to chat {chat_id} for players: {players_pending}"
         )
 
-        message = (
-            f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}\.\n"
-            f"The following players have not completed this round yet:\n{pending_list}\n\n"
+        message = escape_markdown(
+            f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}.\n"
+            f"The following players have not completed this round yet:\n{pending_list}\n\n",
+            version=2,
         )
 
         await context.bot.send_message(chat_id, message, parse_mode="MarkdownV2")
@@ -1178,16 +1178,9 @@ class BotManager:
                 logger.warning(f"No odds for {market=}")
                 continue
 
-            latest_lay_odds = self.bet_manager.get_latest_odds(
-                league_round=self.league_state.current_round_num,
-                market_type=market,
-                bet_type=BetType.LAY,
-            )
-            odds_message += formatters.format_odds_message(
-                latest_back_odds, latest_lay_odds, market
-            )
+            odds_message += formatters.format_odds_message(latest_back_odds, market)
 
-        odds_message += "\n DM me with /bet to place your bets!"
+        odds_message += "DM me with /bet to place your bets!"
         odds_message += "\n Use /position to check your current betting position."
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
