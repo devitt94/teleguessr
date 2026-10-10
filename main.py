@@ -367,7 +367,19 @@ def predictions(
             include_legacy_rounds=include_legacy_rounds,
         )
     )
-    print(preds)
+    print(
+        preds.select(
+            [
+                "player",
+                "win_pct",
+                "wooden_spoon_pct",
+                "podium_pct",
+                "back_win_odds",
+                "back_ws_odds",
+                "back_podium_odds",
+            ]
+        )
+    )
     print("\n\n")
     back_odds = dict(
         zip(
