@@ -26,6 +26,7 @@ from teleguessr.settings import AppSettings, get_settings
 from teleguessr.bot_manager import (
     BET_SELECT_AMOUNT,
     BET_SELECT_BET_TYPE,
+    BET_SELECT_MARKET,
     BET_SELECT_PLAYER,
     OPT_IN_CALLBACK,
     BotManager,
@@ -127,6 +128,10 @@ def main(test_mode: bool = False):
     bet_handler = ConversationHandler(
         entry_points=[CommandHandler("bet", bot_manager.start_bet)],
         states={
+            BET_SELECT_MARKET: [
+                CallbackQueryHandler(bot_manager.handle_market_selection),
+                CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
+            ],
             BET_SELECT_PLAYER: [
                 CallbackQueryHandler(bot_manager.handle_player_selection),
                 CallbackQueryHandler(bot_manager.cancel_bet, pattern="^cancel$"),
@@ -362,7 +367,19 @@ def predictions(
             include_legacy_rounds=include_legacy_rounds,
         )
     )
-    print(preds)
+    print(
+        preds.select(
+            [
+                "player",
+                "win_pct",
+                "wooden_spoon_pct",
+                "podium_pct",
+                "back_win_odds",
+                "back_ws_odds",
+                "back_podium_odds",
+            ]
+        )
+    )
     print("\n\n")
     back_odds = dict(
         zip(
@@ -374,23 +391,13 @@ def predictions(
             ),
         )
     )
-    lay_odds = dict(
-        zip(
-            preds["player"],
-            (
-                FractionalOdds.from_str(odds)
-                for odds in preds["lay_win_odds"]
-                if odds is not None
-            ),
-        )
-    )
     print("Predicted outright odds:")
     print(json.dumps(dict(zip(preds["player"], preds["back_win_odds"])), indent=4))
     print("\n\n")
     print("Predicted lay odds:")
     print(json.dumps(dict(zip(preds["player"], preds["lay_win_odds"])), indent=4))
     print("\n\n")
-    print(formatters.format_odds_message(back_odds, lay_odds))
+    print(formatters.format_odds_message(back_odds))
 
 
 if __name__ == "__main__":

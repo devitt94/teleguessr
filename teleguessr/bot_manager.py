@@ -4,6 +4,7 @@ from functools import wraps
 from pathlib import Path
 import traceback
 from typing import Awaitable
+from telegram.helpers import escape_markdown
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application as TelegramApp, ConversationHandler
@@ -53,7 +54,7 @@ from teleguessr.ranks import get_ranks_from_scores
 from telegram.ext import ContextTypes
 
 
-BET_SELECT_PLAYER, BET_SELECT_BET_TYPE, BET_SELECT_AMOUNT = range(3)
+BET_SELECT_MARKET, BET_SELECT_PLAYER, BET_SELECT_BET_TYPE, BET_SELECT_AMOUNT = range(4)
 
 OPT_IN_CALLBACK = "optin_next_league"
 
@@ -211,30 +212,40 @@ class BotManager:
         self, player_name: str, is_bookmaker: bool = False
     ) -> str:
         if is_bookmaker:
-            position = self.bet_manager.compute_bookmaker_exposure()
-            position_message = "📈 Bookmaker's exposure:\n\n"
+            position_message = "📈 DevBet's exposure\n"
         else:
-            position_message = "📈 Your current betting position:\n\n"
-            position = self.bet_manager.compute_position(bettor=player_name)
+            position_message = "📈 Your current betting position\n"
 
         total_equity = 0.0
 
-        for runner, position in sorted(
-            position.items(), key=lambda x: x[1], reverse=True
-        ):
-            runner_odds = self.bet_manager.get_latest_odds(
-                self.league_state.current_round_num
-            ).get(runner)
+        for market_type in MarketType:
+            if is_bookmaker:
+                position = self.bet_manager.compute_bookmaker_exposure(market_type)
+            else:
+                position = self.bet_manager.compute_position(
+                    bettor=player_name, market_type=market_type
+                )
+                if all(pos == 0.0 for pos in position.values()):
+                    continue
 
-            total_equity += self.bet_manager.compute_equity(
-                runner, position, runner_odds
+            position_message += f"\nMarket: {market_type}\n"
+            latest_odds = self.bet_manager.get_latest_odds(
+                self.league_state.current_round_num,
+                market_type=market_type,
             )
+            for runner, position in sorted(
+                position.items(), key=lambda x: x[1], reverse=True
+            ):
+                total_equity += self.bet_manager.compute_equity(
+                    runner, position, latest_odds.get(runner)
+                )
 
-            position_message += (
-                f"- {runner}: {formatters.format_signed_amount(position)}\n"
-            )
+                position_message += (
+                    f"- {runner}: {formatters.format_signed_amount(position)}\n"
+                )
 
         position_message += f"\nEstimated cash out (adjusted for odds): {formatters.format_signed_amount(total_equity)}"
+
         return position_message
 
     async def __poll_for_round_updates(self, context: ContextTypes.DEFAULT_TYPE):
@@ -380,9 +391,7 @@ class BotManager:
         logger.info(
             f"Writing empty odds file for round {self.league_state.current_round_num}"
         )
-        self.bet_manager.update_odds(
-            round_num=self.league_state.current_round_num, back_odds={}, lay_odds={}
-        )
+        self.bet_manager.suspend_betting()
 
         context.job_queue.run_once(
             self.__generate_and_send_odds_update,
@@ -403,44 +412,51 @@ class BotManager:
             n_sims=self.model_settings.n_sims,
             runners=self.player_manager.get_active_players(),
         )
-
-        back_win_odds_dict = {
-            player: FractionalOdds.from_str(odds)
-            for player, odds in odds_df.select("player", "back_win_odds")
-            .drop_nulls("back_win_odds")
-            .iter_rows()
-        }
-
-        lay_win_odds_dict = {
-            player: FractionalOdds.from_str(odds)
-            for player, odds in odds_df.select("player", "lay_win_odds")
-            .drop_nulls("lay_win_odds")
-            .iter_rows()
-        }
+        market_cols = [
+            (MarketType.WINNER, BetType.BACK, "back_win_odds"),
+            (MarketType.WINNER, BetType.LAY, "lay_win_odds"),
+            (MarketType.PODIUM, BetType.BACK, "back_podium_odds"),
+            (MarketType.PODIUM, BetType.LAY, "lay_podium_odds"),
+            (MarketType.WOODEN_SPOON, BetType.BACK, "back_ws_odds"),
+            (MarketType.WOODEN_SPOON, BetType.LAY, "lay_ws_odds"),
+        ]
+        all_odds = {}
+        for _, _, col in market_cols:
+            all_odds[col] = {
+                player: FractionalOdds.from_str(odds)
+                for player, odds in odds_df.select("player", col)
+                .drop_nulls(col)
+                .iter_rows()
+            }
 
         back_overround = (
-            sum(odds.implied_probability for odds in back_win_odds_dict.values()) - 1
+            sum(odds.implied_probability for odds in all_odds["back_win_odds"].values())
+            - 1
         )
         lay_overround = (
-            sum(odds.implied_probability for odds in lay_win_odds_dict.values()) - 1
+            sum(odds.implied_probability for odds in all_odds["lay_win_odds"].values())
+            - 1
         )
         logger.info(
             f"Odds predictions generated\n\n{odds_df}\\n\nOverrounds: Back - {back_overround:.2%}, Lay - {lay_overround:.2%}"
         )
 
-        self.bet_manager.update_odds(
-            round_num=self.league_state.current_round_num,
-            back_odds=back_win_odds_dict,
-            lay_odds=lay_win_odds_dict,
-        )
+        for market_type, bet_type, field in market_cols:
+            self.bet_manager.update_odds(
+                round_num=self.league_state.current_round_num,
+                odds=all_odds[field],
+                bet_type=bet_type,
+                market_type=market_type,
+            )
+
         self.bet_manager.suspend_betting()
         odds_message = formatters.format_odds_message(
-            back_win_odds_dict, lay_win_odds_dict
+            all_odds["back_win_odds"],
+            market_type=MarketType.WINNER,
         )
 
         await context.bot.send_message(
-            chat_id=chat_id,
-            text=odds_message,
+            chat_id=chat_id, text=odds_message, parse_mode="Markdown"
         )
 
     async def __announce_league_end(
@@ -632,7 +648,7 @@ class BotManager:
         ]
 
         pending_list = "\n".join(
-            f"\- [{player}](tg://user?id={telegram_id})"
+            escape_markdown(f"[{player}](tg://user?id={telegram_id})", version=2)
             for player, telegram_id in players_with_telegram_ids
         )
 
@@ -640,9 +656,10 @@ class BotManager:
             f"Sending reminder to chat {chat_id} for players: {players_pending}"
         )
 
-        message = (
-            f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}\.\n"
-            f"The following players have not completed this round yet:\n{pending_list}\n\n"
+        message = escape_markdown(
+            f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}.\n"
+            f"The following players have not completed this round yet:\n{pending_list}\n\n",
+            version=2,
         )
 
         await context.bot.send_message(chat_id, message, parse_mode="MarkdownV2")
@@ -925,9 +942,7 @@ class BotManager:
             gross_replay_league_state.filepath.unlink(missing_ok=True)
 
             # Comupute bet P&L and send final bet results
-            bet_pnls = self.bet_manager.compute_bet_pnls(
-                winner=winner,
-            )
+            bet_pnls = self.bet_manager.compute_bet_pnls(winner, second, third, last)
 
             if bet_pnls:
                 bet_results_message = "💰 Bet Results:\n\n"
@@ -1153,23 +1168,24 @@ class BotManager:
 
     @command_handler(league_in_progress=True)
     async def odds_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        latest_back_odds = self.bet_manager.get_latest_odds(
-            league_round=self.league_state.current_round_num
-        )
-        if not latest_back_odds:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Odds have not been generated yet for this round. Please check back soon!",
+        odds_message = "📊 Current Odds:\n\n"
+        for market in MarketType:
+            latest_back_odds = self.bet_manager.get_latest_odds(
+                league_round=self.league_state.current_round_num, market_type=market
             )
-            return
 
-        latest_lay_odds = self.bet_manager.get_latest_odds(
-            league_round=self.league_state.current_round_num, bet_type=BetType.LAY
-        )
-        odds_message = formatters.format_odds_message(latest_back_odds, latest_lay_odds)
+            if not latest_back_odds:
+                logger.warning(f"No odds for {market=}")
+                continue
+
+            odds_message += formatters.format_odds_message(latest_back_odds, market)
+
+        odds_message += "DM me with /bet to place your bets!"
+        odds_message += "\n Use /position to check your current betting position."
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=odds_message,
+            parse_mode="Markdown",
         )
 
     @command_handler(league_in_progress=True)
@@ -1197,7 +1213,9 @@ class BotManager:
             )
             return
 
-        position_message = self.__construct_position_message(player_name=player_name)
+        position_message = self.__construct_position_message(
+            player_name=player_name,
+        )
         await update.message.reply_text(
             position_message,
             parse_mode="HTML",
@@ -1346,6 +1364,42 @@ class BotManager:
         await update.message.reply_text(
             "Who would you like to bet on?", reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return BET_SELECT_MARKET
+
+    async def handle_market_selection(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+        query = update.callback_query
+        await query.answer()
+
+        if query.data == "cancel":
+            await query.edit_message_text("Bet cancelled.")
+            return ConversationHandler.END
+
+        context.user_data["bet_player"] = query.data
+        keyboard = [
+            [InlineKeyboardButton("Winner", callback_data=MarketType.WINNER)],
+            [
+                InlineKeyboardButton(
+                    "Podium Finish",
+                    callback_data=MarketType.PODIUM,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "Wooden Spoon",
+                    callback_data=MarketType.WOODEN_SPOON,
+                )
+            ],
+            [InlineKeyboardButton("Cancel", callback_data="cancel")],
+        ]
+
+        await query.edit_message_text(
+            f"Runner: *{query.data}*\nWhich market would you like to bet on?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
+        )
+
         return BET_SELECT_PLAYER
 
     async def handle_player_selection(
@@ -1358,24 +1412,29 @@ class BotManager:
             await query.edit_message_text("Bet cancelled.")
             return ConversationHandler.END
 
-        context.user_data["bet_player"] = query.data
+        market_type = MarketType(query.data)
+        context.user_data["market_type"] = market_type
+        runner = context.user_data["bet_player"]
 
         runner_back_odds = self.bet_manager.get_latest_odds(
-            self.league_state.current_round_num, bet_type=BetType.BACK
-        ).get(query.data)
+            self.league_state.current_round_num,
+            market_type=market_type,
+            bet_type=BetType.BACK,
+        ).get(runner)
         runner_lay_odds = self.bet_manager.get_latest_odds(
-            self.league_state.current_round_num, bet_type=BetType.LAY
-        ).get(query.data)
+            self.league_state.current_round_num,
+            market_type=market_type,
+            bet_type=BetType.LAY,
+        ).get(runner)
 
         if not (runner_back_odds or runner_lay_odds):
             await query.edit_message_text(
-                f"Sorry, odds for {query.data} are not available. Please try again later."
+                f"Sorry, odds for {runner}/{market_type.value} are not available. Please try again later."
             )
             return ConversationHandler.END
 
         context.user_data["back_odds"] = runner_back_odds
         context.user_data["lay_odds"] = runner_lay_odds
-
         keyboard = [
             [
                 InlineKeyboardButton(
@@ -1397,7 +1456,7 @@ class BotManager:
         ]
 
         await query.edit_message_text(
-            f"Runner: *{query.data}*\nWould you like to place a Back or Lay bet?",
+            f"Runner: *{runner}*\nMarket:*{market_type}*\nWould you like to place a Back or Lay bet?",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
@@ -1415,6 +1474,7 @@ class BotManager:
             return ConversationHandler.END
 
         context.user_data["bet_type"] = BetType(query.data)
+        market_type = MarketType(context.user_data["market_type"])
         bettor = TELEGRAM_ID_TO_PLAYER_NAME.get(update.effective_user.id)
         bettor_is_active = bettor in self.active_handicaps
 
@@ -1424,7 +1484,7 @@ class BotManager:
             odds=context.user_data["back_odds"]
             if context.user_data["bet_type"] == BetType.BACK
             else context.user_data["lay_odds"],
-            market_type=MarketType.WINNER,
+            market_type=market_type,
             bet_type=context.user_data["bet_type"],
             bettor_is_active=bettor_is_active,
         )
@@ -1445,7 +1505,7 @@ class BotManager:
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
-        return BET_SELECT_AMOUNT  # ← move to next state
+        return BET_SELECT_AMOUNT
 
     async def handle_amount_selection(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -1458,6 +1518,7 @@ class BotManager:
             return ConversationHandler.END
 
         player = context.user_data["bet_player"]
+        market_type = context.user_data["market_type"]
         bet_odds: FractionalOdds = (
             context.user_data["back_odds"]
             if context.user_data["bet_type"] == BetType.BACK
@@ -1478,7 +1539,7 @@ class BotManager:
                 runner=player,
                 amount=amount,
                 odds=bet_odds,
-                market_type=MarketType.WINNER,
+                market_type=market_type,
                 bet_type=context.user_data["bet_type"],
             )
         except BettingSuspendedError:
