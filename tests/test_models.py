@@ -1,7 +1,19 @@
+from datetime import datetime, timedelta
+
 import pytest
 
 
-from teleguessr.models import Bet, BetType, MarketType, ChallengeScore, Player, Guess
+from teleguessr.models import (
+    Bet,
+    BetType,
+    ChallengeSettings,
+    MarketType,
+    ChallengeScore,
+    Player,
+    Guess,
+    ActiveRound,
+)
+from freezegun import freeze_time
 
 
 @pytest.mark.parametrize(
@@ -82,3 +94,54 @@ def test_Bet_potential_return(stake, odds, bet_type, expected_return):
     )
 
     assert bet.potential_return == expected_return
+
+
+def _make_challenge_settings() -> ChallengeSettings:
+    return ChallengeSettings(
+        map_id="blah",
+        time_limit_seconds=10,
+        move_allowed=True,
+        pan_allowed=True,
+        zoom_allowed=True,
+    )
+
+
+def test_ActiveRound_should_send_first_reminder():
+    with freeze_time("2026-10-11 21:00:00") as clock:
+        round = ActiveRound(
+            challenge_url="blah",
+            challenge_settings=_make_challenge_settings(),
+            end_time=datetime.now() + timedelta(hours=24),
+        )
+
+        clock.tick(timedelta(hours=20, seconds=10))
+
+        assert round.should_send_reminder(as_of=datetime.now())
+
+
+def test_ActiveRound_should_send_subsequent_reminder():
+    with freeze_time("2026-10-11 21:00:00") as clock:
+        round = ActiveRound(
+            challenge_url="blah",
+            challenge_settings=_make_challenge_settings(),
+            end_time=datetime.now() + timedelta(hours=24),
+            last_reminder_sent=datetime.now() + timedelta(hours=20, minutes=2),
+        )
+
+        clock.tick(timedelta(hours=22, seconds=10))
+
+        assert round.should_send_reminder(as_of=datetime.now())
+
+
+def test_ActiveRound_should_not_send_reminder_already_sent():
+    with freeze_time("2026-10-11 21:00:00") as clock:
+        round = ActiveRound(
+            challenge_url="blah",
+            challenge_settings=_make_challenge_settings(),
+            end_time=datetime.now() + timedelta(hours=24),
+            last_reminder_sent=datetime.now() + timedelta(hours=20, minutes=2),
+        )
+
+        clock.tick(timedelta(hours=20, seconds=10))
+
+        assert not round.should_send_reminder(as_of=datetime.now())

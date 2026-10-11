@@ -312,9 +312,10 @@ class BotManager:
                     round_result=round_result,
                 )
 
+        current_time = datetime.now()
         should_end_round = not still_pending_players or (
             self.league_state.round_in_progress
-            and self.league_state.current_round.end_time <= datetime.now()
+            and self.league_state.current_round.end_time <= current_time
         )
 
         if should_end_round:
@@ -322,19 +323,10 @@ class BotManager:
             await self.__end_round(context, chat_id=self.league_state.chat_id)
             return
 
-        round_reminder_time = self.league_state.current_round.end_time - timedelta(
-            hours=2
-        )
-        should_send_reminder = (
-            not self.league_state.current_round.reminder_sent
-            and self.league_settings.round_end_time_hour_utc >= 0
-            and datetime.now() >= round_reminder_time
-        )
-
-        if should_send_reminder:
+        if self.league_state.current_round.should_send_reminder(as_of=current_time):
             logger.info("Sending round reminder.")
             await self.__reminder(context, chat_id=self.league_state.chat_id)
-            self.league_state.current_round.reminder_sent = True
+            self.league_state.current_round.last_reminder_sent = current_time
             self.league_state.save()
 
     async def __start_round(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):

@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from enum import StrEnum
 from typing_extensions import Annotated
 from pydantic import BaseModel, Field, conlist, field_serializer
@@ -33,7 +33,24 @@ class ActiveRound(BaseModel):
     challenge_settings: ChallengeSettings
     end_time: datetime
     players_finished: list[str] = Field(default_factory=list)
-    reminder_sent: bool = False
+    last_reminder_sent: datetime = datetime.now()
+
+    def should_send_reminder(self, as_of: datetime) -> bool:
+        reminder_deltas = (
+            timedelta(hours=4),
+            timedelta(hours=2),
+            timedelta(hours=1),
+            timedelta(minutes=20),
+        )
+        next_reminder_time = next(
+            filter(
+                lambda dt: dt > self.last_reminder_sent,
+                (self.end_time - delta for delta in reminder_deltas),
+            ),
+            None,
+        )
+
+        return next_reminder_time is not None and as_of >= next_reminder_time
 
 
 class ChallengeScore(BaseModel):
