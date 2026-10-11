@@ -98,6 +98,7 @@ async def post_init(application: Application) -> None:
     commands = [
         ("status", "Display the current status of the round"),
         ("handicaps", "Display the current player handicaps"),
+        ("leaderboard", "Display the current league leaderboard"),
         ("lounge", "Join the players lounge after your round"),
         ("odds", "Display current odds."),
         ("position", "Display your current betting position"),
