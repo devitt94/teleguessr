@@ -432,7 +432,7 @@ class BotManager:
         logger.info(
             f"Odds predictions generated\n\n{odds_df}\\n\nOverrounds: Back - {back_overround:.2%}, Lay - {lay_overround:.2%}"
         )
-
+        odds_message = ""
         for market_type, bet_type, field in market_cols:
             self.bet_manager.update_odds(
                 round_num=self.league_state.current_round_num,
@@ -441,11 +441,13 @@ class BotManager:
                 market_type=market_type,
             )
 
+            if bet_type == BetType.BACK:
+                odds_message += formatters.format_odds_message(
+                    all_odds[field],
+                    market_type=market_type,
+                )
+
         self.bet_manager.suspend_betting()
-        odds_message = formatters.format_odds_message(
-            all_odds["back_win_odds"],
-            market_type=MarketType.WINNER,
-        )
 
         await context.bot.send_message(
             chat_id=chat_id, text=odds_message, parse_mode="Markdown"
