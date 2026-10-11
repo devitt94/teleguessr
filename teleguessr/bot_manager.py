@@ -8,7 +8,6 @@ from telegram.helpers import escape_markdown
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application as TelegramApp, ConversationHandler
-from telegram.error import NetworkError
 
 from teleguessr.active_players import PlayerManager
 from teleguessr.analysis import all_gross_scores_needed
@@ -787,9 +786,6 @@ class BotManager:
     ) -> None:
         """Error handler that sends the traceback to the admin."""
         # Build a clean traceback message
-        if isinstance(context.error, NetworkError):
-            logger.info(f"Network error occurred: {context.error}")
-            return
 
         tb_list = traceback.format_exception(
             None, context.error, context.error.__traceback__
