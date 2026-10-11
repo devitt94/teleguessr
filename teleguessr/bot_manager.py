@@ -1538,7 +1538,7 @@ class BotManager:
             )
             return ConversationHandler.END
 
-        message = f"✅ Bet placed\n\n{bet}"
+        message = escape_markdown(f"✅ Bet placed\n\n{bet}")
 
         await query.edit_message_text(
             message,
