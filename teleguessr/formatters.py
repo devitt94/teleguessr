@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Iterable
+import html
 
 from teleguessr.league import skewed_ranking_score_manager
 from teleguessr.models import (
@@ -373,7 +374,7 @@ def format_reminder_message(
     players_pending: Iterable[tuple[str, int]], time_left_str: str
 ) -> str:
     pending_list = "</li><li>".join(
-        f'<a href="tg://user?id={telegram_id}">{player}</a>'
+        f'<a href="tg://user?id={telegram_id}">{html.escape(player)}</a>'
         for player, telegram_id in players_pending
     )
 
