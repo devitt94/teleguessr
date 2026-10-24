@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Iterable
 
 from teleguessr.league import skewed_ranking_score_manager
 from teleguessr.models import (
@@ -365,4 +366,19 @@ def format_rank_scores(rank_scores: list[int]) -> str:
     for rank, score in enumerate(rank_scores, start=1):
         message += f"{NUMBER_EMOJI_MAP.get(rank)}: {score}\n"
 
+    return message
+
+
+def format_reminder_message(
+    players_pending: Iterable[tuple[str, int]], time_left_str: str
+) -> str:
+    pending_list = "</li><li>".join(
+        f'<a href="tg://user?id={telegram_id}">{player}</a>'
+        for player, telegram_id in players_pending
+    )
+
+    message = (
+        f"⏰ Reminder: Round will end in {time_left_str}.<br>"
+        f"The following players have not completed this round yet:<br><ul><li>{pending_list}</li></ul>"
+    )
     return message

@@ -639,23 +639,14 @@ class BotManager:
             (player, PLAYER_NAME_TO_TELEGRAM_ID.get(player))
             for player in players_pending
         ]
-
-        pending_list = "\n".join(
-            escape_markdown(f"[{player}](tg://user?id={telegram_id})", version=2)
-            for player, telegram_id in players_with_telegram_ids
-        )
-
         logger.info(
             f"Sending reminder to chat {chat_id} for players: {players_pending}"
         )
 
-        message = escape_markdown(
-            f"⏰ Reminder: Round {self.league_state.current_round_num} will end in {time_left_str}.\n"
-            f"The following players have not completed this round yet:\n{pending_list}\n\n",
-            version=2,
+        message = formatters.format_reminder_message(
+            players_with_telegram_ids, time_left_str
         )
-
-        await context.bot.send_message(chat_id, message, parse_mode="MarkdownV2")
+        await context.bot.send_message(chat_id, message, parse_mode="HTML")
 
     async def __end_league(self):
         if self.league_state is None:
