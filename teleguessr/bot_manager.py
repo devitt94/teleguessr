@@ -804,22 +804,27 @@ class BotManager:
         self, round_result: ChallengeResult
     ) -> dict[str, AbbreviatedRoundScore | None]:
         net_scores = {}
+        gross_scores = {}
         rounds_played_by_player = {}
         for score in round_result.scores:
             net_score = score.compute_net_score()
             net_scores[score.player.name] = net_score
             rounds_played_by_player[score.player.name] = len(score.guesses)
+            gross_scores[score.player.name] = score.gross_score
 
-        ranks = get_ranks_from_scores(net_scores)
+        net_ranks = get_ranks_from_scores(net_scores)
+        gross_ranks = get_ranks_from_scores(gross_scores)
 
         result = {player: None for player in self.active_handicaps.keys()}
 
-        for player, rank in ranks.items():
+        for player, rank in net_ranks.items():
             result[player] = AbbreviatedRoundScore(
                 rank=rank,
                 net_score=net_scores[player],
                 rounds_played=rounds_played_by_player[player],
                 total_rounds=round_result.num_rounds,
+                net_pos=net_ranks[player],
+                gross_pos=gross_ranks[player],
             )
 
         # Sort the result dict by rank (None values at the end)

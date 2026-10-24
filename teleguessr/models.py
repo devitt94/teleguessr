@@ -155,6 +155,8 @@ class AbbreviatedRoundScore(BaseModel):
     net_score: int
     rounds_played: int
     total_rounds: int
+    net_pos: int
+    gross_pos: int
 
     @property
     def is_finished(self) -> bool:

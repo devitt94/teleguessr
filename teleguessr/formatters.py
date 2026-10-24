@@ -301,10 +301,10 @@ def format_round_leaderboard_message(
                 net_score_str = ""
             elif not abbreviated_score.is_finished:
                 rank_emoji = "⏳"
-                net_score_str = f" ({abbreviated_score.net_score} pts, {abbreviated_score.rounds_played}/{abbreviated_score.total_rounds} played)"
+                net_score_str = f" ({abbreviated_score.net_score} pts, {abbreviated_score.rounds_played}/{abbreviated_score.total_rounds} played, {abbreviated_score.net_pos}N, {abbreviated_score.gross_pos}G)"
             else:
                 rank_emoji = NUMBER_EMOJI_MAP.get(abbreviated_score.rank, "❓")
-                net_score_str = f" ({abbreviated_score.net_score} pts)"
+                net_score_str = f" ({abbreviated_score.net_score} pts, {abbreviated_score.gross_pos}G)"
 
             leaderboard_message += f"  {rank_emoji}: {player} {net_score_str}\n"
 
