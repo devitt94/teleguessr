@@ -33,7 +33,7 @@ class ActiveRound(BaseModel):
     challenge_settings: ChallengeSettings
     end_time: datetime
     players_finished: list[str] = Field(default_factory=list)
-    last_reminder_sent: datetime = datetime.now()
+    last_reminder_sent: datetime | None = None
 
     def should_send_reminder(self, as_of: datetime) -> bool:
         reminder_deltas = (
@@ -42,9 +42,15 @@ class ActiveRound(BaseModel):
             timedelta(hours=1),
             timedelta(minutes=20),
         )
+
+        def already_sent(ts: datetime) -> bool:
+            if self.last_reminder_sent is None:
+                return True
+            return ts > self.last_reminder_sent
+
         next_reminder_time = next(
             filter(
-                lambda dt: dt > self.last_reminder_sent,
+                already_sent,
                 (self.end_time - delta for delta in reminder_deltas),
             ),
             None,
