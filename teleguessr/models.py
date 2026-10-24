@@ -65,8 +65,12 @@ class ChallengeScore(BaseModel):
     num_rounds: int = Field(default=10, ge=1)
 
     @property
+    def rounds_completed(self) -> int:
+        return len(self.guesses)
+
+    @property
     def is_finished(self) -> bool:
-        return len(self.guesses) == self.num_rounds
+        return self.rounds_completed == self.num_rounds
 
     @property
     def gross_score(self) -> int:
@@ -78,9 +82,12 @@ class ChallengeScore(BaseModel):
             self.player.hcap_multiplier * (max_challenge_score - self.gross_score)
         )
 
-    def compute_hcap_adjustment(self) -> int:
+    def compute_hcap_adjustment(self, rounds_to_count: int | None = None) -> int:
+        if rounds_to_count is None:
+            rounds_to_count = len(self.guesses)
+
         uncapped_adjustment = self.compute_uncapped_hcap_adjustment(
-            num_rounds=len(self.guesses)
+            num_rounds=rounds_to_count
         )
         max_adjustment = int(
             ((MAX_ROUND_SCORE * self.num_rounds) // 2) * self.player.hcap_multiplier
@@ -90,6 +97,14 @@ class ChallengeScore(BaseModel):
 
     def compute_net_score(self) -> int:
         return self.gross_score + self.compute_hcap_adjustment()
+
+    def compute_partial_gross_score(self, num_rounds: int) -> int:
+        counted_guesses = self.guesses[:num_rounds]
+        return sum(guess.score for guess in counted_guesses)
+
+    def compute_partial_net_score(self, num_rounds: int):
+        hcap_adjustment = self.compute_hcap_adjustment(rounds_to_count=num_rounds)
+        return self.compute_partial_gross_score(num_rounds) + hcap_adjustment
 
 
 class GuessStats(BaseModel):
@@ -149,14 +164,18 @@ class ChallengeResult(BaseModel):
 
         return -1
 
+    def get_current_rank_net(self, player_name: str):
+        if player_name in self.players_finished:
+            return self.get_player_position(player_name)
+
 
 class AbbreviatedRoundScore(BaseModel):
     rank: int
     net_score: int
     rounds_played: int
     total_rounds: int
-    net_pos: int
-    gross_pos: int
+    net_pos: int | None = None
+    gross_pos: int | None = None
 
     @property
     def is_finished(self) -> bool:

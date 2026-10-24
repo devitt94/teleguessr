@@ -48,7 +48,7 @@ from teleguessr.handicaps import (
     get_latest_handicaps,
     update_handicaps,
 )
-from teleguessr.ranks import get_ranks_from_scores
+from teleguessr.ranks import get_mid_round_ranks, get_ranks_from_scores
 
 from telegram.ext import ContextTypes
 
@@ -806,11 +806,18 @@ class BotManager:
         net_scores = {}
         gross_scores = {}
         rounds_played_by_player = {}
+        wip_net_ranks = {}
+        wip_gross_ranks = {}
         for score in round_result.scores:
-            net_score = score.compute_net_score()
-            net_scores[score.player.name] = net_score
-            rounds_played_by_player[score.player.name] = len(score.guesses)
-            gross_scores[score.player.name] = score.gross_score
+            rounds_played = len(score.guesses)
+            player = score.player.name
+            net_scores[player] = score.compute_net_score()
+            rounds_played_by_player[player] = rounds_played
+            gross_scores[player] = score.gross_score
+            gross_rank, net_rank = get_mid_round_ranks(player, round_result)
+            if not score.is_finished:
+                wip_gross_ranks[player] = gross_rank
+                wip_net_ranks[player] = net_rank
 
         net_ranks = get_ranks_from_scores(net_scores)
         gross_ranks = get_ranks_from_scores(gross_scores)
@@ -823,8 +830,8 @@ class BotManager:
                 net_score=net_scores[player],
                 rounds_played=rounds_played_by_player[player],
                 total_rounds=round_result.num_rounds,
-                net_pos=net_ranks[player],
-                gross_pos=gross_ranks[player],
+                net_pos=wip_net_ranks.get(player) or rank,
+                gross_pos=wip_gross_ranks.get(player) or gross_ranks.get(player),
             )
 
         # Sort the result dict by rank (None values at the end)
