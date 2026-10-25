@@ -151,12 +151,20 @@ def main(test_mode: bool = False):
     request = HTTPXRequest(
         read_timeout=30, write_timeout=30, connect_timeout=10, pool_timeout=10
     )
+    get_updates_request = HTTPXRequest(
+        read_timeout=30,
+        write_timeout=30,
+        connect_timeout=10,
+        pool_timeout=10,
+        connection_pool_size=1,
+    )
 
     app = (
         ApplicationBuilder()
         .token(settings.telegram_bot_token)
         .post_init(post_init)
         .request(request)
+        .get_updates_request(get_updates_request)
         .build()
     )
     app.add_handler(CommandHandler("help", bot_manager.help_handler))
