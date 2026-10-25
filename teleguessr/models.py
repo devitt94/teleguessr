@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, conlist, field_serializer
 
 
 MAX_ROUND_SCORE = 5000
+EFFECTIVE_HANDICAP_MULTIPLIER = 0.85
 
 HandicapMultiplier = Annotated[float, Field(ge=-1.0, le=1.0)]
 
@@ -17,6 +18,10 @@ class Guess(BaseModel):
 class Player(BaseModel):
     name: str
     hcap_multiplier: HandicapMultiplier
+
+    @property
+    def effective_hcap_multiplier(self) -> float:
+        return round(self.hcap_multiplier * EFFECTIVE_HANDICAP_MULTIPLIER, 4)
 
 
 class ChallengeSettings(BaseModel):
@@ -79,7 +84,8 @@ class ChallengeScore(BaseModel):
     def compute_uncapped_hcap_adjustment(self, num_rounds: int) -> int:
         max_challenge_score = MAX_ROUND_SCORE * num_rounds
         return int(
-            self.player.hcap_multiplier * (max_challenge_score - self.gross_score)
+            self.player.effective_hcap_multiplier
+            * (max_challenge_score - self.gross_score)
         )
 
     def compute_hcap_adjustment(self, rounds_to_count: int | None = None) -> int:
@@ -87,11 +93,11 @@ class ChallengeScore(BaseModel):
             rounds_to_count = len(self.guesses)
 
         uncapped_adjustment = self.compute_uncapped_hcap_adjustment(
-            num_rounds=rounds_to_count
+            num_rounds=rounds_to_count,
         )
         max_adjustment = int(
             ((MAX_ROUND_SCORE * self.num_rounds) // 2)
-            * abs(self.player.hcap_multiplier)
+            * abs(self.player.effective_hcap_multiplier)
         )
         min_adjusment = -max_adjustment
         capped_adjustment = max(min(uncapped_adjustment, max_adjustment), min_adjusment)

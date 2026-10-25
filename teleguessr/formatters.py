@@ -147,7 +147,8 @@ def format_round_result_html(
         block = (
             f"{rank_emoji} <b>{pos_str} — {rs.player.name}</b>\n"
             f"    • Gross: <b>{rs.gross_score}</b>\n"
-            f"    • Hcap: <b>{rs.player.hcap_multiplier:.1%}</b>\n"
+            f"    • Hcap: <b>{rs.player.hcap_multiplier:.0%} </b>\n"
+            f"    • Playing Handicap: <b>{rs.player.effective_hcap_multiplier:.2%}</b>\n"
             f"    • Hcap Adjustment: <b>{rs.compute_hcap_adjustment()}</b>\n"
             f"    • Net: <b>{rs.compute_net_score()}</b>\n"
             f"    • Points: <b>{points_str}</b>\n"

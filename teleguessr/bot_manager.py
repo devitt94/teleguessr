@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import wraps
+import html
 from pathlib import Path
 import traceback
 from typing import Awaitable
@@ -33,6 +34,7 @@ from teleguessr.models import (
     BetType,
     ChallengeResult,
     MarketType,
+    Player,
     RankedGuess,
 )
 from teleguessr.settings import (
@@ -784,7 +786,7 @@ class BotManager:
         tb_text = "".join(tb_list)
         tb_text = tb_text[-4000:]
 
-        message = (
+        message = html.escape(
             "⚠️ <b>Bot Handler Error</b>\n"
             f"<b>Exception:</b> {context.error}\n\n"
             f"<b>Traceback:</b>\n<pre>{tb_text}</pre>"
@@ -1254,9 +1256,13 @@ class BotManager:
             self.active_handicaps.items(), key=lambda item: item[1]
         )
 
+        players = [
+            Player(name=name, hcap_multiplier=hcap) for name, hcap in sorted_handicaps
+        ]
+
         message = "📉 Current Handicaps:\n\n"
-        for player, handicap in sorted_handicaps:
-            message += f"- {player}: {handicap:.0%}\n"
+        for player in players:
+            message += f"- {player.name}: {player.hcap_multiplier:.0%} (effective: {player.effective_hcap_multiplier:.2%})\n"
 
         await update.message.reply_text(message)
 

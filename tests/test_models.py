@@ -48,7 +48,9 @@ def test_ChallengeScore_compute_hcap_adjustment(
         player=player, guesses=guesses, num_rounds=num_rounds
     )
 
-    assert challenge_score.compute_hcap_adjustment() == expected_adjustment
+    assert challenge_score.compute_hcap_adjustment() == round(
+        expected_adjustment * 0.85
+    )
 
 
 @pytest.mark.parametrize(

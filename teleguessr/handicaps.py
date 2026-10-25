@@ -21,6 +21,14 @@ def get_latest_handicaps(league_settings: LeagueSettings) -> dict[str, float]:
     return handicaps
 
 
+def get_latest_effective_handicaps(league_settings: LeagueSettings) -> dict[str, float]:
+    hcaps = get_latest_handicaps(league_settings)
+    return {
+        k: round(v * league_settings.playing_handicap_adjustment_factor, 4)
+        for k, v in hcaps.items()
+    }
+
+
 def get_adjustments(num_players: int) -> list[float]:
     """Generate handicap adjustments based on player rankings."""
 

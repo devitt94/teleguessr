@@ -378,18 +378,28 @@ def predictions(
         "-n",
         help="Number of simulations to run for the predictions. Higher numbers will increase accuracy but also increase runtime. Default is 40,000.",
     ),
+    active_only: bool = typer.Option(
+        False, "--active-only", help="Only include players marked as active"
+    ),
 ):
     """Generate outright odds predictions for the current league."""
     from teleguessr.predictions import generate_outright_odds_predictions
 
+    handicaps = get_latest_handicaps(get_settings().league)
     player_manager = PlayerManager(
         data_dir=get_settings().data_dir,
-        initial_players=set(get_latest_handicaps(get_settings().league).keys()),
+        initial_players=set(handicaps.keys()),
     )
+
+    if active_only:
+        runners = player_manager.get_active_players()
+    else:
+        runners = handicaps.keys()
+
     preds = asyncio.run(
         generate_outright_odds_predictions(
             n_sims=n_sims,
-            runners=player_manager.get_active_players(),
+            runners=runners,
             include_legacy_rounds=include_legacy_rounds,
         )
     )
