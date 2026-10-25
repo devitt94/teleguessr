@@ -4,6 +4,7 @@ import pytest
 
 
 from teleguessr.models import (
+    EFFECTIVE_HANDICAP_MULTIPLIER,
     Bet,
     BetType,
     ChallengeSettings,
@@ -49,7 +50,7 @@ def test_ChallengeScore_compute_hcap_adjustment(
     )
 
     assert challenge_score.compute_hcap_adjustment() == round(
-        expected_adjustment * 0.85
+        expected_adjustment * EFFECTIVE_HANDICAP_MULTIPLIER
     )
 
 
