@@ -35,18 +35,18 @@ def test_get_adjustments(num_players, expected_adjustments):
         (
             {"Alice": 1, "Bob": 2, "Charlie": 3, "Dave": 4},
             {
-                "Alice": 0.0,
-                "Bob": 0.03,
-                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
+                "Alice": -0.02,
+                "Bob": 0.01,
+                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.02, 2),
                 "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
             },
         ),
         (
             {"Alice": 1, "Bob": 3, "Charlie": 3, "Dave": 4},
             {
-                "Alice": 0.0,
-                "Bob": 0.05,
-                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
+                "Alice": -0.02,
+                "Bob": 0.03,
+                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.02, 2),
                 "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
             },
         ),
@@ -54,7 +54,7 @@ def test_get_adjustments(num_players, expected_adjustments):
             {"Alice": 4, "Bob": 1, "Charlie": 2, "Dave": 3},
             {
                 "Alice": 0.02,
-                "Bob": 0.0,
+                "Bob": 0.00,
                 "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.04, 2),
                 "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
             },
@@ -62,38 +62,38 @@ def test_get_adjustments(num_players, expected_adjustments):
         (
             {"Alice": 2, "Bob": 3, "Charlie": 4, "Dave": 1},
             {
-                "Alice": 0.0,
-                "Bob": 0.04,
-                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
-                "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.01, 2),
+                "Alice": -0.01,
+                "Bob": 0.03,
+                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.01, 2),
+                "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.02, 2),
             },
         ),
         (
             {"Alice": 4, "Bob": 3, "Charlie": 2, "Dave": 1},
             {
-                "Alice": 0.0,
-                "Bob": 0.01,
-                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.06, 2),
-                "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.04, 2),
+                "Alice": 0.02,
+                "Bob": 0.03,
+                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.04, 2),
+                "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.02, 2),
             },
         ),
         (
             {"Alice": 1, "Bob": 2, "Charlie": 3, "Dave": 4, "Eve": 5},
             {
-                "Alice": 0.0,
-                "Bob": 0.03,
-                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.01, 2),
+                "Alice": -0.02,
+                "Bob": 0.01,
+                "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.03, 2),
                 "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
-                "Eve": 0.04,
+                "Eve": 0.02,
             },
         ),
         (
             {"Alice": 3, "Bob": 1, "Dave": 2},
             {
-                "Alice": 0.00,
-                "Bob": 0.00,
+                "Alice": 0.01,
+                "Bob": 0.01,
                 "Charlie": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.03, 2),
-                "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER - 0.01, 2),
+                "Dave": round(MAXIMUM_HANDICAP_MULTIPLIER, 2),
             },
         ),
         (

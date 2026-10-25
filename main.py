@@ -12,7 +12,7 @@ from teleguessr.active_players import PlayerManager
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.other_handlers.gross_handler import build_gross_stats_handler
-from teleguessr.handicaps import get_latest_handicaps
+from teleguessr.handicaps import calculate_new_handicaps, get_latest_handicaps
 from teleguessr.league import get_last_finished_league_date
 from teleguessr.odds import FractionalOdds
 from teleguessr.other_handlers.player_handler import (
@@ -20,6 +20,7 @@ from teleguessr.other_handlers.player_handler import (
     build_player_callback_handler,
     build_player_command_handler,
 )
+from teleguessr.ranks import get_ranks_from_scores
 from teleguessr.replay import replay_league
 from teleguessr.settings import AppSettings, get_settings
 from teleguessr.bot_manager import (
@@ -299,6 +300,22 @@ def replay(
     leaderboard_text = format_leaderboard_html(**leaderboard)
     print("Final Leaderboard after replay:")
     print(leaderboard_text.replace("<b>", "").replace("</b>", ""))
+
+    if not is_gross:
+        print("\n\n")
+        print("Handicap adjustments after replay:")
+
+        # Calculate and update handicaps
+        player_ranks = get_ranks_from_scores(
+            league_state.get_leaderboard_data()["scores"]
+        )
+        new_handicaps = calculate_new_handicaps(player_ranks, settings.league)
+
+        for player, new_handicap in new_handicaps.items():
+            old_handicap = handicaps.get(
+                player, settings.league.default_handicap_multiplier
+            )
+            print(f"{player}: {old_handicap:.0%} -> {new_handicap:.0%}")
 
 
 class AnalysisType(str, Enum):

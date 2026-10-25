@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, conlist, field_serializer
 
 MAX_ROUND_SCORE = 5000
 
-HandicapMultiplier = Annotated[float, Field(ge=0.0, le=1.0)]
+HandicapMultiplier = Annotated[float, Field(ge=-1.0, le=1.0)]
 
 
 class Guess(BaseModel):
@@ -90,9 +90,11 @@ class ChallengeScore(BaseModel):
             num_rounds=rounds_to_count
         )
         max_adjustment = int(
-            ((MAX_ROUND_SCORE * self.num_rounds) // 2) * self.player.hcap_multiplier
+            ((MAX_ROUND_SCORE * self.num_rounds) // 2)
+            * abs(self.player.hcap_multiplier)
         )
-        capped_adjustment = min(uncapped_adjustment, max_adjustment)
+        min_adjusment = -max_adjustment
+        capped_adjustment = max(min(uncapped_adjustment, max_adjustment), min_adjusment)
         return capped_adjustment
 
     def compute_net_score(self) -> int:

@@ -30,6 +30,7 @@ class LeagueSettings(BaseModel):
 
     default_handicap_multiplier: float = 0.0
 
+    min_handicap_multiplier: float = -MAXIMUM_HANDICAP_MULTIPLIER
     max_handicap_multiplier: float = MAXIMUM_HANDICAP_MULTIPLIER
 
     challenge_settings_name: str = "MIXED"

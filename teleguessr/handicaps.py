@@ -57,36 +57,15 @@ def calculate_new_handicaps(
         logger.info(
             f"Player: {player}, Rank: {rank}, Current Handicap: {current_handicap}, Adjustment: {adjustment}, New Handicap: {new_handicap}"
         )
-        new_handicaps[player] = round(new_handicap, 2)
+        capped_new_handicap = max(
+            min(new_handicap, league_settings.max_handicap_multiplier),
+            league_settings.min_handicap_multiplier,
+        )
+        new_handicaps[player] = round(capped_new_handicap, 2)
 
-    # Find the minimum among players who participated
-    if new_handicaps:
-        min_new_handicap = min(new_handicaps.values())
-    else:
-        min_new_handicap = 0.0
-
-    # Add unchanged handicaps for players not in the recent league BEFORE normalization
-    # to find the global minimum
     for player, handicap in current_handicaps.items():
         if player not in new_handicaps:
             new_handicaps[player] = handicap
-            min_new_handicap = min(min_new_handicap, handicap)
-
-    normalization_adjustment = min_new_handicap * -1
-
-    # Only normalize players who participated in the league
-    for player in player_ranks.keys():
-        logger.info(
-            f"Normalizing Player: {player}, Pre-Normalization Handicap: {new_handicaps[player]}, Adjustment: {normalization_adjustment}"
-        )
-        new_handicaps[player] = round(
-            new_handicaps[player] + normalization_adjustment, 2
-        )
-        if new_handicaps[player] > league_settings.max_handicap_multiplier:
-            logger.info(
-                f"Capping Player: {player}, Handicap before cap: {new_handicaps[player]}"
-            )
-            new_handicaps[player] = league_settings.max_handicap_multiplier
 
     return new_handicaps
 
