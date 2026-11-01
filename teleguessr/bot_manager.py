@@ -989,7 +989,6 @@ class BotManager:
             "/guesses - Show current round guesses and rankings\n"
             "/exposure - Show the bookmaker's position"
             "/scoresneeded - Show the gross scores needed by each remaining player in the round\n"
-            "/outcomes - Show all betting outcomes"
             "/records - Show all-time records\n"
             "/help - Show this help message\n\n"
         )
@@ -1134,30 +1133,6 @@ class BotManager:
         )
         await update.message.reply_text(
             guesses_message,
-            parse_mode="HTML",
-        )
-
-    @command_handler(league_in_progress=True)
-    async def outcomes_handler(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        odds = self.bet_manager.get_latest_odds(
-            league_round=self.league_state.current_round_num
-        )
-        if not odds:
-            await update.message.reply_text(
-                "Odds have not been generated yet for this round. Please check back soon!",
-            )
-            return
-
-        outcomes = {
-            player: self.bet_manager.compute_bet_pnls(winner=player) for player in odds
-        }
-
-        bet_outcomes_message = formatters.format_outcomes_message(odds, outcomes)
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=bet_outcomes_message,
             parse_mode="HTML",
         )
 

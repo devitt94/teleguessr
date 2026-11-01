@@ -262,19 +262,6 @@ def format_signed_amount(amount: float) -> str:
         return "€0.00"
 
 
-def format_outcomes_message(
-    all_odds: dict[str, FractionalOdds], outcomes_by_winner: dict[str, dict[str, float]]
-) -> str:
-    bet_outcomes_message = "📊 Bet Outcomes:\n\n"
-    for player, current_odds in all_odds.items():
-        bet_outcomes_message += f"{player}: (current odds: {current_odds.formatted})\n"
-        for bettor, pnl in outcomes_by_winner[player].items():
-            bet_outcomes_message += f"    - {bettor}: {format_signed_amount(pnl)}\n"
-        bet_outcomes_message += "\n"
-
-    return bet_outcomes_message
-
-
 def format_odds_message(
     back_odds: dict[str, FractionalOdds],
     market_type: MarketType = MarketType.WINNER,
