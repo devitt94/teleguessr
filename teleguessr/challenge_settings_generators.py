@@ -14,7 +14,6 @@ CAPITALS_OF_THE_WORLD_MAP_ID = "60de2a8a81b92c00015f29e1"
 GEODETECTIVE_MAP_ID = "5d374dc141d2a43c1cd4527b"
 VARIED_WORLD_MAP_ID = "64ce812adc7614680516ff8c"
 DRONE_WORLD_MAP_ID = "5ffdf324d32ba4000169ff6e"
-ABANDONED_PLACES_MAP_ID = "5e8cafac2ad6cf626cd89384"
 UNESCO_WORLD_HERITAGE_SITES_MAP_ID = "5ad0b0cb2a3e0d4da46cc44c"
 DIVERSE_COMPLETE_WORLD_MAP_ID = "5ff7033214a99c00012fe738"
 
@@ -56,7 +55,6 @@ def mixed_challenge_settings_generator(round_number: int) -> ChallengeSettings:
                 GEODETECTIVE_MAP_ID,
                 VARIED_WORLD_MAP_ID,
                 DRONE_WORLD_MAP_ID,
-                ABANDONED_PLACES_MAP_ID,
                 UNESCO_WORLD_HERITAGE_SITES_MAP_ID,
                 DIVERSE_COMPLETE_WORLD_MAP_ID,
             ]
