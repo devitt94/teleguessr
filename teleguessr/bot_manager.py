@@ -1629,3 +1629,11 @@ class BotManager:
 
         message = f"<b>Live leaderboard ({rounds_completed}/{n_rounds_total} played)</b>\n\n{live_leaderboard_message}"
         await update.message.reply_text(message, parse_mode="HTML")
+
+    @command_handler(league_in_progress=True, round_in_progress=True, admin=True)
+    async def remind_handler(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ):
+        await self.__reminder(context=context, chat_id=update.effective_chat.id)

@@ -361,13 +361,13 @@ def format_rank_scores(rank_scores: list[int]) -> str:
 def format_reminder_message(
     players_pending: Iterable[tuple[str, int]], time_left_str: str
 ) -> str:
-    pending_list = "</li><li>".join(
-        f'<a href="tg://user?id={telegram_id}">{html.escape(player)}</a>'
+    pending_list = "\n".join(
+        f'• <a href="tg://user?id={telegram_id}">{html.escape(player)}</a>'
         for player, telegram_id in players_pending
     )
 
-    message = (
-        f"⏰ Reminder: Round will end in {time_left_str}.<br>"
-        f"The following players have not completed this round yet:<br><ul><li>{pending_list}</li></ul>"
+    return (
+        f"⏰ Reminder: Round will end in {html.escape(time_left_str)}.\n"
+        f"The following players have not completed this round yet:\n"
+        f"{pending_list}"
     )
-    return message
