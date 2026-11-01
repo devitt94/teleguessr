@@ -1331,8 +1331,8 @@ class BotManager:
             return
 
         keyboard = [
-            [InlineKeyboardButton(f"{player} ({odd.formatted})", callback_data=player)]
-            for player, odd in odds.items()
+            [InlineKeyboardButton(f"{player}", callback_data=player)]
+            for player in self.active_handicaps.keys()
         ]
         keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel")])
         await update.message.reply_text(
