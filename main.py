@@ -5,6 +5,7 @@ import datetime
 from enum import Enum
 import json
 
+import httpx
 from loguru import logger
 
 from teleguessr import formatters
@@ -156,7 +157,13 @@ def main(test_mode: bool = False):
         write_timeout=30,
         connect_timeout=10,
         pool_timeout=10,
-        connection_pool_size=1,
+        httpx_kwargs={
+            "limits": httpx.Limits(
+                max_connections=1,
+                max_keepalive_connections=1,
+                keepalive_expiry=5,  # seconds
+            )
+        },
     )
 
     app = (
