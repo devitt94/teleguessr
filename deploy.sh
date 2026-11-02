@@ -1,0 +1,1 @@
+ssh rory@rory-Kratos 'cd ~/src/teleguessr && git stash && git checkout master && git pull && sudo systemctl restart teleguessr && echo "Deployed successfully!"'
