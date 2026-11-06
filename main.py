@@ -441,6 +441,23 @@ def predictions(
     print("\n\n")
     print(formatters.format_odds_message(back_odds))
 
+    print("Predicted wooden spoon odds:")
+    print(json.dumps(dict(zip(preds["player"], preds["back_ws_odds"])), indent=4))
+    print("\n\n")
+    print("Predicted lay wooden spoon  odds:")
+    print(json.dumps(dict(zip(preds["player"], preds["lay_ws_odds"])), indent=4))
+    print("\n\n")
+    print(formatters.format_odds_message(back_odds))
+
+    print("Predicted podium odds:")
+    print(json.dumps(dict(zip(preds["player"], preds["back_podium_odds"])), indent=4))
+    print("\n\n")
+    print("Predicted lay podium  odds:")
+    print(json.dumps(dict(zip(preds["player"], preds["lay_podium_odds"])), indent=4))
+    print("\n\n")
+    print(formatters.format_odds_message(back_odds))
+    print()
+
 
 if __name__ == "__main__":
     app()

@@ -13,6 +13,7 @@ import dotenv
 from teleguessr.models import ChallengeResult
 from teleguessr.settings import get_settings
 from teleguessr.handicaps import get_latest_handicaps
+from teleguessr.models import EFFECTIVE_HANDICAP_MULTIPLIER
 import polars as pl
 
 
@@ -208,11 +209,14 @@ async def round_analysis(
 def gross_score_needed(
     handicap: float, net_score_to_beat: float, max_score: float = 50_000
 ):
-    max_adjustment = max_score * handicap // 2
+    effective_handicap = handicap * EFFECTIVE_HANDICAP_MULTIPLIER
+    max_adjustment = max_score * effective_handicap // 2
     if (max_score // 2) + max_adjustment > net_score_to_beat:
         return net_score_to_beat - max_adjustment
     else:
-        return (net_score_to_beat - (max_score * handicap)) / (1 - handicap)
+        return (net_score_to_beat - (max_score * effective_handicap)) / (
+            1 - effective_handicap
+        )
 
 
 def all_gross_scores_needed(
