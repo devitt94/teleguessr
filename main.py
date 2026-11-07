@@ -8,14 +8,12 @@ import json
 import httpx
 from loguru import logger
 
-from teleguessr import formatters
 from teleguessr.active_players import PlayerManager
 from teleguessr.formatters import format_leaderboard_html
 from teleguessr.geoguessr_scraper import GeoguessrClient
 from teleguessr.other_handlers.gross_handler import build_gross_stats_handler
 from teleguessr.handicaps import calculate_new_handicaps, get_latest_handicaps
 from teleguessr.league import get_last_finished_league_date
-from teleguessr.odds import FractionalOdds
 from teleguessr.other_handlers.player_handler import (
     PLAYER_STATS_CALLBACK_PREFIX,
     build_player_callback_handler,
@@ -423,23 +421,12 @@ def predictions(
         )
     )
     print("\n\n")
-    back_odds = dict(
-        zip(
-            preds["player"],
-            (
-                FractionalOdds.from_str(odds)
-                for odds in preds["back_win_odds"]
-                if odds is not None
-            ),
-        )
-    )
     print("Predicted outright odds:")
     print(json.dumps(dict(zip(preds["player"], preds["back_win_odds"])), indent=4))
     print("\n\n")
     print("Predicted lay odds:")
     print(json.dumps(dict(zip(preds["player"], preds["lay_win_odds"])), indent=4))
     print("\n\n")
-    print(formatters.format_odds_message(back_odds))
 
     print("Predicted wooden spoon odds:")
     print(json.dumps(dict(zip(preds["player"], preds["back_ws_odds"])), indent=4))
@@ -447,7 +434,6 @@ def predictions(
     print("Predicted lay wooden spoon  odds:")
     print(json.dumps(dict(zip(preds["player"], preds["lay_ws_odds"])), indent=4))
     print("\n\n")
-    print(formatters.format_odds_message(back_odds))
 
     print("Predicted podium odds:")
     print(json.dumps(dict(zip(preds["player"], preds["back_podium_odds"])), indent=4))
@@ -455,8 +441,6 @@ def predictions(
     print("Predicted lay podium  odds:")
     print(json.dumps(dict(zip(preds["player"], preds["lay_podium_odds"])), indent=4))
     print("\n\n")
-    print(formatters.format_odds_message(back_odds))
-    print()
 
 
 if __name__ == "__main__":
