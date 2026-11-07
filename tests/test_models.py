@@ -35,6 +35,7 @@ from freezegun import freeze_time
         (10, 10, 40_000, -0.05, -500),
         (10, 10, 40_000, -0.5, -5000),
         (10, 10, 20_000, -0.8, -20_000),
+        (10, 1, 0, 0.25, 1250),
     ],
 )
 def test_ChallengeScore_compute_hcap_adjustment(
@@ -49,9 +50,11 @@ def test_ChallengeScore_compute_hcap_adjustment(
         player=player, guesses=guesses, num_rounds=num_rounds
     )
 
-    assert challenge_score.compute_hcap_adjustment() == round(
-        expected_adjustment * EFFECTIVE_HANDICAP_MULTIPLIER
+    expected_adjustment = round(expected_adjustment * EFFECTIVE_HANDICAP_MULTIPLIER)
+    actual_adjustment = challenge_score.compute_hcap_adjustment(
+        rounds_to_count=num_guesses
     )
+    assert expected_adjustment == actual_adjustment
 
 
 @pytest.mark.parametrize(

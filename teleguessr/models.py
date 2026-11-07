@@ -83,9 +83,9 @@ class ChallengeScore(BaseModel):
 
     def compute_uncapped_hcap_adjustment(self, num_rounds: int) -> int:
         max_challenge_score = MAX_ROUND_SCORE * num_rounds
+        gross_score = self.compute_partial_gross_score(num_rounds)
         return int(
-            self.player.effective_hcap_multiplier
-            * (max_challenge_score - self.gross_score)
+            self.player.effective_hcap_multiplier * (max_challenge_score - gross_score)
         )
 
     def compute_hcap_adjustment(self, rounds_to_count: int | None = None) -> int:
