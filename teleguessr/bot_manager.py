@@ -227,10 +227,15 @@ class BotManager:
                 position = self.bet_manager.compute_position(
                     bettor=player_name, market_type=market_type
                 )
-                if all(pos == 0.0 for pos in position.values()):
+                if all(pos == 0.0 or pos == (0.0, 0.0) for pos in position.values()):
                     continue
 
-            position_message += f"\nMarket: {market_type}\n"
+            position_message += f"\nMarket: {market_type}"
+            if market_type.is_multi_winner():
+                position_message += " (yes/no)\n"
+            else:
+                position_message += "\n"
+
             latest_odds = self.bet_manager.get_latest_odds(
                 self.league_state.current_round_num,
                 market_type=market_type,
@@ -239,12 +244,14 @@ class BotManager:
                 position.items(), key=lambda x: x[1], reverse=True
             ):
                 total_equity += self.bet_manager.compute_equity(
-                    runner, position, latest_odds.get(runner)
+                    position, latest_odds.get(runner)
                 )
-
-                position_message += (
-                    f"- {runner}: {formatters.format_signed_amount(position)}\n"
-                )
+                if market_type.is_multi_winner():
+                    position_message += f"- {runner}: {formatters.format_signed_amount(position[0])} / {formatters.format_signed_amount(position[1])}\n"
+                else:
+                    position_message += (
+                        f"- {runner}: {formatters.format_signed_amount(position)}\n"
+                    )
 
         position_message += f"\nEstimated cash out (adjusted for odds): {formatters.format_signed_amount(total_equity)}"
 

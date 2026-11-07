@@ -195,6 +195,10 @@ class MarketType(StrEnum):
     WOODEN_SPOON = "WOODEN_SPOON"
     PODIUM = "PODIUM"
 
+    def is_multi_winner(self) -> bool:
+        """Check if the market type involves multiple winners."""
+        return self == MarketType.PODIUM
+
 
 class BetType(StrEnum):
     BACK = "BACK"

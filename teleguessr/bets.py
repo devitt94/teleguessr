@@ -126,7 +126,7 @@ class BetManager:
 
     def get_current_position(
         self, bettor: str, runner: str, market_type: MarketType = MarketType.WINNER
-    ) -> float:
+    ) -> float | tuple[float, float]:
         bets = self.get_all_bets(market_type=market_type)
         position = 0.0
         relevant_bets = [
@@ -134,6 +134,19 @@ class BetManager:
             for bet in bets
             if bet.bettor == bettor and bet.market_type == market_type
         ]
+        if market_type.is_multi_winner():
+            relevant_bets = [bet for bet in relevant_bets if bet.runner == runner]
+            pos_win, pos_lose = 0.0, 0.0
+            for bet in relevant_bets:
+                if bet.bet_type == BetType.LAY:
+                    pos_lose += bet.potential_profit
+                    pos_win -= bet.stake
+                else:
+                    pos_win += bet.potential_profit
+                    pos_lose -= bet.stake
+
+            return pos_win, pos_lose
+
         for bet in relevant_bets:
             if (bet.runner == runner) ^ (bet.bet_type == BetType.BACK):
                 position -= bet.stake
@@ -272,26 +285,25 @@ class BetManager:
 
     def compute_position(
         self, bettor: str, market_type: MarketType = MarketType.WINNER
-    ) -> dict[str, float]:
+    ) -> dict[str, float | tuple[float, float]]:
         position = {}
         for runner in self.all_runners:
             position[runner] = self.get_current_position(bettor, runner, market_type)
         return position
 
     def compute_equity(
-        self, runner: str, net_position: float, odds: FractionalOdds | None
+        self, net_position: float | tuple[float, float], odds: FractionalOdds | None
     ) -> float:
-        min_prob, max_prob = 0.00001, 0.99999
         if odds is None:
-            adjusted_probability = min_prob
+            adjusted_probability = 0.00001
         else:
-            adjusted_probability = (
-                odds.implied_probability - 0.02
-                if net_position > 0
-                else odds.implied_probability + 0.02
+            adjusted_probability = odds.implied_probability
+        if isinstance(net_position, tuple):
+            return net_position[0] * adjusted_probability + net_position[1] * (
+                1 - adjusted_probability
             )
-            adjusted_probability = max(min_prob, min(max_prob, adjusted_probability))
-        return net_position * adjusted_probability
+        else:
+            return net_position * adjusted_probability
 
     def compute_max_stake(
         self,
@@ -340,32 +352,49 @@ class BetManager:
                 else:
                     return (-200.0, 50.0)
 
-        max_stake = float("inf")
         decimal_odds = odds.decimal
 
-        for runner in self.all_runners:
-            pos = current_bettor_position.get(runner, 0.0)
-            lower, upper = position_bounds(runner)
+        if market_type.is_multi_winner():
+            # Multi-winner market: treated as independent per-runner, even though strictly speaking the outcomes are not independent.
+            lower, upper = position_bounds(selected_runner)
+            pos_win, pos_lose = current_bettor_position.get(selected_runner, (0.0, 0.0))
+            if bet_type == BetType.BACK:
+                # Winning outcome: profit increases by S * (odds - 1)
+                allowed = (upper - pos_win) / (decimal_odds - 1)
+            else:  # LAY
+                # Winning outcome: position decreases by S
+                allowed = pos_lose - lower
 
-            if runner == selected_runner:
-                if bet_type == BetType.BACK:
-                    # Winning outcome: profit increases by S * (odds - 1)
-                    allowed = (upper - pos) / (decimal_odds - 1)
-                else:  # LAY
-                    # Winning outcome: position decreases by S
-                    allowed = pos - lower
-            else:
-                if bet_type == BetType.BACK:
-                    # Any other runner winning: position decreases by S (stake lost)
-                    allowed = pos - lower
-                else:  # LAY
-                    # Any other runner winning: position increases by S * (odds - 1)
-                    allowed = (upper - pos) * (decimal_odds - 1)
-
+            max_stake = allowed
             logger.info(
-                f"Computed position bounds for {bettor=} {runner=} {pos=} {lower=} {upper=} {allowed=}"
+                f"Computed position bounds for {bettor=} {market_type=} {selected_runner=} {pos_win=} {pos_lose=} {lower=} {upper=} {allowed=}"
             )
-            max_stake = min(max_stake, allowed)
+        else:
+            max_stake = float("inf")
+            for runner in self.all_runners:
+                pos = current_bettor_position.get(runner, 0.0)
+
+                lower, upper = position_bounds(runner)
+
+                if runner == selected_runner:
+                    if bet_type == BetType.BACK:
+                        # Winning outcome: profit increases by S * (odds - 1)
+                        allowed = (upper - pos) / (decimal_odds - 1)
+                    else:  # LAY
+                        # Winning outcome: position decreases by S
+                        allowed = pos - lower
+                else:
+                    if bet_type == BetType.BACK:
+                        # Any other runner winning: position decreases by S (stake lost)
+                        allowed = pos - lower
+                    else:  # LAY
+                        # Any other runner winning: position increases by S * (odds - 1)
+                        allowed = (upper - pos) * (decimal_odds - 1)
+
+                logger.info(
+                    f"Computed position bounds for {bettor=} {runner=} {pos=} {lower=} {upper=} {allowed=}"
+                )
+                max_stake = min(max_stake, allowed)
 
         return round(max(0.0, max_stake), 2)
 
