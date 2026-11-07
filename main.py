@@ -27,6 +27,7 @@ from teleguessr.bot_manager import (
     BET_SELECT_BET_TYPE,
     BET_SELECT_MARKET,
     BET_SELECT_PLAYER,
+    POSITION_SELECT_PLAYER,
     OPT_IN_CALLBACK,
     BotManager,
 )
@@ -147,6 +148,15 @@ def main(test_mode: bool = False):
         fallbacks=[CommandHandler("cancel", bot_manager.cancel_bet)],
     )
 
+    position_handler = ConversationHandler(
+        entry_points=[CommandHandler("position", bot_manager.position_handler)],
+        states={
+            POSITION_SELECT_PLAYER: [
+                CallbackQueryHandler(bot_manager.handle_position_player_selection),
+            ],
+        },
+        fallbacks=[],
+    )
     request = HTTPXRequest(
         read_timeout=30, write_timeout=30, connect_timeout=10, pool_timeout=10
     )
@@ -180,7 +190,6 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("status", bot_manager.status_handler))
     app.add_handler(CommandHandler("lounge", bot_manager.lounge_handler))
     app.add_handler(CommandHandler("odds", bot_manager.odds_handler))
-    app.add_handler(CommandHandler("position", bot_manager.position_handler))
     app.add_handler(CommandHandler("exposure", bot_manager.exposure_handler))
     app.add_handler(CommandHandler("guesses", bot_manager.guesses_handler))
     app.add_handler(CommandHandler("records", bot_manager.records_handler))
@@ -208,6 +217,7 @@ def main(test_mode: bool = False):
         )
     )
     app.add_handler(bet_handler)
+    app.add_handler(position_handler)
     app.add_error_handler(bot_manager.error_handler)
     logger.info("Bot running...")
 

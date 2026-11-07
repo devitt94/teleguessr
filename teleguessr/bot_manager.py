@@ -56,6 +56,7 @@ from telegram.ext import ContextTypes
 
 
 BET_SELECT_MARKET, BET_SELECT_PLAYER, BET_SELECT_BET_TYPE, BET_SELECT_AMOUNT = range(4)
+POSITION_SELECT_PLAYER = range(10)
 
 OPT_IN_CALLBACK = "optin_next_league"
 
@@ -215,7 +216,7 @@ class BotManager:
         if is_bookmaker:
             position_message = "📈 DevBet's exposure\n"
         else:
-            position_message = "📈 Your current betting position\n"
+            position_message = f"📈 {player_name}'s current betting position\n"
 
         total_equity = 0.0
 
@@ -1183,13 +1184,36 @@ class BotManager:
             )
             return
 
+        keyboard = [
+            [InlineKeyboardButton(f"{player}", callback_data=player)]
+            for player in self.active_handicaps.keys()
+        ]
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel")])
+        await update.message.reply_text(
+            "Whose position would you like to check?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return POSITION_SELECT_PLAYER
+
+    async def handle_position_player_selection(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        query = update.callback_query
+        await query.answer()
+        player_name = query.data
+
+        if player_name == "cancel":
+            await query.edit_message_text("Position check cancelled.")
+            return ConversationHandler.END
+
         position_message = self.__construct_position_message(
             player_name=player_name,
         )
-        await update.message.reply_text(
+        await query.edit_message_text(
             position_message,
             parse_mode="HTML",
         )
+        return ConversationHandler.END
 
     @command_handler(league_in_progress=True, round_in_progress=True)
     async def lounge_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1320,13 +1344,6 @@ class BotManager:
         if player_id != self.admin_id and players_played.get(player_name) is not None:
             await update.message.reply_text(
                 "You have already started this round, so you cannot place bets. Please wait for the next round to start."
-            )
-            return
-
-        odds = self.bet_manager.get_latest_odds(self.league_state.current_round_num)
-        if not odds:
-            await update.message.reply_text(
-                "Betting is not currently available for this round. Please try again later."
             )
             return
 
