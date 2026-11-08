@@ -12,6 +12,8 @@ M = 20015  # km
 
 # --- Model ---
 
+DEFAULT_PLAYER_MU_SIGMA = (8.12, 2.8)
+
 
 def neg_log_likelihood(
     params: np.ndarray,
@@ -149,4 +151,19 @@ def fit_all_players(
         if fit is not None:
             results[player[0]] = fit
 
+    unfitted_players = set(adjustments.keys()) - set(results.keys())
+    for player in unfitted_players:
+        mu_hat, sigma_hat = DEFAULT_PLAYER_MU_SIGMA
+        logger.warning(
+            f"Player {player} was not fitted. Using defaults {mu_hat=} {sigma_hat=}"
+        )
+        results[player] = FitResult(
+            player=player,
+            mu=mu_hat,
+            sigma=sigma_hat,
+            n_rounds=0,
+            converged=False,
+            mean_km=np.nan,
+            median_km=np.nan,
+        )
     return results
