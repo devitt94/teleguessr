@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date
+import itertools
 from pathlib import Path
 
 from teleguessr.models import Bet, BetType, MarketType
@@ -266,21 +267,29 @@ class BetManager:
 
         return dict(pnls)
 
-    def compute_bookmaker_exposure(self, market_type: MarketType) -> dict[str, float]:
+    def compute_bookmaker_exposure(
+        self, market_type: MarketType
+    ) -> dict[str, float | tuple[float, float]]:
         bets = self.get_all_bets(market_type=market_type)
-        exposure = {runner: 0.0 for runner in self.all_runners}
-        for bet in bets:
-            for runner in self.all_runners:
-                if bet.runner == runner:
-                    if bet.bet_type == BetType.BACK:
-                        exposure[runner] -= bet.potential_profit
-                    else:
-                        exposure[runner] += bet.stake
+        if market_type.is_multi_winner():
+            exposure = defaultdict(lambda: (0.0, 0.0))
+            for bet in bets:
+                runner_win_pos, runner_lose_pos = exposure[bet.runner]
+                if bet.bet_type == BetType.LAY:
+                    runner_win_pos += bet.stake
+                    runner_lose_pos -= bet.potential_profit
                 else:
-                    if bet.bet_type == BetType.BACK:
-                        exposure[runner] += bet.stake
-                    else:
-                        exposure[runner] -= bet.potential_profit
+                    runner_win_pos -= bet.potential_profit
+                    runner_lose_pos += bet.stake
+                exposure[bet.runner] = (runner_win_pos, runner_lose_pos)
+
+        else:
+            exposure = {runner: 0.0 for runner in self.all_runners}
+            for bet, runner in itertools.product(bets, self.all_runners):
+                if (bet.runner == runner) ^ (bet.bet_type == BetType.LAY):
+                    exposure[runner] -= bet.potential_profit
+                else:
+                    exposure[runner] += bet.stake
         return dict(exposure)
 
     def compute_position(
