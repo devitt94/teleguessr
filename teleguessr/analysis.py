@@ -78,6 +78,7 @@ NAME_CHANGES = {
     "Boothd": "Boothlandia",
     "Danminican Republic": "Danquador Junta State",
     "Commissioner Perez": "Ashghanistani Dem Rep Mikistan",
+    "Barry": "Bazbekistan",
 }
 
 
