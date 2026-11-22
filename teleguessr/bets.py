@@ -345,21 +345,21 @@ class BetManager:
 
         def position_bounds(runner: str) -> tuple[float, float]:
             if not bettor_is_active:
-                return (-200.0, 150.0)
+                return (-200.0, 200.0)
             if runner == bettor:
                 if market_type == MarketType.WOODEN_SPOON:
-                    return (-60.0, 0.0)
+                    return (-120.0, 0.0)
                 elif market_type == MarketType.PODIUM:
-                    return (0.0, 75.0)
+                    return (0.0, 150.0)
                 else:
                     return (0.0, 150.0)
             else:
                 if market_type == MarketType.WOODEN_SPOON:
-                    return (-15.0, 60.0)
+                    return (-30.0, 120.0)
                 elif market_type == MarketType.PODIUM:
-                    return (-60.0, 15.0)
+                    return (-120.0, 30.0)
                 else:
-                    return (-200.0, 50.0)
+                    return (-200.0, 100.0)
 
         decimal_odds = odds.decimal
 
