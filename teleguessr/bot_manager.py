@@ -70,6 +70,9 @@ def command_handler(
     admin: bool = False,
     league_in_progress: bool | None = None,
     round_in_progress: bool = False,
+    allowed_in_lounge: bool = True,
+    allowed_in_main_chat: bool = True,
+    allowed_in_dm: bool = True,
 ) -> Callable[[HandlerFunc], HandlerFunc]:
     """A decorator for command handlers to validate the application state before executing the command."""
 
@@ -107,6 +110,21 @@ def command_handler(
             ):
                 await update.message.reply_text("No round currently in progress.")
                 return
+
+            if not (allowed_in_dm or allowed_in_lounge or allowed_in_main_chat):
+                player_id = update.effective_user.id
+                chat_id = update.effective_chat.id
+                if allowed_in_dm and chat_id == player_id:
+                    pass
+                elif allowed_in_lounge and chat_id == self.players_lounge_group_id:
+                    pass
+                elif allowed_in_main_chat and chat_id == self.league_state.chat_id:
+                    pass
+                else:
+                    await update.message.reply_text(
+                        "This command is not available in this chat."
+                    )
+                    return
 
             return await func(self, update, context)
 
@@ -1073,7 +1091,7 @@ class BotManager:
 
         await self.__status_update(context, chat_id, round_result)
 
-    @command_handler(admin=True, league_in_progress=False)
+    @command_handler(admin=True, league_in_progress=False, allowed_in_lounge=False)
     async def start_league_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -1119,20 +1137,22 @@ class BotManager:
     ):
         await self.__show_leaderboard(context, chat_id=update.effective_chat.id)
 
-    @command_handler(admin=True, league_in_progress=True, round_in_progress=True)
+    @command_handler(
+        admin=True,
+        league_in_progress=True,
+        round_in_progress=True,
+        allowed_in_lounge=False,
+        allowed_in_dm=False,
+    )
     async def end_round_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         await self.__end_round(context, update.effective_chat.id)
 
-    @command_handler(league_in_progress=True, round_in_progress=True)
+    @command_handler(
+        league_in_progress=True, round_in_progress=True, allowed_in_main_chat=False
+    )
     async def guesses_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_chat.id == self.league_state.chat_id:
-            await update.message.reply_text(
-                "Guesses are only visible in private chat or Players' Lounge. Please DM me with /guesses to see the current round guesses and rankings.",
-            )
-            return
-
         ranked_guesses = await self.__get_ranked_guesses()
 
         guesses_message = formatters.format_ranked_guesses(ranked_guesses)
@@ -1222,7 +1242,12 @@ class BotManager:
         )
         return ConversationHandler.END
 
-    @command_handler(league_in_progress=True, round_in_progress=True)
+    @command_handler(
+        league_in_progress=True,
+        round_in_progress=True,
+        allowed_in_lounge=False,
+        allowed_in_main_chat=False,
+    )
     async def lounge_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
 
@@ -1272,7 +1297,9 @@ class BotManager:
 
         await update.message.reply_text(message)
 
-    @command_handler(league_in_progress=True, round_in_progress=True)
+    @command_handler(
+        league_in_progress=True, round_in_progress=True, allowed_in_main_chat=False
+    )
     async def gross_scores_needed_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -1322,17 +1349,14 @@ class BotManager:
             parse_mode="HTML",
         )
 
-    @command_handler(league_in_progress=True, round_in_progress=True)
+    @command_handler(
+        league_in_progress=True,
+        round_in_progress=True,
+        allowed_in_main_chat=False,
+        allowed_in_lounge=False,
+    )
     async def start_bet(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         player_id = update.effective_user.id
-
-        chat_id = update.effective_chat.id
-        if chat_id != player_id:
-            await update.message.reply_text(
-                "Please place bets in a private chat with the bot to avoid interference."
-            )
-            return
-
         player_name = TELEGRAM_ID_TO_PLAYER_NAME.get(player_id)
 
         if player_name is None:
@@ -1603,7 +1627,9 @@ class BotManager:
         msg = formatters.format_rank_scores(rank_scores)
         await update.message.reply_text(msg, parse_mode="HTML")
 
-    @command_handler(league_in_progress=True, round_in_progress=True)
+    @command_handler(
+        league_in_progress=True, round_in_progress=True, allowed_in_main_chat=False
+    )
     async def live_scoring_handler(
         self,
         update: Update,
@@ -1661,3 +1687,27 @@ class BotManager:
         context: ContextTypes.DEFAULT_TYPE,
     ):
         await self.__reminder(context=context, chat_id=update.effective_chat.id)
+
+    @command_handler(
+        league_in_progress=True,
+        round_in_progress=True,
+        allowed_in_main_chat=False,
+        allowed_in_lounge=False,
+    )
+    async def practice_handler(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ):
+        challenge_settings = self.challenge_settings_generator(
+            self.league_state.current_round_num
+        )
+        challenge_url = await self.geoguessr_client.create_challenge(
+            challenge_settings=challenge_settings
+        )
+
+        await update.message.reply_text(
+            f"Practice round created: {challenge_url}\n"
+            f"Format:\n{formatters.format_challenge_settings(challenge_settings)}",
+            parse_mode="HTML",
+        )

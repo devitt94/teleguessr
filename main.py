@@ -112,6 +112,10 @@ async def post_init(application: Application) -> None:
             "scoresneeded",
             "Display the gross scores the remaining players would need to rank.",
         ),
+        (
+            "practice",
+            "Start a practice round with the same settings as the current round.",
+        ),
     ]
 
     await application.bot.set_my_commands(commands)
@@ -196,6 +200,7 @@ def main(test_mode: bool = False):
     app.add_handler(CommandHandler("rankscores", bot_manager.rank_scores_handler))
     app.add_handler(CommandHandler("livescores", bot_manager.live_scoring_handler))
     app.add_handler(CommandHandler("reminder", bot_manager.remind_handler))
+    app.add_handler(CommandHandler("practice", bot_manager.practice_handler))
     app.add_handler(
         CommandHandler("scoresneeded", bot_manager.gross_scores_needed_handler)
     )
